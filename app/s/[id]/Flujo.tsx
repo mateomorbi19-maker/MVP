@@ -9,7 +9,7 @@ type Respuestas = Record<string, unknown>
 /** Motivo por el que no se pudo obtener la ubicación, para poder explicar qué hacer. */
 type FalloGps = {
   codigo: number
-  motivo: 'denegado' | 'no_disponible' | 'demora' | 'no_soportado' | 'servidor'
+  motivo: 'denegado' | 'no_disponible' | 'demora' | 'no_soportado' | 'servidor' | 'sin_respuesta'
   detalle?: string
 } | null
 type Media = { id: string; tipo: string; guia_id: string | null }
@@ -80,8 +80,30 @@ export function Flujo(props: Props) {
     setEstadoGps('pidiendo')
     setFalloGps(null)
 
+    /*
+     * Vigilante propio.
+     *
+     * En iOS hay un defecto conocido: con la aplicación instalada en la pantalla de
+     * inicio, a veces el cartel de permiso no aparece y getCurrentPosition no llama
+     * a NINGUNA de las dos funciones, ni siquiera a la de tiempo agotado. Sin esto,
+     * la pantalla se quedaría colgada en "Registrando la ubicación..." para siempre,
+     * que es lo último que querés parado al lado de un auto chocado.
+     */
+    let resuelto = false
+    let vigilante: ReturnType<typeof setTimeout> | undefined
+    const marcarResuelto = () => {
+      resuelto = true
+      if (vigilante) clearTimeout(vigilante)
+    }
+    vigilante = setTimeout(() => {
+      if (resuelto) return
+      setEstadoGps('error')
+      setFalloGps({ codigo: -2, motivo: 'sin_respuesta' })
+    }, 25000)
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        marcarResuelto()
         try {
           const res = await fetch(`/api/casos/${props.casoId}/ubicacion`, {
             method: 'POST',
@@ -102,6 +124,7 @@ export function Flujo(props: Props) {
         }
       },
       (err) => {
+        marcarResuelto()
         setEstadoGps('error')
         setFalloGps({
           codigo: err.code,
@@ -293,9 +316,14 @@ export function Flujo(props: Props) {
 /** Instrucción concreta según por qué falló, para que se pueda resolver en el momento. */
 const GUIA_FALLO: Record<string, { titulo: string; comoResolver: string }> = {
   denegado: {
-    titulo: 'El navegador tiene bloqueado el acceso a la ubicación',
+    titulo: 'El acceso a la ubicación está bloqueado',
     comoResolver:
-      'Tocá el candado (o el ícono de ajustes) a la izquierda de la dirección web, habilitá "Ubicación" y volvé a intentar. Si estás en iPhone, revisá además Ajustes › Privacidad › Localización › Safari.',
+      'En Android: tocá el candado a la izquierda de la dirección web y habilitá "Ubicación". En iPhone: entrá a Ajustes › Safari › Ajustes para sitios web › Ubicación y ponelo en "Permitir"; revisá además que Ajustes › Privacidad › Localización esté activado para Safari. Después volvé acá y reintentá.',
+  },
+  sin_respuesta: {
+    titulo: 'El teléfono no respondió al pedido de ubicación',
+    comoResolver:
+      'Es un problema conocido de iPhone cuando la aplicación está instalada en la pantalla de inicio: el cartel de permiso a veces aparece en Safari en vez de acá. Abrí Safari, entrá a este mismo sitio, aceptá el permiso de ubicación, y después volvé a la aplicación y reintentá.',
   },
   no_disponible: {
     titulo: 'El dispositivo no pudo determinar dónde está',
