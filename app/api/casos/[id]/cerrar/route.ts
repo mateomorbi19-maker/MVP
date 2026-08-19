@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { registrarEvento, construirManifiesto } from '@/lib/hash'
 import { obtenerCaso, calcularConsistencia } from '@/lib/casos'
@@ -63,7 +64,6 @@ export async function POST(_req: Request, { params }: Ctx) {
       consistencia: consistencia?.resumen ?? null,
     })
   } catch (err) {
-    console.error('[cerrar:POST]', err)
-    return NextResponse.json({ error: 'No se pudo cerrar la actuación.' }, { status: 500 })
+    return errorApi('cerrar:POST', err, 'No se pudo cerrar la actuación.')
   }
 }

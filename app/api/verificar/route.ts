@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { verificarCadena, construirManifiesto } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
 
@@ -72,7 +73,6 @@ export async function POST(req: Request) {
       problemas,
     })
   } catch (err) {
-    console.error('[verificar:POST]', err)
-    return NextResponse.json({ error: 'No se pudo completar la verificación.' }, { status: 500 })
+    return errorApi('verificar:POST', err, 'No se pudo completar la verificación.')
   }
 }

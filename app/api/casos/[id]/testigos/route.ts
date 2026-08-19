@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento, sha256, canonico } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
@@ -84,7 +85,6 @@ export async function POST(req: Request, { params }: Ctx) {
 
     return NextResponse.json({ id: testigoId, sha256: huella }, { status: 201 })
   } catch (err) {
-    console.error('[testigos:POST]', err)
-    return NextResponse.json({ error: 'No se pudo registrar el testigo.' }, { status: 500 })
+    return errorApi('testigos:POST', err, 'No se pudo registrar el testigo.')
   }
 }

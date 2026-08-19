@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { datosExpediente } from '@/lib/casos'
 import { generarExpediente } from '@/lib/pdf'
 
@@ -27,7 +28,6 @@ export async function GET(req: Request, { params }: Ctx) {
       },
     })
   } catch (err) {
-    console.error('[pdf:GET]', err)
-    return NextResponse.json({ error: 'No se pudo generar el expediente.' }, { status: 500 })
+    return errorApi('pdf:GET', err, 'No se pudo generar el expediente.')
   }
 }

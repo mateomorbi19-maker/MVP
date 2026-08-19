@@ -2,7 +2,10 @@ node_modules/
 .next/
 data/
 *.log
-.env*.local
+# Secretos: nunca al repositorio
+.env
+.env.*
+!.env.example
 
 # Configuración local de herramientas
 .claude/

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { leerArchivo } from '@/lib/almacenamiento'
 
@@ -25,7 +26,6 @@ export async function GET(_req: Request, { params }: Ctx) {
       },
     })
   } catch (err) {
-    console.error('[media:GET]', err)
-    return NextResponse.json({ error: 'No se pudo leer el archivo.' }, { status: 500 })
+    return errorApi('media:GET', err, 'No se pudo leer el archivo.')
   }
 }

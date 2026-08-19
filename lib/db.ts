@@ -6,12 +6,62 @@ import { Pool } from 'pg'
  */
 const globalForDb = globalThis as unknown as { _pool?: Pool; _schemaLista?: Promise<void> }
 
+/**
+ * Error de configuración o de conexión a la base.
+ *
+ * Se distingue de un fallo cualquiera para poder mostrarle al operador qué tiene que
+ * arreglar, en vez de un "algo salió mal" que no orienta a nadie. El mensaje no expone
+ * credenciales: sólo dice qué falta.
+ */
+export class ErrorBaseDeDatos extends Error {
+  constructor(
+    message: string,
+    readonly causa: 'sin_configurar' | 'inalcanzable' | 'autenticacion' | 'desconocida' = 'desconocida',
+  ) {
+    super(message)
+    this.name = 'ErrorBaseDeDatos'
+  }
+}
+
+/** Traduce los códigos de error de red y de Postgres a algo accionable. */
+export function traducirErrorBase(err: unknown): ErrorBaseDeDatos | null {
+  if (err instanceof ErrorBaseDeDatos) return err
+  const codigo = (err as { code?: string })?.code
+  switch (codigo) {
+    case 'ECONNREFUSED':
+      return new ErrorBaseDeDatos(
+        'No hay ningún Postgres escuchando en la dirección de DATABASE_URL. Verificá que la base esté levantada y que el host y el puerto sean correctos.',
+        'inalcanzable',
+      )
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN':
+      return new ErrorBaseDeDatos(
+        'No se pudo resolver el host de DATABASE_URL. Revisá que el nombre del servidor esté bien escrito.',
+        'inalcanzable',
+      )
+    case 'ETIMEDOUT':
+    case 'ECONNRESET':
+      return new ErrorBaseDeDatos(
+        'La conexión con la base se cortó por tiempo de espera. Si es una base en la nube, puede faltar habilitar TLS: probá con DATABASE_SSL=true.',
+        'inalcanzable',
+      )
+    case '28P01':
+    case '28000':
+      return new ErrorBaseDeDatos('Usuario o contraseña incorrectos en DATABASE_URL.', 'autenticacion')
+    case '3D000':
+      return new ErrorBaseDeDatos('La base indicada en DATABASE_URL no existe.', 'sin_configurar')
+    default:
+      return null
+  }
+}
+
 export function pool(): Pool {
   if (!globalForDb._pool) {
     const connectionString = process.env.DATABASE_URL
     if (!connectionString) {
-      throw new Error(
-        'Falta la variable DATABASE_URL. En local levantá Postgres con "docker compose up -d db" y copiá .env.example a .env',
+      throw new ErrorBaseDeDatos(
+        'Falta la variable DATABASE_URL: no hay ninguna base configurada. En local, copiá .env.example a .env y apuntala a un Postgres. En Easypanel, cargala en las variables de entorno del servicio.',
+        'sin_configurar',
       )
     }
     globalForDb._pool = new Pool({
@@ -112,8 +162,41 @@ export function asegurarEsquema(): Promise<void> {
 }
 
 export async function db() {
-  await asegurarEsquema()
-  return pool()
+  try {
+    await asegurarEsquema()
+    return pool()
+  } catch (err) {
+    const traducido = traducirErrorBase(err)
+    throw traducido ?? err
+  }
+}
+
+/** Comprobación de salud: ¿está la base configurada, alcanzable y con el esquema creado? */
+export async function estadoBase(): Promise<{
+  ok: boolean
+  detalle: string
+  causa?: string
+  version?: string
+  tablas?: number
+}> {
+  try {
+    const pg = await db()
+    const version = await pg.query<{ v: string }>('SELECT version() AS v')
+    const tablas = await pg.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name IN ('casos','eventos','medias','testigos')`,
+    )
+    return {
+      ok: true,
+      detalle: 'Base conectada y esquema creado.',
+      version: version.rows[0]?.v?.split(',')[0] ?? 'desconocida',
+      tablas: Number(tablas.rows[0]?.n ?? 0),
+    }
+  } catch (err) {
+    const traducido = traducirErrorBase(err)
+    if (traducido) return { ok: false, detalle: traducido.message, causa: traducido.causa }
+    return { ok: false, detalle: err instanceof Error ? err.message : 'Error desconocido.', causa: 'desconocida' }
+  }
 }
 
 /** Identificador corto y legible para dictar por teléfono: ADS-7K2M4Q */

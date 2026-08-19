@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso, listarMedias, listarTestigos } from '@/lib/casos'
@@ -60,7 +61,6 @@ export async function PATCH(req: Request, { params }: Ctx) {
 
     return NextResponse.json({ ok: true, respuestas: combinadas })
   } catch (err) {
-    console.error('[caso:PATCH]', err)
-    return NextResponse.json({ error: 'No se pudieron guardar las respuestas.' }, { status: 500 })
+    return errorApi('caso:PATCH', err, 'No se pudieron guardar las respuestas.')
   }
 }

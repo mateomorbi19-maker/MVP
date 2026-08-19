@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
@@ -74,7 +75,6 @@ export async function POST(req: Request, { params }: Ctx) {
 
     return NextResponse.json({ ok: true, gps, direccion, clima })
   } catch (err) {
-    console.error('[ubicacion:POST]', err)
-    return NextResponse.json({ error: 'No se pudo registrar la ubicación.' }, { status: 500 })
+    return errorApi('ubicacion:POST', err, 'No se pudo registrar la ubicación.')
   }
 }

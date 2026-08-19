@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { listarCasos } from '@/lib/casos'
@@ -39,8 +40,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ id }, { status: 201 })
   } catch (err) {
-    console.error('[casos:POST]', err)
-    return NextResponse.json({ error: 'No se pudo crear la actuación.' }, { status: 500 })
+    return errorApi('casos:POST', err, 'No se pudo crear la actuación.')
   }
 }
 
@@ -62,7 +62,6 @@ export async function GET() {
       })),
     )
   } catch (err) {
-    console.error('[casos:GET]', err)
-    return NextResponse.json({ error: 'No se pudo leer el listado.' }, { status: 500 })
+    return errorApi('casos:GET', err, 'No se pudo leer el listado.')
   }
 }

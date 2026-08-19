@@ -68,6 +68,34 @@ npm run dev
 
 Abrir http://localhost:3000
 
+### Si algo no funciona, mirar acá primero
+
+```bash
+curl http://localhost:3000/api/salud
+```
+
+Dice si la base está configurada, alcanzable y con el esquema creado, y muestra qué
+variables de entorno están definidas. El inicio también avisa en pantalla cuando el
+sistema no está operativo, antes de que alguien cargue datos al pedo.
+
+### Con Supabase como base
+
+Copiar la cadena de **Connect → Session pooler** (no "Direct connection": el pooler anda
+sobre IPv4 y soporta las transacciones que el encadenado de hashes necesita) y agregar
+`DATABASE_SSL=true`. Sin eso la conexión se corta por tiempo de espera.
+
+En Supabase conviene además dejar **RLS habilitado sin políticas** en las cuatro tablas:
+la aplicación se conecta como dueña y no lo nota, pero bloquea el acceso vía PostgREST con
+la clave `anon`, que de otro modo dejaría los datos personales del siniestro a la vista de
+cualquiera que tenga esa clave.
+
+```sql
+ALTER TABLE casos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE eventos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE testigos ENABLE ROW LEVEL SECURITY;
+```
+
 > **La cámara y la geolocalización sólo funcionan sobre HTTPS o en `localhost`.** Si probás
 > desde el celular contra la IP de tu máquina, el navegador va a bloquear los permisos.
 > Para probar en un teléfono real, usá el deploy con dominio y certificado.

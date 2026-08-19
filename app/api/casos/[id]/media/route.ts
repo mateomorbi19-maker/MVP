@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
@@ -73,7 +74,6 @@ export async function POST(req: Request, { params }: Ctx) {
     if (err instanceof ErrorArchivo) {
       return NextResponse.json({ error: err.message }, { status: 400 })
     }
-    console.error('[media:POST]', err)
-    return NextResponse.json({ error: 'No se pudo incorporar el archivo.' }, { status: 500 })
+    return errorApi('media:POST', err, 'No se pudo incorporar el archivo.')
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Marca } from './components/Marca'
@@ -10,6 +10,15 @@ export default function Inicio() {
   const [datos, setDatos] = useState({ poliza: '', patente: '', asegurado: '', telefono: '' })
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [salud, setSalud] = useState<{ ok: boolean; detalle: string } | null>(null)
+
+  // Avisa del problema antes de que la persona cargue los datos, no después.
+  useEffect(() => {
+    fetch('/api/salud')
+      .then((r) => r.json())
+      .then((c) => setSalud({ ok: Boolean(c?.ok), detalle: c?.base?.detalle ?? 'Sin detalle.' }))
+      .catch(() => setSalud({ ok: false, detalle: 'No se pudo contactar al servidor.' }))
+  }, [])
 
   async function iniciar() {
     setEnviando(true)
@@ -37,6 +46,16 @@ export default function Inicio() {
   return (
     <main className="envoltura">
       <Marca enlace={false} sub="Registro probatorio de siniestros viales" />
+
+      {salud && !salud.ok ? (
+        <div className="aviso aviso-alerta">
+          <strong>El sistema no está operativo.</strong>
+          <div style={{ marginTop: 6 }}>{salud.detalle}</div>
+          <div style={{ marginTop: 6, fontSize: 13 }}>
+            Diagnóstico completo en <code>/api/salud</code>.
+          </div>
+        </div>
+      ) : null}
 
       <h1>¿Tuviste un accidente?</h1>
       <p className="apagado">
