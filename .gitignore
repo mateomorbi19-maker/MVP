@@ -6,3 +6,5 @@ data/
 
 # Configuración local de herramientas
 .claude/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
