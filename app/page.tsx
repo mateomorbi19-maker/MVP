@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Marca } from './components/Marca'
+import { InstalarApp } from './components/InstalarApp'
 
 export default function Inicio() {
   const router = useRouter()
@@ -90,6 +91,8 @@ export default function Inicio() {
           Si hay heridos, llamá primero al 107. El registro puede esperar.
         </p>
       </div>
+
+      <InstalarApp />
 
       <div className="tarjeta-plana">
         <h3>Antes de empezar</h3>
