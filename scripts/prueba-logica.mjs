@@ -166,6 +166,31 @@ verificar('una declaración coherente no levanta banderas', coherente.resumen.ba
 verificar('una declaración completa no reclama faltantes', !coherente.hallazgos.some((h) => h.titulo.includes('Faltan')))
 verificar('registra controles consistentes', coherente.resumen.controles_ok >= 4, `ok=${coherente.resumen.controles_ok}`)
 
+// Regresión: declarar "Despejado" con cielo nublado no es una contradicción, pero
+// tampoco se puede informar que "coincide". Antes decía que coincidía.
+const nublado = {
+  ...climaLluvioso,
+  precipitacion_mm: 0,
+  precipitacion_3h_mm: 0,
+  codigo_wmo: 3,
+  descripcion: 'Nublado',
+  es_de_dia: true,
+}
+const nubosidad = analizar({ ...entradaBase, clima: nublado, respuestas: { clima: 'Despejado' } })
+const hallazgoClima = nubosidad.hallazgos.find((x) => x.declarado === 'Despejado')
+verificar(
+  'no afirma que coinciden cuando el clima declarado difiere del real',
+  hallazgoClima?.titulo === 'Sin contradicción climática relevante',
+  `-> "${hallazgoClima?.titulo}"`,
+)
+verificar('la diferencia de nubosidad no cuenta como contradicción', nubosidad.resumen.alertas === 0)
+
+const climaExacto = analizar({ ...entradaBase, clima: nublado, respuestas: { clima: 'Nublado' } })
+verificar(
+  'cuando el clima declarado coincide de verdad, lo informa como consistente',
+  climaExacto.hallazgos.some((x) => x.titulo === 'Condición climática consistente'),
+)
+
 const viejo = analizar({ ...entradaBase, respuestas: { momento_declarado: 'Ayer o antes' } })
 verificar(
   'avisa que la evidencia no corresponde al momento del hecho',

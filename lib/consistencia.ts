@@ -105,6 +105,17 @@ export function analizar(e: Entrada): InformeConsistencia {
     const secoDeclarado = climaDecl === 'Despejado' || climaDecl === 'Nublado'
     const lluviaDeclarada = climaDecl === 'Lloviznando' || climaDecl === 'Lluvia fuerte'
 
+    /** Categoría real según el código WMO, para comparar contra lo declarado. */
+    const categoriaReal = ((codigo: number | null): string | null => {
+      if (codigo === null) return null
+      if (codigo <= 1) return 'Despejado'
+      if (codigo <= 3) return 'Nublado'
+      if (codigo === 45 || codigo === 48) return 'Niebla'
+      if (codigo >= 51 && codigo <= 57) return 'Lloviznando'
+      if (codigo === 61) return 'Lloviznando'
+      return 'Lluvia fuerte'
+    })(clima.codigo_wmo)
+
     if (secoDeclarado && precip > 0.5) {
       h.push({
         nivel: 'alerta',
@@ -128,6 +139,26 @@ export function analizar(e: Entrada): InformeConsistencia {
         declarado: 'Niebla',
         objetivo: `Visibilidad estimada: ${Math.round((clima.visibilidad_m ?? 0) / 1000)} km`,
         detalle: 'La niebla de banco es muy local y puede no estar reflejada en el modelo.',
+      })
+    } else if (climaDecl === 'Viento fuerte' && (clima.rafaga_kmh ?? 0) < 30) {
+      h.push({
+        nivel: 'atencion',
+        titulo: 'Viento fuerte declarado sin registro de ráfagas',
+        declarado: 'Viento fuerte',
+        objetivo: `Ráfagas registradas: ${clima.rafaga_kmh ?? 0} km/h`,
+        detalle: 'Las ráfagas registradas no alcanzan valores que afecten la conducción.',
+      })
+    } else if (categoriaReal !== null && categoriaReal !== climaDecl) {
+      // Difieren, pero ambos sin precipitación: la nubosidad es apreciación subjetiva
+      // y no incide sobre la responsabilidad. Se deja asentada la diferencia sin
+      // presentarla como contradicción, y sobre todo sin afirmar que coinciden.
+      h.push({
+        nivel: 'ok',
+        titulo: 'Sin contradicción climática relevante',
+        declarado: climaDecl,
+        objetivo: clima.descripcion,
+        detalle:
+          'Hay una diferencia menor de nubosidad respecto del registro, sin incidencia sobre la visibilidad ni sobre el estado de la calzada. La apreciación de la nubosidad es subjetiva y muy local.',
       })
     } else {
       h.push({
