@@ -6,6 +6,12 @@ import { SECCIONES, GUIA_FOTOS, ZONAS_IMPACTO, preguntasVisibles, type Pregunta 
 import { Marca } from '@/app/components/Marca'
 
 type Respuestas = Record<string, unknown>
+/** Motivo por el que no se pudo obtener la ubicación, para poder explicar qué hacer. */
+type FalloGps = {
+  codigo: number
+  motivo: 'denegado' | 'no_disponible' | 'demora' | 'no_soportado' | 'servidor'
+  detalle?: string
+} | null
 type Media = { id: string; tipo: string; guia_id: string | null }
 type Testigo = { id: string; nombre: string }
 type Ubicacion = { lat: number; lon: number; direccion: string | null } | null
@@ -44,6 +50,7 @@ export function Flujo(props: Props) {
   const [estadoGps, setEstadoGps] = useState<'pidiendo' | 'ok' | 'error'>(
     props.ubicacionInicial ? 'ok' : 'pidiendo',
   )
+  const [falloGps, setFalloGps] = useState<FalloGps>(null)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cierre, setCierre] = useState<{ hash_maestro: string } | null>(
@@ -56,12 +63,23 @@ export function Flujo(props: Props) {
 
   /* ---------- Captura silenciosa de la ubicación ---------- */
 
-  useEffect(() => {
-    if (props.ubicacionInicial) return
+  /**
+   * Pide la ubicación al navegador y la registra en el servidor.
+   *
+   * Se guarda el motivo exacto del fallo: sin eso, un permiso denegado, un GPS apagado
+   * y una demora se ven todos igual, y la persona no sabe qué hacer para resolverlo.
+   * Es reintentable a propósito: parado al lado del auto, quedarse sin ubicación por
+   * haber tocado "Bloquear" sin querer arruinaría el expediente entero.
+   */
+  const pedirUbicacion = useCallback(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setEstadoGps('error')
+      setFalloGps({ codigo: 0, motivo: 'no_soportado' })
       return
     }
+    setEstadoGps('pidiendo')
+    setFalloGps(null)
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
@@ -75,17 +93,35 @@ export function Flujo(props: Props) {
             }),
           })
           const cuerpo = await res.json()
-          if (!res.ok) throw new Error(cuerpo?.error)
+          if (!res.ok) throw new Error(cuerpo?.error ?? 'El servidor rechazó la ubicación.')
           setUbicacion({ lat: pos.coords.latitude, lon: pos.coords.longitude, direccion: cuerpo.direccion ?? null })
           setEstadoGps('ok')
-        } catch {
+        } catch (e) {
           setEstadoGps('error')
+          setFalloGps({ codigo: -1, motivo: 'servidor', detalle: e instanceof Error ? e.message : undefined })
         }
       },
-      () => setEstadoGps('error'),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      (err) => {
+        setEstadoGps('error')
+        setFalloGps({
+          codigo: err.code,
+          motivo:
+            err.code === err.PERMISSION_DENIED
+              ? 'denegado'
+              : err.code === err.POSITION_UNAVAILABLE
+                ? 'no_disponible'
+                : 'demora',
+          detalle: err.message || undefined,
+        })
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
     )
-  }, [props.casoId, props.ubicacionInicial])
+  }, [props.casoId])
+
+  useEffect(() => {
+    if (props.ubicacionInicial) return
+    pedirUbicacion()
+  }, [props.ubicacionInicial, pedirUbicacion])
 
   /* ---------- Guardado automático ---------- */
 
@@ -198,7 +234,7 @@ export function Flujo(props: Props) {
         </div>
       ) : null}
 
-      <EstadoUbicacion estado={estadoGps} ubicacion={ubicacion} />
+      <EstadoUbicacion estado={estadoGps} ubicacion={ubicacion} fallo={falloGps} alReintentar={pedirUbicacion} />
 
       {error ? <div className="aviso aviso-alerta">{error}</div> : null}
 
@@ -254,7 +290,43 @@ export function Flujo(props: Props) {
 
 /* ================= Ubicación ================= */
 
-function EstadoUbicacion({ estado, ubicacion }: { estado: 'pidiendo' | 'ok' | 'error'; ubicacion: Ubicacion }) {
+/** Instrucción concreta según por qué falló, para que se pueda resolver en el momento. */
+const GUIA_FALLO: Record<string, { titulo: string; comoResolver: string }> = {
+  denegado: {
+    titulo: 'El navegador tiene bloqueado el acceso a la ubicación',
+    comoResolver:
+      'Tocá el candado (o el ícono de ajustes) a la izquierda de la dirección web, habilitá "Ubicación" y volvé a intentar. Si estás en iPhone, revisá además Ajustes › Privacidad › Localización › Safari.',
+  },
+  no_disponible: {
+    titulo: 'El dispositivo no pudo determinar dónde está',
+    comoResolver:
+      'Puede que el GPS esté apagado o que no haya señal. Activá la ubicación del teléfono, salí a cielo abierto si estás bajo techo, y reintentá.',
+  },
+  demora: {
+    titulo: 'La ubicación tardó demasiado',
+    comoResolver: 'Suele pasar bajo techo o entre edificios altos. Esperá unos segundos y volvé a intentar.',
+  },
+  no_soportado: {
+    titulo: 'Este navegador no permite obtener la ubicación',
+    comoResolver: 'Abrí el enlace desde Chrome o Safari en el teléfono. Es donde mejor funciona.',
+  },
+  servidor: {
+    titulo: 'La ubicación se obtuvo pero no se pudo registrar',
+    comoResolver: 'Puede ser un problema momentáneo de conexión. Reintentá en unos segundos.',
+  },
+}
+
+function EstadoUbicacion({
+  estado,
+  ubicacion,
+  fallo,
+  alReintentar,
+}: {
+  estado: 'pidiendo' | 'ok' | 'error'
+  ubicacion: Ubicacion
+  fallo: FalloGps
+  alReintentar: () => void
+}) {
   if (estado === 'pidiendo') {
     return (
       <div className="captura">
@@ -263,17 +335,27 @@ function EstadoUbicacion({ estado, ubicacion }: { estado: 'pidiendo' | 'ok' | 'e
       </div>
     )
   }
+
   if (estado === 'error') {
+    const guia = GUIA_FALLO[fallo?.motivo ?? 'no_disponible'] ?? GUIA_FALLO.no_disponible
     return (
-      <div className="captura">
-        <span className="punto punto-error" />
-        <span>
-          Sin acceso a la ubicación. El expediente se genera igual, pero pierde el registro objetivo del lugar y del
-          clima.
-        </span>
+      <div className="aviso aviso-atencion">
+        <strong>{guia.titulo}</strong>
+        <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
+          Sin ubicación, el expediente pierde el registro objetivo del lugar, la hora solar y el clima. Son justamente
+          los datos que después permiten contrastar la declaración, así que conviene resolverlo ahora.
+        </p>
+        <p style={{ margin: '0 0 12px', fontSize: 13.5 }}>{guia.comoResolver}</p>
+        <button className="boton-secundario" onClick={alReintentar} style={{ width: '100%' }}>
+          Reintentar la ubicación
+        </button>
+        <p className="mini" style={{ margin: '10px 0 0' }}>
+          Podés seguir sin esto, pero el expediente lo va a dejar asentado.
+        </p>
       </div>
     )
   }
+
   return (
     <div className="captura">
       <span className="punto punto-ok" />
