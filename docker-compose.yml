@@ -1,0 +1,42 @@
+# Entorno local. En Easypanel no se usa este archivo: allá Postgres se crea
+# como servicio aparte y la app se construye desde el Dockerfile.
+#
+#   docker compose up -d db      -> sólo la base, para correr la app con npm run dev
+#   docker compose up --build    -> todo el stack como en producción
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: acta
+      POSTGRES_PASSWORD: acta_local
+      POSTGRES_DB: acta
+    ports:
+      - '5432:5432'
+    volumes:
+      - datos_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U acta -d acta']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://acta:acta_local@db:5432/acta
+      DIR_DATOS: /app/data
+      URL_PUBLICA: http://localhost:3000
+    ports:
+      - '3000:3000'
+    volumes:
+      - datos_media:/app/data
+
+volumes:
+  datos_db:
+  datos_media:

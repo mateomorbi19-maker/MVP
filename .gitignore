@@ -1,0 +1,8 @@
+node_modules/
+.next/
+data/
+*.log
+.env*.local
+
+# Configuración local de herramientas
+.claude/

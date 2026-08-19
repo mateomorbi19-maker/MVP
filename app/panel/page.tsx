@@ -1,0 +1,106 @@
+import Link from 'next/link'
+import { listarCasos } from '@/lib/casos'
+import { Marca } from '@/app/components/Marca'
+
+export const dynamic = 'force-dynamic'
+
+const fecha = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-'
+
+export default async function Panel() {
+  const casos = await listarCasos()
+
+  return (
+    <main className="envoltura-ancha">
+      <Marca sub="Panel de siniestros" />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 18 }}>
+        <div>
+          <h1>Siniestros</h1>
+          <p className="apagado" style={{ marginBottom: 0 }}>
+            {casos.length} actuación{casos.length === 1 ? '' : 'es'} registrada{casos.length === 1 ? '' : 's'}.
+          </p>
+        </div>
+        <Link href="/" className="boton boton-secundario">
+          Nueva actuación
+        </Link>
+      </div>
+
+      {casos.length === 0 ? (
+        <div className="tarjeta centrado">
+          <h3>Todavía no hay siniestros cargados</h3>
+          <p className="apagado" style={{ marginBottom: 16 }}>
+            Cuando alguien complete el flujo de captura, la actuación aparece acá.
+          </p>
+          <Link href="/" className="boton boton-primario" style={{ maxWidth: 280, margin: '0 auto' }}>
+            Crear una de prueba
+          </Link>
+        </div>
+      ) : (
+        <div className="tabla-envoltura">
+          <table>
+            <thead>
+              <tr>
+                <th>Actuación</th>
+                <th>Estado</th>
+                <th>Patente</th>
+                <th>Asegurado</th>
+                <th>Lugar</th>
+                <th>Apertura</th>
+                <th>Consistencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {casos.map((c) => {
+                const r = c.consistencia?.resumen
+                return (
+                  <tr key={c.id}>
+                    <td>
+                      <Link href={`/panel/${c.id}`} className="enlace">
+                        {c.id}
+                      </Link>
+                    </td>
+                    <td>
+                      <span className={`insignia ${c.estado === 'cerrado' ? 'insignia-ok' : 'insignia-neutra'}`}>
+                        {c.estado === 'cerrado' ? 'Sellada' : 'En curso'}
+                      </span>
+                    </td>
+                    <td>{c.patente || '-'}</td>
+                    <td>{c.asegurado || '-'}</td>
+                    <td style={{ maxWidth: 260, fontSize: 13 }}>
+                      {c.direccion ? c.direccion.split(',').slice(0, 3).join(', ') : '-'}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{fecha(c.creado_en)}</td>
+                    <td>
+                      {r ? (
+                        <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                          {r.alertas > 0 ? <span className="insignia insignia-alerta">{r.alertas} contra.</span> : null}
+                          {r.banderas_cobertura > 0 ? (
+                            <span className="insignia insignia-cobertura">{r.banderas_cobertura} cob.</span>
+                          ) : null}
+                          {r.atenciones > 0 ? (
+                            <span className="insignia insignia-atencion">{r.atenciones} rev.</span>
+                          ) : null}
+                          {r.alertas === 0 && r.banderas_cobertura === 0 && r.atenciones === 0 ? (
+                            <span className="insignia insignia-ok">Sin observaciones</span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="mini">Sin cerrar</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="aviso aviso-atencion" style={{ marginTop: 22 }}>
+        <strong>Sin control de acceso.</strong> Este panel es abierto porque es un MVP de uso interno. Antes de
+        mostrárselo a una aseguradora con datos reales hay que ponerle autenticación.
+      </div>
+    </main>
+  )
+}
