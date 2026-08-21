@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
-import { obtenerCaso, listarMedias, listarTestigos } from '@/lib/casos'
+import { obtenerCaso, listarMedias, listarTestigos, limpiarDatosAsegurado } from '@/lib/casos'
 import { SECCIONES } from '@/lib/cuestionario'
 
 export const runtime = 'nodejs'
@@ -26,8 +26,11 @@ export async function GET(_req: Request, { params }: Ctx) {
 }
 
 /**
- * Guarda respuestas. Se llama a medida que la persona contesta, no al final:
- * si se cierra el navegador en el medio, no se pierde nada de lo ya declarado.
+ * Guarda respuestas y datos del asegurado.
+ *
+ * Se llama a medida que la persona contesta, no al final: si se cierra el navegador en
+ * el medio, no se pierde nada de lo ya declarado. Todo lo que entra queda además
+ * asentado como evento en la cadena de custodia, con su hora.
  */
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params
@@ -46,20 +49,42 @@ export async function PATCH(req: Request, { params }: Ctx) {
     for (const [k, v] of Object.entries(entrantes)) {
       if (IDS_VALIDOS.has(k)) validas[k] = v
     }
-    if (Object.keys(validas).length === 0) {
+
+    /*
+     * Los cuatro campos de la carátula llegan por separado porque son columnas, no
+     * respuestas: los usan el panel, el PDF y el listado. Sólo se pisa lo que viene
+     * con contenido, para que un envío parcial no borre lo ya cargado.
+     */
+    const datos = limpiarDatosAsegurado(cuerpo?.datos)
+    const cambios = Object.entries(datos).filter(([, v]) => v !== null) as Array<[string, string]>
+
+    if (Object.keys(validas).length === 0 && cambios.length === 0) {
       return NextResponse.json({ ok: true, sinCambios: true })
     }
 
-    const combinadas = { ...caso.respuestas, ...validas }
     const pg = await db()
-    await pg.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(combinadas)])
 
-    await registrarEvento(id, 'respuestas_registradas', {
-      preguntas: Object.keys(validas).sort(),
-      valores: validas,
-    })
+    if (Object.keys(validas).length > 0) {
+      const combinadas = { ...caso.respuestas, ...validas }
+      await pg.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(combinadas)])
+      await registrarEvento(id, 'respuestas_registradas', {
+        preguntas: Object.keys(validas).sort(),
+        valores: validas,
+      })
+    }
 
-    return NextResponse.json({ ok: true, respuestas: combinadas })
+    if (cambios.length > 0) {
+      // Las claves vienen de DatosAsegurado, no del cuerpo: son siempre esas cuatro.
+      const asignaciones = cambios.map(([clave], i) => `${clave} = $${i + 2}`).join(', ')
+      await pg.query(
+        `UPDATE casos SET ${asignaciones} WHERE id = $1`,
+        [id, ...cambios.map(([, valor]) => valor)],
+      )
+      await registrarEvento(id, 'datos_asegurado_registrados', Object.fromEntries(cambios))
+    }
+
+    const actualizado = await obtenerCaso(id)
+    return NextResponse.json({ ok: true, respuestas: actualizado?.respuestas ?? caso.respuestas })
   } catch (err) {
     return errorApi('caso:PATCH', err, 'No se pudieron guardar las respuestas.')
   }

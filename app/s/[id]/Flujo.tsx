@@ -2,8 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { SECCIONES, GUIA_FOTOS, ZONAS_IMPACTO, preguntasVisibles, type Pregunta } from '@/lib/cuestionario'
-import { Marca } from '@/app/components/Marca'
+import {
+  RECORRIDO,
+  ZONAS_IMPACTO,
+  fotosVisibles,
+  preguntasVisibles,
+  seccionPorId,
+  type Bloque,
+  type GuiaFoto,
+  type Pregunta,
+  type Seccion,
+} from '@/lib/cuestionario'
+import { olvidarActuacion, recordarActuacion } from '@/lib/local'
 
 type Respuestas = Record<string, unknown>
 /** Motivo por el que no se pudo obtener la ubicación, para poder explicar qué hacer. */
@@ -15,41 +25,113 @@ type FalloGps = {
 type Media = { id: string; tipo: string; guia_id: string | null }
 type Testigo = { id: string; nombre: string }
 type Ubicacion = { lat: number; lon: number; direccion: string | null } | null
+type Datos = { poliza: string; patente: string; asegurado: string; telefono: string }
+type Subir = (archivo: File, tipo: 'foto' | 'audio', guiaId?: string) => Promise<string>
 
 interface Props {
   casoId: string
   estadoInicial: string
   respuestasIniciales: Respuestas
+  datosIniciales: Datos
   hashMaestro: string | null
   mediasIniciales: Media[]
   testigosIniciales: Testigo[]
   ubicacionInicial: Ubicacion
 }
 
-type Paso =
-  | { tipo: 'seccion'; indice: number }
-  | { tipo: 'fotos' }
-  | { tipo: 'testigos' }
-  | { tipo: 'revision' }
-  | { tipo: 'final' }
+/* ================= El recorrido ================= */
 
-const PASOS: Paso[] = [
-  ...SECCIONES.map((_, indice) => ({ tipo: 'seccion' as const, indice })),
-  { tipo: 'fotos' },
-  { tipo: 'testigos' },
-  { tipo: 'revision' },
-  { tipo: 'final' },
-]
+type Paso =
+  | { clave: string; bloque: Bloque; tipo: 'pregunta'; seccion: Seccion; pregunta: Pregunta }
+  | { clave: string; bloque: Bloque; tipo: 'emergencia' }
+  | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
+  | { clave: string; bloque: Bloque; tipo: 'testigos' }
+  | { clave: string; bloque: Bloque; tipo: 'corte' }
+  | { clave: string; bloque: Bloque; tipo: 'datos' }
+  | { clave: string; bloque: Bloque; tipo: 'revision' }
+  | { clave: string; bloque: Bloque; tipo: 'final' }
+
+const vacia = (v: unknown): boolean =>
+  v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
+
+/** El relato no vive en las respuestas sino en los archivos: se comprueba aparte. */
+function respondida(pregunta: Pregunta, respuestas: Respuestas, medias: Media[]): boolean {
+  if (pregunta.tipo === 'audio') return medias.some((m) => m.tipo === 'audio')
+  return !vacia(respuestas[pregunta.id])
+}
+
+/**
+ * Arma la lista plana de pantallas a partir de las respuestas actuales.
+ *
+ * Se recalcula en cada cambio porque las preguntas condicionales aparecen y
+ * desaparecen: por eso la navegación va por clave y no por índice.
+ */
+function construirPasos(respuestas: Respuestas): Paso[] {
+  const pasos: Paso[] = []
+
+  for (const etapa of RECORRIDO) {
+    if (etapa.tipo === 'seccion') {
+      const seccion = seccionPorId(etapa.id)
+      if (!seccion) continue
+      for (const pregunta of preguntasVisibles(seccion, respuestas)) {
+        pasos.push({ clave: `p:${pregunta.id}`, bloque: seccion.bloque, tipo: 'pregunta', seccion, pregunta })
+        // La pantalla de llamada va pegada a la respuesta que la dispara.
+        const heridos = respuestas.heridos
+        if (pregunta.id === 'heridos' && typeof heridos === 'string' && heridos !== 'No, nadie') {
+          pasos.push({ clave: 'emergencia', bloque: 'seguridad', tipo: 'emergencia' })
+        }
+      }
+      continue
+    }
+
+    if (etapa.tipo === 'fotos') {
+      const guias = fotosVisibles(respuestas)
+      guias.forEach((guia, i) =>
+        pasos.push({
+          clave: `f:${guia.id}`,
+          bloque: 'lugar',
+          tipo: 'foto',
+          guia,
+          numero: i + 1,
+          total: guias.length,
+        }),
+      )
+      continue
+    }
+
+    const bloque: Bloque = etapa.tipo === 'testigos' || etapa.tipo === 'corte' ? 'lugar' : 'despues'
+    pasos.push({ clave: etapa.tipo, bloque, tipo: etapa.tipo } as Paso)
+  }
+
+  return pasos
+}
+
+/**
+ * Dónde retomar.
+ *
+ * Desde que el último bloque se puede completar más tarde, volver siempre a la
+ * primera pregunta sería inaceptable: la persona ya contestó veinte pantallas.
+ * Se retoma en lo primero que quedó sin hacer.
+ */
+function pasoInicial(pasos: Paso[], respuestas: Respuestas, medias: Media[]): string {
+  for (const paso of pasos) {
+    if (paso.tipo === 'pregunta' && !respondida(paso.pregunta, respuestas, medias)) return paso.clave
+    if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {
+      return paso.clave
+    }
+  }
+  return 'revision'
+}
+
+/* ================= Componente principal ================= */
 
 export function Flujo(props: Props) {
-  const [paso, setPaso] = useState(props.estadoInicial === 'cerrado' ? PASOS.length - 1 : 0)
   const [respuestas, setRespuestas] = useState<Respuestas>(props.respuestasIniciales)
+  const [datos, setDatos] = useState<Datos>(props.datosIniciales)
   const [medias, setMedias] = useState<Media[]>(props.mediasIniciales)
   const [testigos, setTestigos] = useState<Testigo[]>(props.testigosIniciales)
   const [ubicacion, setUbicacion] = useState<Ubicacion>(props.ubicacionInicial)
-  const [estadoGps, setEstadoGps] = useState<'pidiendo' | 'ok' | 'error'>(
-    props.ubicacionInicial ? 'ok' : 'pidiendo',
-  )
+  const [estadoGps, setEstadoGps] = useState<'pidiendo' | 'ok' | 'error'>(props.ubicacionInicial ? 'ok' : 'pidiendo')
   const [falloGps, setFalloGps] = useState<FalloGps>(null)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,9 +139,39 @@ export function Flujo(props: Props) {
     props.hashMaestro ? { hash_maestro: props.hashMaestro } : null,
   )
 
-  const pendientes = useRef<Respuestas>({})
+  const pasos = useMemo(() => construirPasos(respuestas), [respuestas])
+
+  const [clave, setClave] = useState<string>(() =>
+    props.estadoInicial === 'cerrado'
+      ? 'final'
+      : pasoInicial(construirPasos(props.respuestasIniciales), props.respuestasIniciales, props.mediasIniciales),
+  )
+
+  /*
+   * Navegación por clave.
+   *
+   * Los índices no sirven: contestar una pregunta puede insertar o quitar pantallas
+   * más adelante. Si la pantalla actual desapareció —cambiar el tipo de siniestro
+   * saca las preguntas del tercero— se cae al último índice conocido.
+   */
+  const indiceRef = useRef(0)
+  let indice = pasos.findIndex((p) => p.clave === clave)
+  if (indice < 0) indice = Math.min(indiceRef.current, pasos.length - 1)
+  indiceRef.current = indice
+  const actual = pasos[indice]
+
+  const pasosRef = useRef(pasos)
+  pasosRef.current = pasos
+  const claveRef = useRef(clave)
+  claveRef.current = clave
+
+  const pendientes = useRef<{ respuestas: Respuestas; datos: Partial<Datos> }>({ respuestas: {}, datos: {} })
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const arriba = useRef<HTMLDivElement>(null)
+  const cola = useRef<Promise<void>>(Promise.resolve())
+
+  useEffect(() => {
+    recordarActuacion(props.casoId)
+  }, [props.casoId])
 
   /* ---------- Captura silenciosa de la ubicación ---------- */
 
@@ -148,55 +260,189 @@ export function Flujo(props: Props) {
 
   /* ---------- Guardado automático ---------- */
 
-  const enviarPendientes = useCallback(async () => {
-    const lote = pendientes.current
-    pendientes.current = {}
-    if (Object.keys(lote).length === 0) return
-    setGuardando(true)
-    try {
-      const res = await fetch(`/api/casos/${props.casoId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ respuestas: lote }),
-      })
-      if (!res.ok) {
-        const cuerpo = await res.json().catch(() => ({}))
-        throw new Error(cuerpo?.error ?? 'No se pudo guardar.')
+  const enviarPendientes = useCallback(() => {
+    /*
+     * Los envíos se encolan en vez de dispararse en paralelo: el servidor combina
+     * las respuestas leyendo primero lo guardado, así que dos PATCH simultáneos
+     * pueden pisarse. Con auto-avance los toques llegan rápido, así que pasa.
+     */
+    cola.current = cola.current.then(async () => {
+      const lote = pendientes.current
+      pendientes.current = { respuestas: {}, datos: {} }
+      const hayRespuestas = Object.keys(lote.respuestas).length > 0
+      const hayDatos = Object.keys(lote.datos).length > 0
+      if (!hayRespuestas && !hayDatos) return
+
+      setGuardando(true)
+      try {
+        const res = await fetch(`/api/casos/${props.casoId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ respuestas: lote.respuestas, datos: lote.datos }),
+        })
+        if (!res.ok) {
+          const cuerpo = await res.json().catch(() => ({}))
+          throw new Error(cuerpo?.error ?? 'No se pudo guardar.')
+        }
+        setError(null)
+      } catch (e) {
+        // Se devuelven al buffer para reintentar en el próximo guardado.
+        pendientes.current = {
+          respuestas: { ...lote.respuestas, ...pendientes.current.respuestas },
+          datos: { ...lote.datos, ...pendientes.current.datos },
+        }
+        setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+      } finally {
+        setGuardando(false)
       }
-      setError(null)
-    } catch (e) {
-      // Se devuelven al buffer para reintentar en el próximo guardado.
-      pendientes.current = { ...lote, ...pendientes.current }
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
-    } finally {
-      setGuardando(false)
-    }
+    })
+    return cola.current
   }, [props.casoId])
+
+  const programarGuardado = useCallback(() => {
+    if (temporizador.current) clearTimeout(temporizador.current)
+    temporizador.current = setTimeout(enviarPendientes, 700)
+  }, [enviarPendientes])
 
   const responder = useCallback(
     (id: string, valor: unknown) => {
       setRespuestas((prev) => ({ ...prev, [id]: valor }))
-      pendientes.current[id] = valor
+      pendientes.current.respuestas[id] = valor
+      programarGuardado()
+    },
+    [programarGuardado],
+  )
+
+  const anotarDato = useCallback(
+    (clave: keyof Datos, valor: string) => {
+      setDatos((prev) => ({ ...prev, [clave]: valor }))
+      pendientes.current.datos[clave] = valor
+      programarGuardado()
+    },
+    [programarGuardado],
+  )
+
+  /* ---------- Navegación ---------- */
+
+  /*
+   * Cada pantalla es una entrada del historial.
+   *
+   * Sin esto, el gesto de "atrás" del teléfono —que en Android se usa todo el
+   * tiempo— saca a la persona del recorrido entero en vez de volver a la pregunta
+   * anterior. Se usa la History API nativa, que Next sincroniza con su router.
+   */
+  const desdeHistorial = useRef(false)
+  const montado = useRef(false)
+  /** Cuántas entradas apilamos nosotros. Sirve para no salirnos del sitio al volver. */
+  const profundidad = useRef(0)
+
+  // El montaje lo resuelve el efecto de abajo, que corre después de éste.
+  useEffect(() => {
+    if (!montado.current) return
+    if (desdeHistorial.current) {
+      desdeHistorial.current = false
+      return
+    }
+    // Se pasa `null` como estado a propósito: el estado del historial es de Next.
+    window.history.pushState(null, '', `?paso=${encodeURIComponent(clave)}`)
+    profundidad.current += 1
+  }, [clave])
+
+  useEffect(() => {
+    /*
+     * Al montar, manda la dirección: si trae una pantalla válida se retoma ahí.
+     *
+     * Esto tiene que resolverse acá y no en el efecto de arriba, que corre antes:
+     * si aquél reemplazara la dirección en el montaje, borraría el `paso` que vino
+     * en el enlace justo antes de que alguien lo leyera. Y la comparación con la
+     * clave actual tampoco sobra: si son iguales React descarta el cambio de estado,
+     * el efecto de arriba no vuelve a correr y la marca quedaría encendida,
+     * comiéndose la siguiente navegación real.
+     */
+    const enUrl = new URLSearchParams(window.location.search).get('paso')
+    if (enUrl && pasosRef.current.some((p) => p.clave === enUrl)) {
+      if (enUrl !== claveRef.current) {
+        desdeHistorial.current = true
+        setClave(enUrl)
+      }
+    } else {
+      // Sin pantalla en la dirección se reemplaza, no se apila: así el "atrás" de
+      // la primera pantalla sale al inicio y no a una entrada fantasma.
+      window.history.replaceState(null, '', `?paso=${encodeURIComponent(claveRef.current)}`)
+    }
+    montado.current = true
+
+    const alVolver = () => {
+      const destino = new URLSearchParams(window.location.search).get('paso')
+      if (!destino) return
+      profundidad.current = Math.max(0, profundidad.current - 1)
+      desdeHistorial.current = true
+      setClave(destino)
+      window.scrollTo({ top: 0 })
+    }
+    window.addEventListener('popstate', alVolver)
+    return () => window.removeEventListener('popstate', alVolver)
+  }, [])
+
+  const irA = useCallback((destino: string) => {
+    if (temporizador.current) clearTimeout(temporizador.current)
+    setClave(destino)
+    window.scrollTo({ top: 0 })
+  }, [])
+
+  const mover = useCallback(
+    (delta: number) => {
       if (temporizador.current) clearTimeout(temporizador.current)
-      temporizador.current = setTimeout(enviarPendientes, 700)
+      void enviarPendientes()
+      const lista = pasosRef.current
+      const desde = lista.findIndex((p) => p.clave === claveRef.current)
+      const siguiente = lista[Math.max(0, Math.min(lista.length - 1, (desde < 0 ? 0 : desde) + delta))]
+      if (siguiente) {
+        setClave(siguiente.clave)
+        window.scrollTo({ top: 0 })
+      }
     },
     [enviarPendientes],
   )
 
-  const avanzar = useCallback(
-    async (delta: number) => {
+  /**
+   * Volver.
+   *
+   * Si la pantalla anterior es una que apilamos nosotros, se deshace la entrada del
+   * historial en vez de apilar otra: de lo contrario el botón "Atrás" de la pantalla
+   * y el gesto de atrás del teléfono terminarían peleándose. Si no hay nada apilado
+   * —el caso de retomar el enlace más tarde, que arranca a mitad del recorrido— se
+   * navega hacia atrás por el recorrido, que sí existe siempre.
+   */
+  const volver = useCallback(() => {
+    if (profundidad.current > 0) {
       if (temporizador.current) clearTimeout(temporizador.current)
-      await enviarPendientes()
-      setPaso((p) => Math.max(0, Math.min(PASOS.length - 1, p + delta)))
-      arriba.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      void enviarPendientes()
+      window.history.back()
+      return
+    }
+    mover(-1)
+  }, [enviarPendientes, mover])
+
+  /**
+   * Contestar y avanzar de un solo toque.
+   *
+   * El retardo no es decorativo: sin él la pantalla cambia antes de que el dedo se
+   * levante y no queda ninguna confirmación de qué se eligió. Con 260 ms se ve la
+   * opción marcarse y recién ahí avanza.
+   */
+  const responderYAvanzar = useCallback(
+    (id: string, valor: unknown) => {
+      responder(id, valor)
+      setTimeout(() => mover(1), 260)
     },
-    [enviarPendientes],
+    [responder, mover],
   )
 
   /* ---------- Subida de archivos ---------- */
 
-  const subir = useCallback(
-    async (archivo: File, tipo: 'foto' | 'audio', guiaId?: string) => {
+  const subir = useCallback<Subir>(
+    async (archivo, tipo, guiaId) => {
       const form = new FormData()
       form.append('archivo', archivo)
       form.append('tipo', tipo)
@@ -208,105 +454,101 @@ export function Flujo(props: Props) {
       const res = await fetch(`/api/casos/${props.casoId}/media`, { method: 'POST', body: form })
       const cuerpo = await res.json()
       if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo subir el archivo.')
-      setMedias((prev) => [...prev, { id: cuerpo.id, tipo, guia_id: guiaId ?? null }])
+      setMedias((prev) => [...prev.filter((m) => !guiaId || m.guia_id !== guiaId), { id: cuerpo.id, tipo, guia_id: guiaId ?? null }])
       return cuerpo.id as string
     },
     [props.casoId, ubicacion],
   )
 
-  /* ---------- Progreso ---------- */
+  /* ---------- Pantalla ---------- */
 
-  const totalContestables = useMemo(
-    () => SECCIONES.reduce((n, s) => n + preguntasVisibles(s, respuestas).length, 0),
-    [respuestas],
-  )
-  const contestadas = useMemo(
-    () =>
-      SECCIONES.reduce(
-        (n, s) =>
-          n +
-          preguntasVisibles(s, respuestas).filter((p) => {
-            const v = respuestas[p.id]
-            return v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
-          }).length,
-        0,
-      ),
-    [respuestas],
-  )
-  const porcentaje = Math.round((paso / (PASOS.length - 1)) * 100)
-
-  const actual = PASOS[paso]
   const cerrado = cierre !== null
+  const porcentaje = pasos.length > 1 ? Math.round((indice / (pasos.length - 1)) * 100) : 0
+  // La pantalla de emergencia también lleva encabezado: si alguien tocó "Sí" por
+  // error, tiene que poder corregirlo sin depender del gesto de atrás del teléfono.
+  const conEncabezado = actual && actual.tipo !== 'final' && !cerrado
+  const conUbicacion = actual && actual.bloque !== 'seguridad' && actual.tipo !== 'final'
 
   return (
-    <main className="envoltura">
-      <div ref={arriba} />
-      <Marca sub={`Actuación ${props.casoId}`} />
-
-      {!cerrado ? (
-        <div className="progreso">
-          <div className="progreso-barra">
-            <div className="progreso-relleno" style={{ width: `${porcentaje}%` }} />
-          </div>
-          <div className="progreso-texto">
-            <span>
-              Paso {paso + 1} de {PASOS.length - 1}
-            </span>
-            <span>{guardando ? 'Guardando...' : `${contestadas} de ${totalContestables} respuestas`}</span>
-          </div>
-        </div>
-      ) : null}
-
-      <EstadoUbicacion estado={estadoGps} ubicacion={ubicacion} fallo={falloGps} alReintentar={pedirUbicacion} />
-
-      {error ? <div className="aviso aviso-alerta">{error}</div> : null}
-
-      {actual.tipo === 'seccion' ? (
-        <PasoSeccion
-          indice={actual.indice}
-          respuestas={respuestas}
-          responder={responder}
-          subir={subir}
-          medias={medias}
-          casoId={props.casoId}
-        />
-      ) : null}
-
-      {actual.tipo === 'fotos' ? <PasoFotos medias={medias} subir={subir} /> : null}
-
-      {actual.tipo === 'testigos' ? (
-        <PasoTestigos casoId={props.casoId} testigos={testigos} setTestigos={setTestigos} />
-      ) : null}
-
-      {actual.tipo === 'revision' ? (
-        <PasoRevision
-          casoId={props.casoId}
-          respuestas={respuestas}
-          medias={medias}
-          testigos={testigos}
-          ubicacion={ubicacion}
-          alCerrar={(r) => {
-            setCierre(r)
-            setPaso(PASOS.length - 1)
-            arriba.current?.scrollIntoView({ behavior: 'smooth' })
-          }}
-        />
-      ) : null}
-
-      {actual.tipo === 'final' ? <PasoFinal casoId={props.casoId} cierre={cierre} /> : null}
-
-      {actual.tipo !== 'final' && actual.tipo !== 'revision' ? (
-        <div className="fila-botones">
-          {paso > 0 ? (
-            <button className="boton-secundario" onClick={() => avanzar(-1)} style={{ flex: '0 0 34%' }}>
-              Atrás
+    <main className="envoltura-flujo">
+      {conEncabezado ? (
+        <div className="encabezado-flujo">
+          {indice > 0 ? (
+            <button className="volver" onClick={volver}>
+              ← Atrás
             </button>
           ) : null}
-          <button className="boton-primario" onClick={() => avanzar(1)}>
-            Continuar
-          </button>
+          <div className="progreso-fino" role="progressbar" aria-valuenow={porcentaje} aria-valuemin={0} aria-valuemax={100}>
+            <div style={{ width: `${porcentaje}%` }} />
+          </div>
+          {guardando ? <span className="contador">Guardando</span> : null}
         </div>
       ) : null}
+
+      <div className="pantalla" key={actual?.clave ?? 'vacio'}>
+        {conUbicacion ? (
+          <ChipUbicacion estado={estadoGps} ubicacion={ubicacion} fallo={falloGps} alReintentar={pedirUbicacion} />
+        ) : null}
+
+        {error ? <div className="aviso aviso-alerta">{error}</div> : null}
+
+        {actual?.tipo === 'pregunta' ? (
+          <PantallaPregunta
+            key={actual.clave}
+            paso={actual}
+            respuestas={respuestas}
+            medias={medias}
+            casoId={props.casoId}
+            responder={responder}
+            responderYAvanzar={responderYAvanzar}
+            seguir={() => mover(1)}
+            subir={subir}
+          />
+        ) : null}
+
+        {actual?.tipo === 'emergencia' ? <PantallaEmergencia respuestas={respuestas} seguir={() => mover(1)} /> : null}
+
+        {actual?.tipo === 'foto' ? (
+          <PantallaFoto key={actual.clave} paso={actual} medias={medias} subir={subir} seguir={() => mover(1)} />
+        ) : null}
+
+        {actual?.tipo === 'testigos' ? (
+          <PantallaTestigos
+            casoId={props.casoId}
+            testigos={testigos}
+            setTestigos={setTestigos}
+            seguir={() => mover(1)}
+          />
+        ) : null}
+
+        {actual?.tipo === 'corte' ? (
+          <PantallaCorte casoId={props.casoId} seguir={() => mover(1)} alCierre={() => irA('revision')} />
+        ) : null}
+
+        {actual?.tipo === 'datos' ? <PantallaDatos datos={datos} anotar={anotarDato} seguir={() => mover(1)} /> : null}
+
+        {actual?.tipo === 'revision' ? (
+          <PantallaRevision
+            casoId={props.casoId}
+            pasos={pasos}
+            respuestas={respuestas}
+            medias={medias}
+            testigos={testigos}
+            ubicacion={ubicacion}
+            irA={irA}
+            alReintentarGps={pedirUbicacion}
+            antesDeCerrar={enviarPendientes}
+            alCerrar={(r) => {
+              setCierre(r)
+              olvidarActuacion()
+              setClave('final')
+              window.scrollTo({ top: 0 })
+            }}
+          />
+        ) : null}
+
+        {actual?.tipo === 'final' ? <PantallaFinal casoId={props.casoId} cierre={cierre} /> : null}
+      </div>
     </main>
   )
 }
@@ -344,7 +586,14 @@ const GUIA_FALLO: Record<string, { titulo: string; comoResolver: string }> = {
   },
 }
 
-function EstadoUbicacion({
+/**
+ * Estado de la ubicación en una línea.
+ *
+ * Ocupa una línea y no una tarjeta porque aparece en todas las pantallas del
+ * recorrido: si fuera un cartel completo, empujaría la pregunta fuera de la vista
+ * en cada paso. En rojo y tocable cuando hay algo que resolver.
+ */
+function ChipUbicacion({
   estado,
   ubicacion,
   fallo,
@@ -355,220 +604,187 @@ function EstadoUbicacion({
   fallo: FalloGps
   alReintentar: () => void
 }) {
-  if (estado === 'pidiendo') {
+  const [abierto, setAbierto] = useState(false)
+
+  if (estado !== 'error') {
     return (
-      <div className="captura">
-        <span className="punto punto-espera" />
-        <span>Registrando la ubicación y las condiciones del lugar...</span>
+      <div className="chip">
+        <span className={`punto ${estado === 'ok' ? 'punto-ok' : 'punto-espera'}`} />
+        <span>
+          {estado === 'ok'
+            ? `Ubicación registrada${ubicacion?.direccion ? ` · ${ubicacion.direccion.split(',').slice(0, 2).join(', ')}` : ''}`
+            : 'Registrando la ubicación...'}
+        </span>
       </div>
     )
   }
 
-  if (estado === 'error') {
-    const guia = GUIA_FALLO[fallo?.motivo ?? 'no_disponible'] ?? GUIA_FALLO.no_disponible
-    return (
-      <div className="aviso aviso-atencion">
-        <strong>{guia.titulo}</strong>
-        <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
-          Sin ubicación, el expediente pierde el registro objetivo del lugar, la hora solar y el clima. Son justamente
-          los datos que después permiten contrastar la declaración, así que conviene resolverlo ahora.
-        </p>
-        <p style={{ margin: '0 0 12px', fontSize: 13.5 }}>{guia.comoResolver}</p>
-        <button className="boton-secundario" onClick={alReintentar} style={{ width: '100%' }}>
-          Reintentar la ubicación
-        </button>
-        <p className="mini" style={{ margin: '10px 0 0' }}>
-          Podés seguir sin esto, pero el expediente lo va a dejar asentado.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="captura">
-      <span className="punto punto-ok" />
-      <span>
-        Ubicación registrada
-        {ubicacion?.direccion ? ` · ${ubicacion.direccion.split(',').slice(0, 3).join(', ')}` : ''}
-      </span>
-    </div>
-  )
-}
-
-/* ================= Secciones del cuestionario ================= */
-
-function PasoSeccion({
-  indice,
-  respuestas,
-  responder,
-  subir,
-  medias,
-  casoId,
-}: {
-  indice: number
-  respuestas: Respuestas
-  responder: (id: string, valor: unknown) => void
-  subir: (a: File, t: 'foto' | 'audio', g?: string) => Promise<string>
-  medias: Media[]
-  casoId: string
-}) {
-  const seccion = SECCIONES[indice]
-  const visibles = preguntasVisibles(seccion, respuestas)
-  const esTriage = seccion.id === 'triage'
-  const heridos = String(respuestas.heridos ?? '')
-  const hayHeridos = heridos.startsWith('Sí')
+  const guia = GUIA_FALLO[fallo?.motivo ?? 'no_disponible'] ?? GUIA_FALLO.no_disponible
 
   return (
     <>
-      <h1>{seccion.titulo}</h1>
-      <p className="apagado">{seccion.descripcion}</p>
+      <button className="chip" data-estado="error" onClick={() => setAbierto((a) => !a)}>
+        <span className="punto punto-error" />
+        <span>Sin ubicación · tocá para resolverlo</span>
+        <span className="chip-flecha">{abierto ? '▲' : '▼'}</span>
+      </button>
 
-      {esTriage ? (
-        <div className="tarjeta">
-          <h3 style={{ marginBottom: 10 }}>Si hay heridos, llamá ahora</h3>
-          <div className="pila">
-            <a href="tel:107" className="boton boton-emergencia">
-              Llamar al 107 · Emergencias médicas
-            </a>
-            <a href="tel:911" className="boton boton-secundario">
-              Llamar al 911 · Policía
-            </a>
-          </div>
-          <p className="mini" style={{ marginTop: 12, marginBottom: 0 }}>
-            El registro queda guardado. Podés volver cuando la situación esté controlada.
+      {abierto ? (
+        <div className="aviso aviso-atencion">
+          <strong>{guia.titulo}</strong>
+          <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
+            Sin ubicación, el expediente pierde el registro objetivo del lugar, la hora solar y el clima. Son
+            justamente los datos que después permiten contrastar la declaración.
           </p>
+          <p style={{ margin: '0 0 12px', fontSize: 13.5 }}>{guia.comoResolver}</p>
+          <button className="boton-secundario" onClick={alReintentar} style={{ width: '100%' }}>
+            Reintentar la ubicación
+          </button>
         </div>
       ) : null}
-
-      {esTriage && hayHeridos ? (
-        <div className="aviso aviso-alerta">
-          Declaraste que hay personas heridas. Asegurate de que estén siendo asistidas antes de seguir con el registro.
-        </div>
-      ) : null}
-
-      {visibles.map((p) => (
-        <CampoPregunta
-          key={p.id}
-          pregunta={p}
-          valor={respuestas[p.id]}
-          responder={responder}
-          subir={subir}
-          medias={medias}
-          casoId={casoId}
-        />
-      ))}
     </>
   )
 }
 
-function CampoPregunta({
-  pregunta,
-  valor,
-  responder,
-  subir,
+/* ================= Una pregunta, una pantalla ================= */
+
+function PantallaPregunta({
+  paso,
+  respuestas,
   medias,
   casoId,
+  responder,
+  responderYAvanzar,
+  seguir,
+  subir,
 }: {
-  pregunta: Pregunta
-  valor: unknown
-  responder: (id: string, valor: unknown) => void
-  subir: (a: File, t: 'foto' | 'audio', g?: string) => Promise<string>
+  paso: Extract<Paso, { tipo: 'pregunta' }>
+  respuestas: Respuestas
   medias: Media[]
   casoId: string
+  responder: (id: string, valor: unknown) => void
+  responderYAvanzar: (id: string, valor: unknown) => void
+  seguir: () => void
+  subir: Subir
 }) {
+  const { pregunta, seccion } = paso
+  const valor = respuestas[pregunta.id]
+  const yaEsta = respondida(pregunta, respuestas, medias)
+  // Con un toque alcanza: elegir ya es avanzar. El resto necesita confirmación.
+  const autoAvanza = pregunta.tipo === 'opcion' || pregunta.tipo === 'zonaImpacto'
+
   return (
-    <div className="tarjeta">
-      <label htmlFor={pregunta.id}>{pregunta.texto}</label>
-      {pregunta.ayuda ? <p className="ayuda">{pregunta.ayuda}</p> : null}
+    <>
+      <div className="pantalla-cuerpo">
+        <div className="rotulo">{seccion.titulo}</div>
+        <h1 className="pregunta">{pregunta.texto}</h1>
+        {pregunta.ayuda ? <p className="pregunta-ayuda">{pregunta.ayuda}</p> : null}
 
-      {pregunta.tipo === 'opcion' ? (
-        <div className="opciones">
-          {pregunta.opciones?.map((o) => (
-            <button
-              key={o}
-              type="button"
-              className="opcion"
-              data-elegida={valor === o}
-              onClick={() => responder(pregunta.id, o)}
-            >
-              <span className="marca-opcion">
-                <span />
-              </span>
-              {o}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {pregunta.tipo === 'multiple' ? (
-        <div className="opciones">
-          {pregunta.opciones?.map((o) => {
-            const actuales = Array.isArray(valor) ? (valor as string[]) : []
-            const elegida = actuales.includes(o)
-            return (
+        {pregunta.tipo === 'opcion' ? (
+          <div className="opciones opciones-grandes">
+            {pregunta.opciones?.map((o) => (
               <button
                 key={o}
                 type="button"
                 className="opcion"
-                data-elegida={elegida}
-                onClick={() =>
-                  responder(pregunta.id, elegida ? actuales.filter((x) => x !== o) : [...actuales, o])
-                }
+                data-elegida={valor === o}
+                onClick={() => responderYAvanzar(pregunta.id, o)}
               >
-                <span className="marca-opcion" data-cuadrada="true">
+                <span className="marca-opcion">
                   <span />
                 </span>
                 {o}
               </button>
-            )
-          })}
-        </div>
-      ) : null}
+            ))}
+          </div>
+        ) : null}
 
-      {pregunta.tipo === 'texto' ? (
-        <input
-          id={pregunta.id}
-          type="text"
-          value={typeof valor === 'string' ? valor : ''}
-          onChange={(e) => responder(pregunta.id, e.target.value)}
-        />
-      ) : null}
+        {pregunta.tipo === 'multiple' ? (
+          <div className="opciones opciones-grandes">
+            {pregunta.opciones?.map((o) => {
+              const actuales = Array.isArray(valor) ? (valor as string[]) : []
+              const elegida = actuales.includes(o)
+              return (
+                <button
+                  key={o}
+                  type="button"
+                  className="opcion"
+                  data-elegida={elegida}
+                  onClick={() => responder(pregunta.id, elegida ? actuales.filter((x) => x !== o) : [...actuales, o])}
+                >
+                  <span className="marca-opcion" data-cuadrada="true">
+                    <span />
+                  </span>
+                  {o}
+                </button>
+              )
+            })}
+          </div>
+        ) : null}
 
-      {pregunta.tipo === 'numero' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {pregunta.tipo === 'texto' ? (
           <input
             id={pregunta.id}
-            type="number"
-            inputMode="numeric"
-            value={typeof valor === 'number' || typeof valor === 'string' ? String(valor) : ''}
-            onChange={(e) => responder(pregunta.id, e.target.value === '' ? '' : Number(e.target.value))}
+            className="campo-grande"
+            type="text"
+            autoFocus
+            autoCapitalize={pregunta.id.includes('patente') ? 'characters' : 'sentences'}
+            value={typeof valor === 'string' ? valor : ''}
+            onChange={(e) => responder(pregunta.id, e.target.value)}
           />
-          {pregunta.unidad ? <span className="apagado">{pregunta.unidad}</span> : null}
-        </div>
-      ) : null}
+        ) : null}
 
-      {pregunta.tipo === 'zonaImpacto' ? (
-        <div className="zonas">
-          {ZONAS_IMPACTO.map((z) => (
-            <button
-              key={z}
-              type="button"
-              className="zona"
-              data-elegida={valor === z}
-              onClick={() => responder(pregunta.id, z)}
-            >
-              {z}
-            </button>
-          ))}
-        </div>
-      ) : null}
+        {pregunta.tipo === 'numero' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <input
+              id={pregunta.id}
+              className="campo-grande"
+              type="number"
+              inputMode="numeric"
+              autoFocus
+              value={typeof valor === 'number' || typeof valor === 'string' ? String(valor) : ''}
+              onChange={(e) => responder(pregunta.id, e.target.value === '' ? '' : Number(e.target.value))}
+            />
+            {pregunta.unidad ? <span className="apagado" style={{ fontSize: 17 }}>{pregunta.unidad}</span> : null}
+          </div>
+        ) : null}
 
-      {pregunta.tipo === 'persona' ? <CamposPersona id={pregunta.id} valor={valor} responder={responder} /> : null}
+        {pregunta.tipo === 'zonaImpacto' ? (
+          <div className="zonas zonas-grandes">
+            {ZONAS_IMPACTO.map((z) => (
+              <button
+                key={z}
+                type="button"
+                className="zona"
+                data-elegida={valor === z}
+                onClick={() => responderYAvanzar(pregunta.id, z)}
+              >
+                {z}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-      {pregunta.tipo === 'audio' ? (
-        <GrabadorAudio subir={subir} yaGrabado={medias.some((m) => m.tipo === 'audio')} casoId={casoId} />
-      ) : null}
-    </div>
+        {pregunta.tipo === 'persona' ? <CamposPersona id={pregunta.id} valor={valor} responder={responder} /> : null}
+
+        {pregunta.tipo === 'audio' ? (
+          <GrabadorAudio subir={subir} yaGrabado={yaEsta} casoId={casoId} />
+        ) : null}
+      </div>
+
+      <div className="barra-accion">
+        {!autoAvanza || yaEsta ? (
+          <button className="boton-primario" onClick={seguir}>
+            Seguir
+          </button>
+        ) : null}
+        {!pregunta.sinOmitir && !yaEsta ? (
+          <button className="omitir" onClick={seguir}>
+            {pregunta.omitir ?? 'Saltear por ahora'}
+          </button>
+        ) : null}
+      </div>
+    </>
   )
 }
 
@@ -586,24 +802,73 @@ function CamposPersona({
 
   return (
     <div className="pila">
-      <input type="text" placeholder="Nombre y apellido" value={actual.nombre ?? ''} onChange={(e) => set('nombre', e.target.value)} />
-      <input type="text" placeholder="DNI" value={actual.dni ?? ''} onChange={(e) => set('dni', e.target.value)} />
-      <input type="tel" placeholder="Teléfono" value={actual.telefono ?? ''} onChange={(e) => set('telefono', e.target.value)} />
+      <input
+        className="campo-grande"
+        type="text"
+        placeholder="Nombre y apellido"
+        autoFocus
+        value={actual.nombre ?? ''}
+        onChange={(e) => set('nombre', e.target.value)}
+      />
+      <input
+        className="campo-grande"
+        type="text"
+        placeholder="DNI"
+        inputMode="numeric"
+        value={actual.dni ?? ''}
+        onChange={(e) => set('dni', e.target.value)}
+      />
+      <input
+        className="campo-grande"
+        type="tel"
+        placeholder="Teléfono"
+        value={actual.telefono ?? ''}
+        onChange={(e) => set('telefono', e.target.value)}
+      />
     </div>
+  )
+}
+
+/* ================= Emergencia ================= */
+
+function PantallaEmergencia({ respuestas, seguir }: { respuestas: Respuestas; seguir: () => void }) {
+  const dudoso = respuestas.heridos === 'No lo sé'
+
+  return (
+    <>
+      <div className="pantalla-cuerpo">
+        <div className="emergencia">
+          <h1>{dudoso ? 'Fijate si alguien está herido' : 'Llamá ahora'}</h1>
+          <p style={{ marginBottom: 18 }}>
+            {dudoso
+              ? 'Ante la duda, llamá. Una ambulancia que llega de más no cuesta nada; una que no llega, sí.'
+              : 'Primero la gente. El registro queda guardado y podés volver cuando la situación esté controlada.'}
+          </p>
+          <div className="pila">
+            <a href="tel:107" className="boton boton-llamada">
+              107
+              <span>Emergencias médicas</span>
+            </a>
+            <a href="tel:911" className="boton boton-llamada">
+              911
+              <span>Policía</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="barra-accion">
+        <button className="boton-secundario" onClick={seguir} style={{ width: '100%' }}>
+          Ya están siendo asistidos, seguir
+        </button>
+      </div>
+    </>
   )
 }
 
 /* ================= Audio ================= */
 
-function GrabadorAudio({
-  subir,
-  yaGrabado,
-  casoId,
-}: {
-  subir: (a: File, t: 'foto' | 'audio', g?: string) => Promise<string>
-  yaGrabado: boolean
-  casoId: string
-}) {
+function GrabadorAudio({ subir, yaGrabado, casoId }: { subir: Subir; yaGrabado: boolean; casoId: string }) {
   const [grabando, setGrabando] = useState(false)
   const [segundos, setSegundos] = useState(0)
   const [listo, setListo] = useState(yaGrabado)
@@ -663,139 +928,121 @@ function GrabadorAudio({
 
   return (
     <div>
-      {listo ? (
-        <div className="aviso aviso-ok" style={{ marginBottom: 10 }}>
-          Relato grabado e incorporado al expediente.
-        </div>
-      ) : null}
+      {listo ? <div className="aviso aviso-ok" style={{ marginBottom: 12 }}>Relato incorporado al expediente.</div> : null}
       {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
 
       {!grabando ? (
-        <button className="boton-secundario" onClick={empezar} disabled={subiendo} style={{ width: '100%' }}>
+        <button
+          className={listo ? 'boton-secundario' : 'boton-primario'}
+          onClick={empezar}
+          disabled={subiendo}
+          style={{ width: '100%', minHeight: 72, fontSize: 18 }}
+        >
           {subiendo ? 'Incorporando el audio...' : listo ? 'Grabar otra vez' : 'Empezar a grabar'}
         </button>
       ) : (
-        <button className="boton-emergencia" onClick={frenar}>
+        <button className="boton-emergencia" onClick={frenar} style={{ minHeight: 72, fontSize: 18 }}>
           <span className="grabando" />
-          Detener grabación · {mmss}
+          Detener · {mmss}
         </button>
       )}
     </div>
   )
 }
 
-/* ================= Fotos ================= */
+/* ================= Fotos, una por pantalla ================= */
 
-function PasoFotos({
+function PantallaFoto({
+  paso,
   medias,
   subir,
+  seguir,
 }: {
+  paso: Extract<Paso, { tipo: 'foto' }>
   medias: Media[]
-  subir: (a: File, t: 'foto' | 'audio', g?: string) => Promise<string>
+  subir: Subir
+  seguir: () => void
 }) {
-  const [subiendo, setSubiendo] = useState<string | null>(null)
+  const [subiendo, setSubiendo] = useState(false)
   const [fallo, setFallo] = useState<string | null>(null)
-  const porGuia = new Map(medias.filter((m) => m.tipo === 'foto' && m.guia_id).map((m) => [m.guia_id as string, m.id]))
-  const hechas = GUIA_FOTOS.filter((g) => porGuia.has(g.id)).length
-  const obligatoriasFaltantes = GUIA_FOTOS.filter((g) => g.obligatoria && !porGuia.has(g.id))
+  // La última, no la primera: repetir una toma no borra la anterior del expediente
+  // —es evidencia, ya está hasheada— pero en pantalla tiene que verse la nueva.
+  const tomada = medias.filter((m) => m.tipo === 'foto' && m.guia_id === paso.guia.id).at(-1)
 
-  async function elegir(e: React.ChangeEvent<HTMLInputElement>, guiaId: string) {
+  async function elegir(e: React.ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0]
     e.target.value = ''
     if (!archivo) return
-    setSubiendo(guiaId)
+    setSubiendo(true)
     setFallo(null)
     try {
-      await subir(archivo, 'foto', guiaId)
+      await subir(archivo, 'foto', paso.guia.id)
     } catch (err) {
       setFallo(err instanceof Error ? err.message : 'No se pudo subir la fotografía.')
     } finally {
-      setSubiendo(null)
+      setSubiendo(false)
     }
   }
 
   return (
     <>
-      <h1>Fotografías del lugar</h1>
-      <p className="apagado">
-        Te vamos a pedir {GUIA_FOTOS.length} tomas, una por una. La ubicación y la hora las pone el sistema, no el
-        archivo: por eso no se pueden falsificar después.
-      </p>
+      <div className="pantalla-cuerpo">
+        <div className="rotulo">
+          Foto {paso.numero} de {paso.total}
+          {paso.guia.obligatoria ? ' · obligatoria' : ''}
+        </div>
+        <h1 className="pregunta">{paso.guia.titulo}</h1>
+        <p className="pregunta-ayuda">{paso.guia.instruccion}</p>
 
-      <div className="captura">
-        <span className={`punto ${obligatoriasFaltantes.length === 0 ? 'punto-ok' : 'punto-espera'}`} />
-        <span>
-          {hechas} de {GUIA_FOTOS.length} tomas cargadas
-          {obligatoriasFaltantes.length > 0 ? ` · faltan ${obligatoriasFaltantes.length} obligatorias` : ' · completas'}
-        </span>
+        {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
+
+        {tomada ? (
+          <div className="foto-tomada">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/api/media/${tomada.id}`} alt={paso.guia.titulo} />
+          </div>
+        ) : (
+          <label className="foto-guiada">
+            {subiendo ? 'Subiendo...' : 'Sacar la foto'}
+            <small>La hora y el lugar los pone el sistema, no el archivo</small>
+            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={elegir} disabled={subiendo} />
+          </label>
+        )}
       </div>
 
-      {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
-
-      {GUIA_FOTOS.map((g) => {
-        const mediaId = porGuia.get(g.id)
-        return (
-          <div className="tarjeta" key={g.id}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <h3>{g.titulo}</h3>
-                <p className="ayuda" style={{ marginBottom: 10 }}>
-                  {g.instruccion}
-                </p>
-              </div>
-              <span className={`insignia ${g.obligatoria ? 'insignia-atencion' : 'insignia-neutra'}`}>
-                {g.obligatoria ? 'Obligatoria' : 'Opcional'}
-              </span>
-            </div>
-
-            {mediaId ? (
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <div className="miniatura" style={{ width: 84, flexShrink: 0 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/media/${mediaId}`} alt={g.titulo} />
-                  <span className="tilde">✓</span>
-                </div>
-                <label className="boton boton-secundario" style={{ flex: 1, cursor: 'pointer' }}>
-                  Reemplazar
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    style={{ display: 'none' }}
-                    onChange={(e) => elegir(e, g.id)}
-                  />
-                </label>
-              </div>
-            ) : (
-              <label className="boton boton-primario" style={{ cursor: 'pointer' }}>
-                {subiendo === g.id ? 'Subiendo...' : 'Sacar la foto'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  style={{ display: 'none' }}
-                  onChange={(e) => elegir(e, g.id)}
-                  disabled={subiendo !== null}
-                />
-              </label>
-            )}
-          </div>
-        )
-      })}
+      <div className="barra-accion">
+        {tomada ? (
+          <>
+            <button className="boton-primario" onClick={seguir}>
+              Seguir
+            </button>
+            <label className="boton boton-secundario" style={{ cursor: 'pointer' }}>
+              Repetir la foto
+              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={elegir} />
+            </label>
+          </>
+        ) : (
+          <button className="omitir" onClick={seguir}>
+            {paso.guia.obligatoria ? 'No puedo sacar esta foto' : 'Saltear esta foto'}
+          </button>
+        )}
+      </div>
     </>
   )
 }
 
 /* ================= Testigos ================= */
 
-function PasoTestigos({
+function PantallaTestigos({
   casoId,
   testigos,
   setTestigos,
+  seguir,
 }: {
   casoId: string
   testigos: Testigo[]
   setTestigos: (t: Testigo[]) => void
+  seguir: () => void
 }) {
   const [svg, setSvg] = useState<string | null>(null)
   const enlace = typeof window !== 'undefined' ? `${window.location.origin}/t/${casoId}` : ''
@@ -832,88 +1079,230 @@ function PasoTestigos({
 
   return (
     <>
-      <h1>Testigos</h1>
-      <p className="apagado">
-        Mostrale esta pantalla a quien haya visto el accidente. Lo escanea con <strong>su</strong> teléfono y carga sus
-        datos él mismo. Un dato cargado por el testigo vale mucho más que uno anotado por vos.
-      </p>
-
-      <div className="tarjeta centrado">
-        {svg ? (
-          <div className="qr" dangerouslySetInnerHTML={{ __html: svg }} />
-        ) : (
-          <p className="apagado">Generando el código...</p>
-        )}
-        <p className="mini" style={{ marginTop: 12, marginBottom: 10 }}>
-          {enlace}
+      <div className="pantalla-cuerpo">
+        <div className="rotulo">Testigos</div>
+        <h1 className="pregunta">¿Alguien vio el choque?</h1>
+        <p className="pregunta-ayuda">
+          Mostrale esta pantalla. La escanea con <strong>su</strong> teléfono y carga sus datos él mismo: eso vale mucho
+          más que un dato anotado por vos.
         </p>
-        <button className="boton-secundario" onClick={compartir} style={{ width: '100%' }}>
-          Compartir el enlace
+
+        <div className="tarjeta centrado">
+          {svg ? <div className="qr" dangerouslySetInnerHTML={{ __html: svg }} /> : <p className="apagado">Generando el código...</p>}
+          <button className="boton-secundario" onClick={compartir} style={{ width: '100%', marginTop: 10 }}>
+            Compartir el enlace
+          </button>
+        </div>
+
+        {testigos.length > 0 ? (
+          <div className="tarjeta">
+            <h3>Ya cargaron sus datos ({testigos.length})</h3>
+            <div className="pila">
+              {testigos.map((t) => (
+                <div key={t.id} className="faltante" style={{ pointerEvents: 'none' }}>
+                  <span className="punto punto-ok" />
+                  {t.nombre}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="mini centrado">Esta pantalla se actualiza sola cuando alguien carga sus datos.</p>
+        )}
+      </div>
+
+      <div className="barra-accion">
+        <button className="boton-primario" onClick={seguir}>
+          Seguir
+        </button>
+        {testigos.length === 0 ? (
+          <button className="omitir" onClick={seguir}>
+            No hay testigos
+          </button>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+/* ================= Corte: lo urgente ya está ================= */
+
+function PantallaCorte({
+  casoId,
+  seguir,
+  alCierre,
+}: {
+  casoId: string
+  seguir: () => void
+  alCierre: () => void
+}) {
+  return (
+    <>
+      <div className="pantalla-cuerpo">
+        <div className="hito">
+          <div className="hito-simbolo">✓</div>
+          <h1 className="pregunta" style={{ marginBottom: 10 }}>
+            Ya tenés lo importante
+          </h1>
+          <p className="pregunta-ayuda">
+            Todo lo que sólo existía en el lugar quedó registrado, con su hora y su ubicación. Lo que falta son datos
+            tuyos —la póliza, la licencia, la VTV— que podés completar cuando quieras.
+          </p>
+        </div>
+
+        <div className="tarjeta centrado">
+          <h3 style={{ marginBottom: 4 }}>Número de actuación</h3>
+          <p className="numero-actuacion" style={{ margin: '4px 0 10px' }}>
+            {casoId}
+          </p>
+          <p className="mini" style={{ margin: 0 }}>
+            Podés cerrar la aplicación e irte. Al volver a abrirla, retomás justo acá.
+          </p>
+        </div>
+      </div>
+
+      <div className="barra-accion">
+        <button className="boton-primario" onClick={seguir}>
+          Completar el resto ahora
+        </button>
+        <button className="boton-secundario" onClick={alCierre} style={{ width: '100%' }}>
+          Ir directo al cierre
         </button>
       </div>
+    </>
+  )
+}
 
-      <div className="tarjeta">
-        <h3>Testigos registrados ({testigos.length})</h3>
-        {testigos.length === 0 ? (
-          <p className="apagado" style={{ marginBottom: 0 }}>
-            Todavía no cargó nadie. Esta pantalla se actualiza sola.
-          </p>
-        ) : (
-          <div className="pila">
-            {testigos.map((t) => (
-              <div key={t.id} className="tarjeta-plana" style={{ marginBottom: 0 }}>
-                <strong>{t.nombre}</strong>
-                <div className="mini">{t.id}</div>
-              </div>
-            ))}
+/* ================= Datos del asegurado ================= */
+
+function PantallaDatos({
+  datos,
+  anotar,
+  seguir,
+}: {
+  datos: Datos
+  anotar: (clave: keyof Datos, valor: string) => void
+  seguir: () => void
+}) {
+  return (
+    <>
+      <div className="pantalla-cuerpo">
+        <div className="rotulo">Tus datos</div>
+        <h1 className="pregunta">¿Con qué póliza está asegurado?</h1>
+        <p className="pregunta-ayuda">
+          Son los datos de la carátula del expediente. Si no los tenés a mano, salteálos: podés volver a cargarlos
+          hasta que cierres.
+        </p>
+
+        <div className="pila">
+          <div className="campo">
+            <label htmlFor="patente">Patente de tu vehículo</label>
+            <input
+              id="patente"
+              className="campo-grande"
+              type="text"
+              placeholder="AB 123 CD"
+              autoCapitalize="characters"
+              value={datos.patente}
+              onChange={(e) => anotar('patente', e.target.value)}
+            />
           </div>
-        )}
+          <div className="campo">
+            <label htmlFor="poliza">Número de póliza</label>
+            <input
+              id="poliza"
+              className="campo-grande"
+              type="text"
+              value={datos.poliza}
+              onChange={(e) => anotar('poliza', e.target.value)}
+            />
+          </div>
+          <div className="campo">
+            <label htmlFor="asegurado">Nombre y apellido</label>
+            <input
+              id="asegurado"
+              className="campo-grande"
+              type="text"
+              placeholder="Como figura en la póliza"
+              value={datos.asegurado}
+              onChange={(e) => anotar('asegurado', e.target.value)}
+            />
+          </div>
+          <div className="campo">
+            <label htmlFor="telefono">Teléfono de contacto</label>
+            <input
+              id="telefono"
+              className="campo-grande"
+              type="tel"
+              placeholder="11 5555 5555"
+              value={datos.telefono}
+              onChange={(e) => anotar('telefono', e.target.value)}
+            />
+          </div>
+        </div>
       </div>
 
-      <p className="mini">
-        Si no hay testigos, seguí adelante. El expediente lo va a dejar asentado expresamente.
-      </p>
+      <div className="barra-accion">
+        <button className="boton-primario" onClick={seguir}>
+          Seguir
+        </button>
+      </div>
     </>
   )
 }
 
 /* ================= Revisión y cierre ================= */
 
-function PasoRevision({
+function PantallaRevision({
   casoId,
+  pasos,
   respuestas,
   medias,
   testigos,
   ubicacion,
+  irA,
+  alReintentarGps,
+  antesDeCerrar,
   alCerrar,
 }: {
   casoId: string
+  pasos: Paso[]
   respuestas: Respuestas
   medias: Media[]
   testigos: Testigo[]
   ubicacion: Ubicacion
+  irA: (clave: string) => void
+  alReintentarGps: () => void
+  antesDeCerrar: () => Promise<void>
   alCerrar: (r: { hash_maestro: string }) => void
 }) {
   const [cerrando, setCerrando] = useState(false)
   const [fallo, setFallo] = useState<string | null>(null)
 
+  /** Lo que falta, con la pantalla exacta a la que hay que volver para completarlo. */
+  const faltantes = useMemo(
+    () =>
+      pasos.flatMap((paso) => {
+        if (paso.tipo === 'pregunta' && paso.pregunta.requerida && !respondida(paso.pregunta, respuestas, medias)) {
+          return [{ clave: paso.clave, texto: paso.pregunta.texto }]
+        }
+        if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {
+          return [{ clave: paso.clave, texto: `Foto: ${paso.guia.titulo}` }]
+        }
+        return []
+      }),
+    [pasos, respuestas, medias],
+  )
+
   const fotos = medias.filter((m) => m.tipo === 'foto').length
   const audios = medias.filter((m) => m.tipo === 'audio').length
-  const obligatoriasFaltantes = GUIA_FOTOS.filter(
-    (g) => g.obligatoria && !medias.some((m) => m.guia_id === g.id),
-  ).length
-  const sinResponder = SECCIONES.flatMap((s) =>
-    preguntasVisibles(s, respuestas).filter((p) => {
-      if (!p.requerida) return false
-      const v = respuestas[p.id]
-      return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
-    }),
-  )
 
   async function cerrar() {
     setCerrando(true)
     setFallo(null)
     try {
+      // Se vacía el buffer antes de sellar: lo que no llegó a guardarse no se sella.
+      await antesDeCerrar()
       const res = await fetch(`/api/casos/${casoId}/cerrar`, { method: 'POST' })
       const cuerpo = await res.json()
       if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo cerrar la actuación.')
@@ -926,43 +1315,69 @@ function PasoRevision({
 
   return (
     <>
-      <h1>Antes de cerrar</h1>
-      <p className="apagado">
-        Al cerrar, el expediente se sella y ya no admite cambios. Es lo que le da valor: nadie puede modificarlo
-        después, ni vos.
-      </p>
+      <div className="pantalla-cuerpo">
+        <div className="rotulo">Último paso</div>
+        <h1 className="pregunta">Antes de cerrar</h1>
+        <p className="pregunta-ayuda">
+          Al cerrar, el expediente se sella y ya no admite cambios. Es lo que le da valor: nadie puede modificarlo
+          después, ni vos.
+        </p>
 
-      <div className="tarjeta">
-        <h3 style={{ marginBottom: 12 }}>Lo que se va a sellar</h3>
-        <div className="pila">
-          <Linea etiqueta="Ubicación y clima" ok={ubicacion !== null} texto={ubicacion ? 'Registrados' : 'Sin registrar'} />
-          <Linea
-            etiqueta="Respuestas obligatorias"
-            ok={sinResponder.length === 0}
-            texto={sinResponder.length === 0 ? 'Completas' : `Faltan ${sinResponder.length}`}
-          />
-          <Linea
-            etiqueta="Fotografías"
-            ok={obligatoriasFaltantes === 0}
-            texto={`${fotos} cargadas${obligatoriasFaltantes > 0 ? ` · faltan ${obligatoriasFaltantes} obligatorias` : ''}`}
-          />
-          <Linea etiqueta="Relato en audio" ok={audios > 0} texto={audios > 0 ? 'Grabado' : 'Sin grabar'} />
-          <Linea etiqueta="Testigos" ok={testigos.length > 0} texto={`${testigos.length} registrados`} />
+        <div className="tarjeta">
+          <h3 style={{ marginBottom: 12 }}>Lo que se va a sellar</h3>
+          <div className="pila">
+            <Linea etiqueta="Ubicación y clima" ok={ubicacion !== null} texto={ubicacion ? 'Registrados' : 'Sin registrar'} />
+            <Linea
+              etiqueta="Respuestas obligatorias"
+              ok={faltantes.length === 0}
+              texto={faltantes.length === 0 ? 'Completas' : `Faltan ${faltantes.length}`}
+            />
+            <Linea etiqueta="Fotografías" ok={fotos > 0} texto={`${fotos} cargadas`} />
+            <Linea etiqueta="Relato en audio" ok={audios > 0} texto={audios > 0 ? 'Grabado' : 'Sin grabar'} />
+            <Linea etiqueta="Testigos" ok={testigos.length > 0} texto={`${testigos.length} registrados`} />
+          </div>
         </div>
+
+        {ubicacion === null ? (
+          <div className="aviso aviso-atencion">
+            <strong>El expediente va a quedar sin ubicación.</strong>
+            <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
+              Sin ella no hay clima ni hora solar con qué contrastar la declaración. Si todavía estás en el lugar,
+              conviene resolverlo ahora.
+            </p>
+            <button className="boton-secundario" onClick={alReintentarGps} style={{ width: '100%' }}>
+              Reintentar la ubicación
+            </button>
+          </div>
+        ) : null}
+
+        {faltantes.length > 0 ? (
+          <div className="tarjeta">
+            <h3 style={{ marginBottom: 4 }}>Quedó sin completar</h3>
+            <p className="mini" style={{ marginBottom: 12 }}>
+              Podés cerrar igual, pero cada faltante debilita el expediente y queda asentado como tal. Tocá cualquiera
+              para completarlo.
+            </p>
+            <div className="pila">
+              {faltantes.map((f) => (
+                <button key={f.clave} className="faltante" onClick={() => irA(f.clave)}>
+                  <span className="punto punto-espera" />
+                  {f.texto}
+                  <span className="faltante-ir">Completar →</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
       </div>
 
-      {sinResponder.length > 0 ? (
-        <div className="aviso aviso-atencion">
-          Quedaron {sinResponder.length} preguntas obligatorias sin responder. Podés cerrar igual, pero cada faltante
-          debilita el expediente y queda asentado como tal.
-        </div>
-      ) : null}
-
-      {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
-
-      <button className="boton-primario" onClick={cerrar} disabled={cerrando}>
-        {cerrando ? 'Sellando el expediente...' : 'Cerrar y sellar el expediente'}
-      </button>
+      <div className="barra-accion">
+        <button className="boton-primario" onClick={cerrar} disabled={cerrando}>
+          {cerrando ? 'Sellando el expediente...' : 'Cerrar y sellar el expediente'}
+        </button>
+      </div>
     </>
   )
 }
@@ -983,19 +1398,22 @@ function Linea({ etiqueta, ok, texto }: { etiqueta: string; ok: boolean; texto: 
 
 /* ================= Final ================= */
 
-function PasoFinal({ casoId, cierre }: { casoId: string; cierre: { hash_maestro: string } | null }) {
+function PantallaFinal({ casoId, cierre }: { casoId: string; cierre: { hash_maestro: string } | null }) {
   return (
-    <>
-      <div className="aviso aviso-ok">Expediente cerrado y sellado.</div>
-      <h1>Listo</h1>
-      <p className="apagado">
-        El expediente quedó registrado con su cadena de custodia. Presentalo en tu aseguradora; el número de actuación
-        alcanza para que lo verifiquen.
-      </p>
+    <div className="pantalla-cuerpo">
+      <div className="hito">
+        <div className="hito-simbolo">✓</div>
+        <h1 className="pregunta">Expediente cerrado y sellado</h1>
+        <p className="pregunta-ayuda">
+          Presentalo en tu aseguradora. El número de actuación alcanza para que lo verifiquen.
+        </p>
+      </div>
 
       <div className="tarjeta">
         <h3>Número de actuación</h3>
-        <p style={{ fontSize: 24, fontWeight: 700, letterSpacing: '0.02em', margin: '4px 0 14px' }}>{casoId}</p>
+        <p className="numero-actuacion" style={{ margin: '4px 0 16px' }}>
+          {casoId}
+        </p>
 
         {cierre ? (
           <>
@@ -1023,6 +1441,6 @@ function PasoFinal({ casoId, cierre }: { casoId: string; cierre: { hash_maestro:
         Guardá el número de actuación. Cualquiera puede comprobar con él que el expediente no fue modificado, sin
         necesidad de acceder a su contenido.
       </p>
-    </>
+    </div>
   )
 }

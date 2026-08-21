@@ -11,22 +11,60 @@ detección de contradicciones.
 
 ## Qué hace
 
-La persona abre un enlace en el celular parada al lado del auto. No instala nada.
+La persona abre la aplicación en el celular parada al lado del auto y toca **un solo
+botón**: "Tuve un accidente". No se le pide nada antes: ni la póliza, ni la patente, ni el
+nombre. Un formulario en la primera pantalla es exactamente lo que hace que alguien con
+adrenalina abandone.
 
-1. **Triage** — ¿hay heridos? Botones directos al 107 y al 911.
+A partir de ahí es **una pregunta por pantalla**, con botones grandes, y elegir es avanzar:
+un toque por respuesta.
+
+1. **¿Hay alguien herido?** — es lo primero y no se puede saltear. Si la respuesta no es
+   "no", la pantalla siguiente es roja y tiene dos botones: **107** y **911**.
 2. **Captura silenciosa** — mientras contesta, el sistema registra por su cuenta las
    coordenadas GPS, la hora, la dirección real de la calle y **las condiciones
    meteorológicas de ese punto en ese minuto**.
-3. **Cuestionario guiado** — 7 secciones, 34 preguntas, con relato en audio.
-4. **12 fotografías guiadas** — una por una, con instrucción concreta de encuadre.
-5. **Testigos por QR** — el testigo escanea con *su* teléfono y carga sus datos él mismo,
-   con consentimiento expreso registrado.
-6. **Cierre y sellado** — se calcula el hash maestro, se firma y se pide un sello de tiempo
+3. **Lo que se pierde si no se toma ahora** — la patente y los datos del tercero, cómo
+   quedaron los vehículos, las 12 fotografías guiadas de a una, el relato en audio y los
+   testigos por QR.
+4. **Cómo ocurrió** — mecánica del hecho, condiciones del lugar y quién intervino.
+5. **Corte** — "ya tenés lo importante". Puede irse y retomar más tarde desde el mismo
+   enlace, o seguir de largo.
+6. **Lo que se completa después** — la póliza, la licencia, la VTV, el uso del vehículo.
+   Datos que la persona tiene siempre y que no se pierden por irse del lugar.
+7. **Cierre y sellado** — se calcula el hash maestro, se firma y se pide un sello de tiempo
    RFC 3161. Desde ese momento el expediente no admite cambios.
-7. **Expediente PDF** — mapa del lugar, fotos, declaración, testigos, clima, informe de
+8. **Expediente PDF** — mapa del lugar, fotos, declaración, testigos, clima, informe de
    consistencia y tabla completa de cadena de custodia.
 
 Más un **panel** para la aseguradora y un **verificador público** de integridad.
+
+---
+
+## El orden es de urgencia, no jurídico
+
+Es la decisión de diseño que ordena todo lo demás. El cuestionario tiene 9 secciones y 38
+preguntas —muchas condicionales, así que nadie las ve todas— y cada sección declara a qué
+`bloque` pertenece:
+
+| Bloque | Qué contiene | Por qué ahí |
+| --- | --- | --- |
+| `seguridad` | heridos, riesgo en el lugar | Define si hay que pedir una ambulancia |
+| `lugar` | tercero, fotos, relato, testigos, mecánica | Deja de existir cuando la persona se va |
+| `despues` | póliza, licencia, VTV, uso del vehículo | Lo tiene siempre; no se pierde |
+
+**Nada bloquea el avance salvo la pregunta por los heridos.** Cada pantalla tiene su forma
+de saltearse —"No la pude ver", "No me los quiso dar", "Todavía no me lo dieron"— y lo que
+quede sin completar aparece en la revisión final como un botón que lleva directo a esa
+pregunta. Un expediente incompleto vale más que uno abandonado en la tercera pantalla.
+
+El relato en audio va **antes** que las preguntas de mecánica, también a propósito: primero
+la persona cuenta lo que vio con sus palabras, y recién después las preguntas cerradas.
+Al revés, cada pregunta le sugiere la respuesta al relato.
+
+Las preguntas y las fotos que no corresponden no se muestran: quien chocó contra un árbol
+no ve las cinco pantallas del otro vehículo, y a quien declara que el tercero se dio a la
+fuga no se le piden sus datos personales.
 
 ---
 
@@ -106,11 +144,17 @@ ALTER TABLE testigos ENABLE ROW LEVEL SECURITY;
 npm run prueba    # pruebas de la lógica pura, sin base de datos
 npm run tipos     # chequeo de tipos
 npm run build     # build de producción
+npm run e2e       # circuito completo contra un servidor ya levantado
 ```
 
-`npm run prueba` verifica el encadenado de hashes (incluido que alterar o suprimir un eslabón
-rompa la validación), el motor de consistencia y la generación del PDF de punta a punta.
-Deja un expediente de ejemplo en `data/expediente-de-prueba.pdf`.
+`npm run prueba` verifica el orden y la visibilidad del cuestionario (que ninguna sección
+quede fuera del recorrido, que no se pidan fotos del tercero cuando no hay tercero), el
+encadenado de hashes —incluido que alterar o suprimir un eslabón rompa la validación—, el
+motor de consistencia y la generación del PDF de punta a punta. Deja un expediente de
+ejemplo en `data/expediente-de-prueba.pdf`.
+
+`npm run e2e` necesita `npm run dev` corriendo aparte y una base configurada: recorre el
+circuito real, desde el alta sin datos hasta el sello de tiempo y la verificación pública.
 
 ---
 
@@ -159,7 +203,7 @@ El esquema de base de datos se crea solo en el primer arranque.
    (Encode, Lakaut, Box Custodia o Digilogix) y firmar el PDF en formato PAdES. Está
    aislado en `lib/sello.ts` para que el cambio toque un solo archivo.
 3. **Transcripción del audio.** El audio se guarda y se hashea, pero no se transcribe.
-4. **Revisión del cuestionario por un abogado de tránsito.** Las 34 preguntas están
+4. **Revisión del cuestionario por un abogado de tránsito.** Las 38 preguntas están
    redactadas con criterio de aseguradora, pero no las validó nadie del fuero. Es lo
    más importante de la lista: la tecnología la copia cualquiera, las preguntas correctas no.
 5. **Registro de la base ante la AAIP**, conforme a la Ley 25.326.
@@ -180,14 +224,14 @@ juntar los miles de choques etiquetados que necesita un modelo propio.
 
 ```
 app/
-  page.tsx               inicio: apertura de la actuación
-  s/[id]/                flujo de captura (el wizard)
+  page.tsx               inicio: un botón, "Tuve un accidente"
+  s/[id]/Flujo.tsx       el recorrido: una pregunta por pantalla
   t/[id]/                carga de testigo por QR
   panel/                 listado y detalle para la aseguradora
   verificar/             verificador público de integridad
   api/                   rutas de servidor
 lib/
-  cuestionario.ts        las 34 preguntas y las 12 tomas fotográficas
+  cuestionario.ts        las preguntas, las tomas fotográficas y el orden del recorrido
   consistencia.ts        motor de contrastes
   hash.ts                cadena de custodia y manifiesto
   sello.ts               firma y sello de tiempo RFC 3161
@@ -196,10 +240,22 @@ lib/
   geo.ts                 Nominatim y mosaicos de mapa
   db.ts                  Postgres y esquema
   almacenamiento.ts      archivos en el volumen
+  local.ts               qué actuación quedó abierta en este teléfono
 scripts/
   prueba-logica.mjs      pruebas sin base de datos
+  prueba-e2e.mjs         circuito completo contra un servidor levantado
 ```
 
+`lib/cuestionario.ts` es el único lugar donde se toca el contenido del cuestionario:
+`SECCIONES` define las preguntas y `RECORRIDO` el orden en que se intercalan con las
+pantallas propias (fotos, testigos, corte). **Los ids de las preguntas son API** —los usan
+el motor de consistencia, el PDF y la validación del `PATCH`—: se pueden reordenar, no
+renombrar.
+
+Cada pantalla del recorrido es una entrada del historial del navegador (`?paso=`), así que
+el gesto de atrás del teléfono vuelve a la pregunta anterior en vez de salirse de la
+
+aplicación, y el enlace se puede compartir apuntando a un paso concreto.
 ---
 
 ## Privacidad

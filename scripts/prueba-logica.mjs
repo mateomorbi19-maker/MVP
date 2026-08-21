@@ -14,7 +14,7 @@ import { canonico, sha256, hashEvento } from '../lib/hash.ts'
 import { analizar } from '../lib/consistencia.ts'
 import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
-import { GUIA_FOTOS } from '../lib/cuestionario.ts'
+import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 
 let fallos = 0
 let pruebas = 0
@@ -28,6 +28,79 @@ function verificar(nombre, condicion, extra = '') {
     console.log(`  FALLA ${nombre} ${extra}`)
   }
 }
+
+/* ---------- 0. Recorrido y visibilidad ---------- */
+console.log('\n[0] Recorrido del cuestionario')
+
+const idsDelRecorrido = RECORRIDO.filter((e) => e.tipo === 'seccion').map((e) => e.id)
+
+verificar(
+  'toda etapa del recorrido apunta a una sección que existe',
+  idsDelRecorrido.every((id) => seccionPorId(id) !== undefined),
+  idsDelRecorrido.filter((id) => !seccionPorId(id)).join(', '),
+)
+
+// Una sección fuera del recorrido no se le muestra a nadie y nadie se entera.
+verificar(
+  'toda sección está incluida en el recorrido',
+  SECCIONES.every((s) => idsDelRecorrido.includes(s.id)),
+  SECCIONES.filter((s) => !idsDelRecorrido.includes(s.id)).map((s) => s.id).join(', '),
+)
+
+verificar('la primera pantalla pregunta por los heridos', SECCIONES[0].preguntas[0].id === 'heridos')
+
+verificar(
+  'los datos de cobertura quedan para el final',
+  SECCIONES.filter((s) => s.bloque === 'despues').every(
+    (s) => idsDelRecorrido.indexOf(s.id) > idsDelRecorrido.indexOf('mecanica'),
+  ),
+)
+
+const contraArbol = { tipo_siniestro: 'Colisión con objeto fijo' }
+const contraAuto = { tipo_siniestro: 'Colisión con otro vehículo' }
+
+verificar(
+  'sin otro vehículo no se exigen fotos del tercero',
+  !fotosObligatorias(contraArbol).some((id) => id.includes('tercero')),
+  fotosObligatorias(contraArbol).join(', '),
+)
+
+verificar(
+  'con otro vehículo sí se exige la patente del tercero',
+  fotosObligatorias(contraAuto).includes('patente_tercero'),
+)
+
+verificar(
+  'todas las tomas siguen estando disponibles para una colisión entre autos',
+  fotosObligatorias(contraAuto).length > fotosObligatorias(contraArbol).length,
+)
+
+const seccionTerceros = seccionPorId('terceros')
+const conFuga = { ...contraAuto, tercero_actitud: 'Se dio a la fuga' }
+const idsConFuga = preguntasVisibles(seccionTerceros, conFuga).map((p) => p.id)
+
+verificar('si el tercero se fugó no se le piden sus datos', !idsConFuga.includes('tercero_datos'))
+verificar('si el tercero se fugó igual se pregunta la patente', idsConFuga.includes('tercero_patente'))
+verificar(
+  'si el tercero está presente se le piden los datos',
+  preguntasVisibles(seccionTerceros, { ...contraAuto, tercero_actitud: 'Sí, está acá' })
+    .map((p) => p.id)
+    .includes('tercero_datos'),
+)
+
+// Saltear una pregunta no puede hacer desaparecer las que vienen después.
+verificar(
+  'omitir la pregunta del tercero no esconde el resto',
+  preguntasVisibles(seccionTerceros, contraAuto).map((p) => p.id).includes('tercero_datos'),
+)
+
+verificar('las guías de foto no tienen ids repetidos', new Set(GUIA_FOTOS.map((g) => g.id)).size === GUIA_FOTOS.length)
+
+verificar(
+  'las preguntas no tienen ids repetidos',
+  new Set(SECCIONES.flatMap((s) => s.preguntas.map((p) => p.id))).size ===
+    SECCIONES.reduce((n, s) => n + s.preguntas.length, 0),
+)
 
 /* ---------- 1. Serialización canónica y cadena ---------- */
 console.log('\n[1] Serialización canónica y encadenado')
@@ -113,7 +186,7 @@ const entradaBase = {
   direccion: 'Avenida Rivadavia 5000, Caballito, Buenos Aires',
   gpsCapturadoEn: new Date().toISOString(),
   fotos: [],
-  fotosObligatorias: GUIA_FOTOS.filter((g) => g.obligatoria).map((g) => g.id),
+  fotosObligatorias: fotosObligatorias({ tipo_siniestro: 'Colisión con otro vehículo' }),
   tieneAudio: false,
   testigos: 0,
 }

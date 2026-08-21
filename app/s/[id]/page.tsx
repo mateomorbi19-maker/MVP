@@ -16,6 +16,12 @@ export default async function PaginaSiniestro({ params }: { params: Promise<{ id
       casoId={caso.id}
       estadoInicial={caso.estado}
       respuestasIniciales={caso.respuestas}
+      datosIniciales={{
+        poliza: caso.poliza ?? '',
+        patente: caso.patente ?? '',
+        asegurado: caso.asegurado ?? '',
+        telefono: caso.telefono ?? '',
+      }}
       hashMaestro={caso.hash_maestro}
       mediasIniciales={medias.map((m) => ({ id: m.id, tipo: m.tipo, guia_id: m.guia_id }))}
       testigosIniciales={testigos.map((t) => ({ id: t.id, nombre: t.nombre }))}

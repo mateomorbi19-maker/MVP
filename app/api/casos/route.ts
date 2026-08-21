@@ -2,39 +2,34 @@ import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
-import { listarCasos } from '@/lib/casos'
+import { listarCasos, limpiarDatosAsegurado } from '@/lib/casos'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/** Alta de una actuación. Es el primer eslabón de la cadena de custodia. */
+/**
+ * Alta de una actuación. Es el primer eslabón de la cadena de custodia.
+ *
+ * El cuerpo puede venir vacío, y es el caso normal: desde el teléfono la actuación se
+ * abre con un solo toque, sin pedir nada. Los datos del asegurado se cargan después,
+ * por PATCH. Se siguen aceptando acá para las altas hechas desde otro sistema.
+ */
 export async function POST(req: Request) {
   try {
     const cuerpo = await req.json().catch(() => ({}))
+    const datos = limpiarDatosAsegurado(cuerpo)
     const id = nuevoId()
     const pg = await db()
-
-    const limpiar = (v: unknown, max = 120): string | null => {
-      if (typeof v !== 'string') return null
-      const s = v.trim().slice(0, max)
-      return s.length > 0 ? s : null
-    }
 
     await pg.query(
       `INSERT INTO casos (id, poliza, patente, asegurado, telefono)
        VALUES ($1, $2, $3, $4, $5)`,
-      [
-        id,
-        limpiar(cuerpo.poliza),
-        limpiar(cuerpo.patente, 15)?.toUpperCase() ?? null,
-        limpiar(cuerpo.asegurado),
-        limpiar(cuerpo.telefono, 40),
-      ],
+      [id, datos.poliza, datos.patente, datos.asegurado, datos.telefono],
     )
 
     await registrarEvento(id, 'apertura_actuacion', {
-      poliza: limpiar(cuerpo.poliza),
-      patente: limpiar(cuerpo.patente, 15)?.toUpperCase() ?? null,
+      poliza: datos.poliza,
+      patente: datos.patente,
       user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null,
     })
 

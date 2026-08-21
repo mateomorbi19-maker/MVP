@@ -1,7 +1,7 @@
 import { db } from './db'
 import { construirManifiesto } from './hash'
 import { analizar, type InformeConsistencia } from './consistencia'
-import { GUIA_FOTOS } from './cuestionario'
+import { fotosObligatorias } from './cuestionario'
 import type { Clima } from './clima'
 import type { Sello } from './sello'
 import type { DatosExpediente } from './pdf'
@@ -114,8 +114,6 @@ export async function listarTestigos(casoId: string): Promise<Testigo[]> {
   }))
 }
 
-const FOTOS_OBLIGATORIAS = GUIA_FOTOS.filter((g) => g.obligatoria).map((g) => g.id)
-
 /** Recalcula el informe de consistencia con el estado actual del expediente. */
 export async function calcularConsistencia(casoId: string): Promise<InformeConsistencia | null> {
   const caso = await obtenerCaso(casoId)
@@ -129,7 +127,7 @@ export async function calcularConsistencia(casoId: string): Promise<InformeConsi
     direccion: caso.direccion,
     gpsCapturadoEn: caso.gps?.capturado_en ?? null,
     fotos: medias.filter((m) => m.tipo === 'foto').map((m) => ({ guia_id: m.guia_id })),
-    fotosObligatorias: FOTOS_OBLIGATORIAS,
+    fotosObligatorias: fotosObligatorias(caso.respuestas),
     tieneAudio: medias.some((m) => m.tipo === 'audio'),
     testigos: testigos.length,
   })
@@ -195,4 +193,45 @@ export function urlPublica(req?: Request): string {
     if (host) return `${proto}://${host}`
   }
   return 'http://localhost:3000'
+}
+
+/* ================= Datos del asegurado ================= */
+
+/**
+ * Los cuatro campos de la carátula.
+ *
+ * Ya no se piden al abrir la actuación: parado al lado del auto nadie tiene la póliza
+ * a mano, y pedirla antes de empezar es lo que hace que la persona abandone. Se cargan
+ * al final del recorrido, con el mismo PATCH que el resto.
+ */
+export interface DatosAsegurado {
+  poliza: string | null
+  patente: string | null
+  asegurado: string | null
+  telefono: string | null
+}
+
+const LARGOS: Record<keyof DatosAsegurado, number> = {
+  poliza: 120,
+  patente: 15,
+  asegurado: 120,
+  telefono: 40,
+}
+
+/** Normaliza lo que llega del cliente. La patente se guarda siempre en mayúsculas. */
+export function limpiarDatosAsegurado(cuerpo: unknown): DatosAsegurado {
+  const c = (cuerpo && typeof cuerpo === 'object' ? cuerpo : {}) as Record<string, unknown>
+  const limpiar = (clave: keyof DatosAsegurado): string | null => {
+    const v = c[clave]
+    if (typeof v !== 'string') return null
+    const s = v.trim().slice(0, LARGOS[clave])
+    if (s.length === 0) return null
+    return clave === 'patente' ? s.toUpperCase() : s
+  }
+  return {
+    poliza: limpiar('poliza'),
+    patente: limpiar('patente'),
+    asegurado: limpiar('asegurado'),
+    telefono: limpiar('telefono'),
+  }
 }
