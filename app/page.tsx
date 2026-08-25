@@ -63,7 +63,8 @@ export default function Inicio() {
         </div>
       ) : null}
 
-      {error ? <div className="aviso aviso-alerta">{error}</div> : null}
+      {/* Si el fallo al abrir es el mismo que ya avisa el estado del sistema, no se repite. */}
+      {error && error !== salud?.detalle ? <div className="aviso aviso-alerta">{error}</div> : null}
 
       <div className="inicio-centro">
         <button className="boton-gigante" onClick={iniciar} disabled={enviando}>

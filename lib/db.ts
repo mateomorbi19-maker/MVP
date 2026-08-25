@@ -47,12 +47,45 @@ export function traducirErrorBase(err: unknown): ErrorBaseDeDatos | null {
       )
     case '28P01':
     case '28000':
-      return new ErrorBaseDeDatos('Usuario o contraseña incorrectos en DATABASE_URL.', 'autenticacion')
+      return new ErrorBaseDeDatos(
+        'Usuario o contraseña incorrectos en DATABASE_URL. Las dos causas más frecuentes son una contraseña con caracteres que la URL se come si no van codificados (#, ?, / y @), y —en Supabase con el pooler— haber puesto el usuario "postgres" en lugar de "postgres.<referencia-del-proyecto>". El log del servidor dice a qué usuario y host se está intentando conectar.',
+        'autenticacion',
+      )
     case '3D000':
       return new ErrorBaseDeDatos('La base indicada en DATABASE_URL no existe.', 'sin_configurar')
     default:
       return null
   }
+}
+
+/**
+ * A qué usuario y host apunta DATABASE_URL, sin la contraseña.
+ *
+ * Va únicamente al log del servidor. En la respuesta de /api/salud, que es pública,
+ * esto le estaría diciendo a cualquiera dónde vive la base y con qué usuario entrar.
+ *
+ * Avisa aparte si la contraseña trae caracteres sin codificar: la URL se corta en el
+ * primer '#', '?' o '/', así que la contraseña llega incompleta y Postgres responde
+ * exactamente lo mismo que si estuviera equivocada. Es la causa más común y la más
+ * difícil de ver, porque en el panel de Easypanel la variable se ve entera y correcta.
+ */
+export function destinoBase(): string {
+  const url = process.env.DATABASE_URL
+  if (!url) return 'sin DATABASE_URL'
+
+  const inicio = url.indexOf('://')
+  const fin = url.lastIndexOf('@')
+  if (inicio < 0 || fin < inicio) return 'DATABASE_URL ilegible: no tiene la forma postgres://usuario:clave@host:puerto/base'
+
+  const credenciales = url.slice(inicio + 3, fin)
+  const usuario = credenciales.split(':')[0]
+  const clave = credenciales.slice(usuario.length + 1)
+  const sinCodificar = [...new Set(clave.match(/[#?/@]/g) ?? [])]
+
+  const aviso = sinCodificar.length
+    ? `  <-- la contraseña contiene ${sinCodificar.map((c) => `"${c}"`).join(' y ')} sin codificar: la URL se corta ahí y la clave llega incompleta`
+    : ''
+  return `${usuario}@${url.slice(fin + 1)}${aviso}`
 }
 
 export function pool(): Pool {
@@ -194,7 +227,12 @@ export async function estadoBase(): Promise<{
     }
   } catch (err) {
     const traducido = traducirErrorBase(err)
-    if (traducido) return { ok: false, detalle: traducido.message, causa: traducido.causa }
+    if (traducido) {
+      if (traducido.causa === 'autenticacion') {
+        console.error('[salud] la base rechazó las credenciales. Se intentó conectar como:', destinoBase())
+      }
+      return { ok: false, detalle: traducido.message, causa: traducido.causa }
+    }
     return { ok: false, detalle: err instanceof Error ? err.message : 'Error desconocido.', causa: 'desconocida' }
   }
 }
