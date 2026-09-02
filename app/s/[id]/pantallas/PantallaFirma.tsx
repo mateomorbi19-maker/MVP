@@ -83,7 +83,7 @@ export function PantallaFirma({
   return (
     <>
       <div className="pantalla-cuerpo">
-        <div className="rotulo">Último paso</div>
+        <div className="rotulo">Tu firma</div>
         <h1 className="pregunta">Firmá lo que declaraste</h1>
 
         {acta ? (

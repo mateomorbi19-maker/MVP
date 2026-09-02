@@ -116,25 +116,19 @@ const GUIAS_CONGELADAS = [
  * que deja la barra de progreso clavada en 0% para siempre y sin ningún error.
  */
 const CUPO_INLINE = {
-  'app/panel/[id]/page.tsx': [0, 35],
-  'app/verificar/page.tsx': [0, 15],
-  'app/panel/page.tsx': [0, 8],
-  'app/s/[id]/pantallas/PantallaRevision.tsx': [0, 8],
-  'app/s/[id]/pantallas/PantallaCorte.tsx': [0, 5],
-  'app/components/InstalarApp.tsx': [0, 4],
-  'app/t/[id]/page.tsx': [0, 3],
-  'app/page.tsx': [0, 3],
-  'app/s/[id]/pantallas/GrabadorAudio.tsx': [0, 3],
-  'app/s/[id]/pantallas/ChipUbicacion.tsx': [0, 3],
-  'app/s/[id]/pantallas/PantallaTestigos.tsx': [0, 2],
-  'app/s/[id]/pantallas/PantallaPregunta.tsx': [0, 2],
-  'app/s/[id]/pantallas/PantallaFinal.tsx': [0, 2],
-  'app/s/[id]/pantallas/PantallaEmergencia.tsx': [0, 2],
-  'app/s/[id]/pantallas/PantallaFoto.tsx': [0, 1],
-  'app/components/Marca.tsx': [0, 1],
-  // El único que tiene mínimo: transporta el avance del progreso, que es un dato.
+  /*
+   * El trinquete de estilos en linea. Un archivo que no figura aca vale cero.
+   *
+   * Arranco con ocho archivos y un techo de 35 para el detalle del panel. Hoy queda uno
+   * solo, y con minimo: el estilo de Flujo.tsx transporta el avance del recorrido como
+   * propiedad personalizada, que es un dato y no puede vivir en la hoja. Todo lo demas
+   * era margen y ancho escritos dentro de un archivo de logica.
+   *
+   * Los maximos SOLO BAJAN. Si necesitas subir uno, lo que falta es una clase.
+   */
   'app/s/[id]/Flujo.tsx': [1, 1],
 }
+
 
 /*
  * Selectores de elemento desnudo admitidos, con el motivo.

@@ -2,15 +2,23 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
 
 /** Alta de cuenta de asegurado. Los productores los da de alta la aseguradora. */
 export default function Registro() {
-  const router = useRouter()
   const [datos, setDatos] = useState({ dni: '', nombre: '', telefono: '', email: '', clave: '' })
   const [error, setError] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  /*
+   * El alta terminaba en router.push('/entrar'), que deja a la persona en un formulario
+   * vacío igualito al que acaba de completar: mismo encabezado, misma tarjeta, DNI y
+   * contraseña en blanco otra vez. Nada decía que la cuenta existía, así que la lectura
+   * natural era «falló y volví al principio» y el reintento se comía un cartel rojo de DNI
+   * duplicado provocado por la cuenta propia recién creada. Se confirma acá, y el paso
+   * siguiente se toca, no se adivina.
+   */
+  const [creada, setCreada] = useState(false)
 
   const campo = (clave: keyof typeof datos) => ({
     value: datos[clave],
@@ -29,7 +37,7 @@ export default function Registro() {
       })
       const cuerpo = await res.json()
       if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo crear la cuenta.')
-      router.push('/entrar')
+      setCreada(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error inesperado.')
       setEnviando(false)
@@ -41,13 +49,27 @@ export default function Registro() {
       <Marca />
 
       <header className="encabezado-pagina">
-        <h1 className="titulo-pagina">Crear una cuenta</h1>
+        <h1 className="titulo-pagina">{creada ? 'Tu cuenta quedó creada' : 'Crear una cuenta'}</h1>
         <p className="bajada-pagina">
           La cuenta sirve para ver tu póliza, el historial de tus actuaciones y mandarle el acta a tu productor. Para
           registrar un siniestro no hace falta: ese botón nunca te va a pedir nada.
         </p>
       </header>
 
+      {creada ? (
+        <div className="vacio">
+          <span className="vacio-icono">
+            <Icono nombre="tilde" />
+          </span>
+          <h2 className="vacio-titulo">Ya podés entrar</h2>
+          <p className="vacio-texto">
+            Entrá con el DNI {datos.dni} y la contraseña que elegiste. Es la misma cuenta desde cualquier teléfono.
+          </p>
+          <Link className="boton boton-primario" href="/entrar">
+            Iniciar sesión
+          </Link>
+        </div>
+      ) : (
       <form className="tarjeta" onSubmit={registrar}>
         <div className="campo">
           <label htmlFor="dni">DNI</label>
@@ -77,10 +99,13 @@ export default function Registro() {
           {enviando ? 'Creando...' : 'Crear la cuenta'}
         </button>
       </form>
+      )}
 
-      <p className="centrado">
-        <Link href="/entrar" className="boton boton-secundario">Ya tengo cuenta</Link>
-      </p>
+      {creada ? null : (
+        <p className="centrado">
+          <Link href="/entrar" className="boton boton-secundario">Ya tengo cuenta</Link>
+        </p>
+      )}
     </main>
   )
 }

@@ -80,7 +80,13 @@ export function PantallaTestigos({
               datos igual.
             </div>
           ) : (
-            <p className="apagado">Generando el código...</p>
+            /*
+             * El hueco del QR se reserva con la misma caja que va a ocupar el código.
+             * Con una línea de texto la tarjeta mide ~60 px y salta a ~292 px al llegar
+             * el SVG: en 375 px «Compartir el enlace», que está acá abajo dentro de la
+             * misma tarjeta, se corre justo cuando el dedo ya iba hacia él.
+             */
+            <div className="qr-esperando">Generando el código...</div>
           )}
           <button className="boton-secundario boton-ancho boton-compartir-qr" onClick={compartir}>
             Compartir el enlace

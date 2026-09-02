@@ -27,8 +27,9 @@ export default async function VerificacionPublica({ params }: { params: Promise<
   const resultado = await verificarCadena(id)
   const manifiesto = await construirManifiesto(id)
 
+  const sellado = caso.estado === 'cerrado'
   const problemas = [...resultado.problemas]
-  if (caso.estado === 'cerrado' && caso.hash_maestro && caso.hash_maestro !== manifiesto.hash_maestro) {
+  if (sellado && caso.hash_maestro && caso.hash_maestro !== manifiesto.hash_maestro) {
     problemas.push('El expediente fue modificado después de cerrarse.')
   }
   const valido = problemas.length === 0
@@ -44,14 +45,25 @@ export default async function VerificacionPublica({ params }: { params: Promise<
         </p>
       </header>
 
-      <div className="aviso" data-nivel={valido ? 'ok' : 'alerta'}>
+      {/*
+        Una actuación abierta no tiene problemas de cadena, así que sale válida: en verde diría lo
+        mismo que un expediente sellado e íntegro, y el verde es lo único que se lee con sol de
+        frente. Todavía no sellada es un tercer estado, no una conformidad.
+      */}
+      <div className="aviso" data-nivel={!valido ? 'alerta' : sellado ? 'ok' : 'atencion'}>
         <strong>
-          {valido
-            ? caso.estado === 'cerrado'
+          {!valido
+            ? 'El expediente no verifica.'
+            : sellado
               ? 'El expediente está íntegro.'
-              : 'La actuación existe, pero todavía no fue sellada.'
-            : 'El expediente no verifica.'}
+              : 'La actuación existe, pero todavía no fue sellada.'}
         </strong>
+        {valido && !sellado ? (
+          <p className="aviso-detalle">
+            Hasta que se selle, su contenido todavía puede cambiar: esto no comprueba un documento impreso. Volvé a
+            verificar el número cuando el expediente esté cerrado.
+          </p>
+        ) : null}
       </div>
 
       <div className="tarjeta">
@@ -61,7 +73,11 @@ export default async function VerificacionPublica({ params }: { params: Promise<
         <p className="mini">
           {resultado.eslabones} registros encadenados · {resultado.piezas} piezas
         </p>
-        <p className="mono mini">{manifiesto.hash_maestro}</p>
+        {/* Mismo bloque y mismo rótulo que el campo impreso en el PDF, que es contra lo que se compara. */}
+        <div className="hash-expediente">
+          <h3>Hash maestro</h3>
+          <p className="mono hash-expediente-valor">{manifiesto.hash_maestro}</p>
+        </div>
         {caso.sello?.tsa?.obtenida ? (
           <p className="mini">Sello de tiempo de {caso.sello.tsa.autoridad}.</p>
         ) : (
@@ -72,10 +88,9 @@ export default async function VerificacionPublica({ params }: { params: Promise<
       {problemas.length > 0 ? (
         <div className="tarjeta">
           <h3>Qué no verifica</h3>
+          {/* En cuerpo normal, no en .mini: es lo que un perito tiene que poder leer, no letra chica. */}
           {problemas.map((p) => (
-            <p className="mini" key={p}>
-              {p}
-            </p>
+            <p key={p}>{p}</p>
           ))}
         </div>
       ) : null}
@@ -90,9 +105,9 @@ export default async function VerificacionPublica({ params }: { params: Promise<
         con las presunciones de autoría e integridad de los arts. 7 y 8, que requieren un certificado emitido por un
         certificador licenciado.
       </p>
-      <p className="mini centrado">
-        <Link href="/verificar" className="enlace">Verificar otro expediente</Link>
-      </p>
+      <Link className="boton boton-secundario boton-ancho" href="/verificar">
+        Verificar otro expediente
+      </Link>
     </main>
   )
 }

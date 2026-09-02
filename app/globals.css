@@ -43,6 +43,10 @@
   --ok-rgb: 17 118 77;
   --atencion-rgb: 134 83 0;
 
+  /* --alerta en canales, para teñir con transparencia el borde de la tarjeta de problemas.
+     Mismo motivo que --ok-rgb y --atencion-rgb. */
+  --alerta-rgb: 180 35 42;
+
   /*
    * Blanco sobre una superficie de color pleno: texto de botones, el punto de la opción
    * elegida, la tarjeta blanca sobre el rojo de emergencia. NO cambia con el tema, igual
@@ -56,15 +60,20 @@
      modo oscuro. Por eso es un token propio y no --superficie. */
   --fondo-qr: #ffffff;
 
-  /* El rojo de emergencia en canales, para la sombra del botón de inicio, que hasta
-     ahora repetía a mano un rojo distinto (184,28,28) del token (#bf1b1b). */
+  /* El rojo de emergencia en canales, para la sombra del botón de inicio, que antes
+     repetía a mano un rojo (184, 28, 28) ya distinto del de --emergencia. El hex del
+     token cambió una vez desde entonces: por eso la sombra sale de acá y no a mano. */
   --emergencia-rgb: 198 40 47;
 
   --radio: 18px;
   --radio-s: 13px;
-  --sombra: 0 1px 2px rgba(10, 35, 71, 0.06), 0 10px 28px rgba(10, 35, 71, 0.08);
-  --sombra-alta: 0 18px 42px rgba(10, 35, 71, 0.14);
-  --sombra-arriba: 0 -10px 28px rgba(10, 35, 71, 0.08);
+
+  /* Las tres salen de --sombra-rgb, igual que las sombras sueltas de la hoja. Escritas a
+     mano quedaban fuera del tema: retocar el azul de sombra las dejaba atrás y convivían
+     dos azules distintos justo en las superficies más grandes. */
+  --sombra: 0 1px 2px rgb(var(--sombra-rgb) / 0.06), 0 10px 28px rgb(var(--sombra-rgb) / 0.08);
+  --sombra-alta: 0 18px 42px rgb(var(--sombra-rgb) / 0.14);
+  --sombra-arriba: 0 -10px 28px rgb(var(--sombra-rgb) / 0.08);
   --ancho: 640px;
 }
 
@@ -98,9 +107,12 @@
     --ok-fondo: #102c20;
     --ok-rgb: 114 215 163;
     --atencion-rgb: 240 188 91;
-    --sombra: 0 1px 2px rgba(0, 0, 0, 0.45), 0 12px 30px rgba(0, 0, 0, 0.3);
-    --sombra-alta: 0 20px 48px rgba(0, 0, 0, 0.42);
-    --sombra-arriba: 0 -12px 30px rgba(0, 0, 0, 0.28);
+    --alerta-rgb: 255 155 159;
+    /* El color ya lo da --sombra-rgb acá arriba; lo que cambia con el tema oscuro son
+       las opacidades, más altas porque la sombra tiene que verse sobre un fondo negro. */
+    --sombra: 0 1px 2px rgb(var(--sombra-rgb) / 0.45), 0 12px 30px rgb(var(--sombra-rgb) / 0.3);
+    --sombra-alta: 0 20px 48px rgb(var(--sombra-rgb) / 0.42);
+    --sombra-arriba: 0 -12px 30px rgb(var(--sombra-rgb) / 0.28);
   }
 }
 
@@ -231,6 +243,27 @@ p {
   font-size: 13px;
   line-height: 1.45;
   color: var(--tinta-3);
+}
+
+/*
+ * La nota de derechos ARCO iba después del botón, fuera de la tarjeta. En la carga del
+ * tercero, con siete campos arriba, eso la deja cerca de los 1200px: se toca «Registrar
+ * mis datos» sin haberla visto nunca. Va dentro de la tarjeta y antes de la acción, que
+ * es donde todavía se puede leer y decidir. Sube de --tinta-3 a --tinta-2 no por
+ * contraste —a 13px sobre --fondo ya pasaba AA por poco— sino por jerarquía: no es un
+ * pie de página, es lo que la persona está consintiendo, y se lee con sol de frente.
+ *
+ * El margen de arriba es 18px y no 14px porque el botón de consentimiento elegido lleva
+ * `box-shadow: 0 10px 22px` y `translateY(-1px)`: con menos espacio la sombra cruza la
+ * línea divisoria y se ve sucia.
+ */
+.nota-datos-personales {
+  margin: 18px 0 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--borde);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--tinta-2);
 }
 
 .mono {
@@ -432,6 +465,18 @@ select:focus {
   box-shadow: 0 0 0 1px var(--acento);
 }
 
+/*
+ * El placeholder era lo único de un campo que seguía con el color que elige el navegador:
+ * el bloque de arriba fija tinta, fondo, borde y foco con token, y se salteaba este. En
+ * WebKit ese gris fijo da 2.35:1 sobre --superficie claro, en una pantalla que se lee al
+ * sol. Firefox además le aplica opacity 0.54 por su cuenta; de ahí el opacity: 1.
+ */
+input::placeholder,
+textarea::placeholder {
+  color: var(--tinta-3);
+  opacity: 1;
+}
+
 textarea {
   min-height: 96px;
   resize: vertical;
@@ -529,6 +574,30 @@ textarea {
   display: block;
 }
 
+/*
+ * El consentimiento es una `.opcion` con un párrafo de texto legal adentro, no un rótulo
+ * de una línea, y necesita tres cosas que `.opcion` no da:
+ *
+ * - Interlineado de párrafo. `.opcion` no declara `line-height`, así que hereda el 1.2 de
+ *   `button`, que es interlineado de rótulo. A 375px este texto son trece renglones, y
+ *   hay que poder leerlo parado al sol.
+ * - La casilla arriba. Centrada queda flotando a media altura del párrafo, sin parecer
+ *   que le pertenece. Con 15px y 1.45 el primer renglón mide 21.75px y la casilla 22px,
+ *   así que `flex-start` ya las deja ópticamente centradas entre sí: no hace falta
+ *   correr la casilla.
+ * - Aire abajo. `.opcion` no trae margen y `.boton-primario` no trae `margin-top`: el
+ *   bloque terminaba borde contra borde con «Registrar mis datos», dos cajas pegadas.
+ *   Los 18px son los de `.campo`, que es el ritmo del resto de la tarjeta.
+ *
+ * Vive acá y no en línea para que las dos cargas por QR —testigo y tercero— muestren el
+ * mismo consentimiento, del mismo tamaño.
+ */
+.opcion-consentimiento {
+  align-items: flex-start;
+  line-height: 1.45;
+  margin-bottom: 18px;
+}
+
 /* ---------- Zonas de impacto ---------- */
 
 .zonas {
@@ -560,40 +629,6 @@ textarea {
   color: var(--sobre-color);
   font-weight: 750;
   transform: scale(0.98);
-}
-
-/* ---------- Progreso ---------- */
-
-.progreso {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--fondo);
-  padding: 10px 0 12px;
-  margin-bottom: 6px;
-}
-
-.progreso-barra {
-  height: 5px;
-  background: var(--borde);
-  border-radius: 99px;
-  overflow: hidden;
-}
-
-.progreso-relleno {
-  height: 100%;
-  background: var(--acento);
-  border-radius: 99px;
-  transition: width 0.3s ease;
-}
-
-.progreso-texto {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12.5px;
-  color: var(--tinta-3);
-  margin-top: 7px;
-  font-weight: 500;
 }
 
 /* ---------- Avisos ---------- */
@@ -634,14 +669,59 @@ textarea {
   color: var(--cobertura);
 }
 
+/*
+ * El fallo se avisa pegado al botón que falló y no arriba de todo: en 375px el encabezado ya
+ * quedó fuera de pantalla. Sin este margen el aviso apoya contra el borde de la tarjeta roja
+ * —que no lleva margin-bottom— y los dos rojos se leen como un solo bloque.
+ */
+.emergencia + .aviso {
+  margin-top: 16px;
+}
+
 .aviso-detalle {
   margin: 7px 0 11px;
   font-size: 13.5px;
 }
 
+/*
+ * En /v el detalle es el último hijo del aviso, y ahí su margin-bottom de 11px desbalancea
+ * la banda contra el padding de arriba.
+ */
+.aviso-detalle:last-child {
+  margin-bottom: 0;
+}
+
 .aviso-instruccion {
   margin: 0 0 13px;
   font-size: 13.5px;
+}
+
+.hallazgo-encabezado {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+/*
+ * El cuerpo del hallazgo va con el color pleno del aviso, sin opacidad. Con
+ * `opacity: 0.85` caía a 3,83:1 sobre el verde de «ok», 4,26:1 sobre el ámbar de
+ * «atención» y 4,34:1 sobre el violeta de «cobertura» en tema claro, por debajo del
+ * 4,5:1 que necesita un texto de 13 px; en tema oscuro daba 6:1 o más, así que
+ * revisando de noche el problema no aparece. La jerarquía la da el peso del título,
+ * no un cuerpo más pálido. `.mini` aporta las métricas; acá sólo se corrige el color,
+ * que sobre un fondo de color no puede ser el gris de la superficie.
+ *
+ * Va después de `.mini` —que fija color: var(--tinta-3)— porque con dos selectores de
+ * una sola clase el desempate lo da la posición.
+ */
+.hallazgo-detalle {
+  color: inherit;
+}
+
+.hallazgo-detalle-nota {
+  margin-top: 4px;
 }
 
 /* ---------- Insignias ---------- */
@@ -679,19 +759,7 @@ textarea {
   color: var(--tinta-2);
 }
 
-/* ---------- Estado de captura ---------- */
-
-.captura {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--tinta-2);
-  padding: 11px 13px;
-  background: var(--superficie-2);
-  border-radius: 14px;
-  margin-bottom: 14px;
-}
+/* ---------- Punto de estado ---------- */
 
 .punto {
   width: 9px;
@@ -742,29 +810,42 @@ textarea {
   display: block;
 }
 
-.miniatura-vacia {
-  display: grid;
-  place-items: center;
-  font-size: 10.5px;
-  color: var(--tinta-3);
-  text-align: center;
-  padding: 6px;
-  border-style: dashed;
+/*
+ * En el panel la miniatura lleva pie —qué toma es y cuándo se sacó— así que necesita más
+ * ancho que la grilla de 96px del recorrido. Pero un mínimo fijo de 180px deja UNA sola
+ * columna a 375px: dentro de .envoltura-ancha quedan 343px de contenido y dos pistas de
+ * 180px más el gap no entran, así que cada foto mide 343x257 y un expediente de once
+ * tomas —las que tiene GUIA_FOTOS— son más de 2500px de scroll en la pantalla que el
+ * productor abre desde el celular para mirar daños. Con min(100%, 150px) entran dos en el
+ * teléfono y seis en el escritorio, y el min() impide que la pista pedida supere el ancho
+ * disponible en una pantalla más angosta.
+ *
+ * Va después de `.grilla-fotos` para pisarle las pistas y el gap: misma especificidad, el
+ * desempate lo da la posición.
+ */
+.grilla-fotos-panel {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: 12px;
 }
 
-.tilde {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
-  background: var(--ok);
-  color: var(--sobre-color);
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 700;
+.foto-panel {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Apaisada y no cuadrada: es la proporción con la que se sacó la toma en la calle. */
+.foto-panel .miniatura {
+  aspect-ratio: 4 / 3;
+}
+
+.foto-panel-pie {
+  margin-top: 5px;
+}
+
+/* .mini pinta todo en --tinta-3; el título de la toma es lo que se busca al barrer la grilla. */
+.foto-panel-titulo {
+  color: var(--tinta);
 }
 
 /* ---------- Tabla ---------- */
@@ -849,6 +930,30 @@ tr:last-child td {
   display: inline-block;
   border: 1px solid var(--borde);
   box-shadow: 0 10px 26px rgb(var(--sombra-rgb) / 0.08);
+}
+
+/*
+ * Reserva el hueco del QR mientras se genera. Sin esto la caja mide ~33px y salta a
+ * 292px al llegar el SVG: en 375px el botón «Compartir el enlace», que está justo
+ * debajo dentro de la misma tarjeta, baja ~160px cuando el dedo ya iba hacia él.
+ * Las medidas son las de .qr: con box-sizing border-box, min(100%, 292px) y
+ * aspect-ratio 1 dan la misma caja de 292x292 que ocupa el código ya cargado.
+ * No usa --fondo-qr: ese blanco es fijo para que la cámara lea el código, y texto
+ * gris sobre blanco fijo se pierde en modo oscuro.
+ */
+.qr-esperando {
+  width: min(100%, 292px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border: 1px dashed var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie-2);
+  color: var(--tinta-2);
+  font-size: 14.5px;
+  line-height: 1.45;
 }
 
 .qr-imagen svg {
@@ -1176,6 +1281,16 @@ tr:last-child td {
   }
 }
 
+/*
+ * El detalle del panel es el primer encabezado con acción que lleva DOS botones, y para
+ * eso reusa `.fila-botones`. Dentro del encabezado la separación ya la da el gap del
+ * contenedor; el margen propio de .fila-botones la sumaría dos veces y el botón se
+ * despegaría de la bajada.
+ */
+.encabezado-con-accion > .fila-botones {
+  margin-top: 0;
+}
+
 /* ---------- Tabla del panel ---------- */
 
 .celda-lugar {
@@ -1192,6 +1307,117 @@ tr:last-child td {
   display: flex;
   gap: 5px;
   flex-wrap: wrap;
+}
+
+/*
+ * Va después de `.insignias` y no antes: tienen la misma especificidad, así que puesta
+ * arriba el gap de 8px no se aplica y la fila se aprieta a 5px sin que nada falle.
+ */
+.insignias-resumen {
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/*
+ * Cada bloque del expediente arranca separado del anterior. Vivía repetido seis veces
+ * como estilo en línea sobre el h2: para respirar más entre bloques había que editar
+ * seis lugares de un archivo de lógica, y olvidarse de uno dejaba un bloque desalineado.
+ */
+.bloque-panel {
+  margin-top: 28px;
+}
+
+/*
+ * El h3 que rotula una tarjeta del expediente. Va acá y no como `.tarjeta h3` porque un
+ * selector de elemento se desconecta en cuanto alguien reordena el marcado.
+ */
+.titulo-tarjeta {
+  margin-bottom: 10px;
+}
+
+/* En la declaración el rótulo va apagado: el dato es la respuesta, no la pregunta. */
+.titulo-tarjeta-apagado {
+  color: var(--tinta-3);
+}
+
+/*
+ * La fila etiqueta/valor del expediente.
+ *
+ * La etiqueta llevaba `flex-shrink: 0`, así que quedaba clavada en su ancho de max-content.
+ * En la declaración del conductor la etiqueta es el texto entero de la pregunta, y la más
+ * larga mide 296px: por debajo de 349px de ventana se salía del borde de la tarjeta, y por
+ * debajo de 333px arrastraba scroll horizontal a toda la página, que es justo lo que el
+ * comentario de cabecera de esta hoja dice que no puede pasar. Sin `flex-shrink` la
+ * etiqueta usa todo el ancho que le queda y ahí envuelve, en vez de empujar.
+ */
+.dato {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--borde);
+}
+
+.dato:last-child {
+  border-bottom: none;
+}
+
+.dato-etiqueta {
+  min-width: 200px;
+  font-weight: 600;
+}
+
+/*
+ * Las seis ultimas piezas del detalle del panel que vivian como estilo en linea.
+ *
+ * Ninguna llevaba un valor calculado: eran margenes y anchos escritos dentro de un
+ * archivo de logica. Con esto el repositorio entero queda con un solo estilo en linea, el
+ * de Flujo.tsx, que si transporta un dato —el avance del recorrido— y por eso tiene
+ * minimo y maximo en el cupo.
+ */
+.pie-fuente {
+  margin: 10px 0 0;
+}
+
+/* El renglon de huella que cierra una pieza: pegado a lo suyo, sin arrastrar aire. */
+.pie-huella {
+  margin: 8px 0 0;
+}
+
+.pieza-audio {
+  margin-bottom: 14px;
+}
+
+.pieza-audio:last-child {
+  margin-bottom: 0;
+}
+
+.pieza-audio-reproductor {
+  width: 100%;
+}
+
+/*
+ * El hash de la cadena en la tabla. La celda no puede crecer con el hash: son 64
+ * caracteres en monoespaciada y sin tope empujan la tabla mucho mas alla del ancho de la
+ * ventana, arrastrando scroll horizontal a toda la pagina.
+ */
+.celda-hash {
+  max-width: 320px;
+}
+
+.tarjeta-sellado {
+  margin-top: 14px;
+}
+
+/* Un aviso que cierra una tarjeta: el margen de abajo lo pone el relleno de la tarjeta. */
+.aviso-al-pie {
+  margin: 12px 0 0;
+}
+
+.dato-valor {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 14.5px;
 }
 
 .pie-sesion {
@@ -1678,21 +1904,6 @@ tr:last-child td {
   }
 }
 
-.boton-claro {
-  background: transparent;
-  color: var(--sobre-color);
-  border: 2px solid rgb(var(--sobre-color-rgb) / 0.55);
-  width: 100%;
-  min-height: 54px;
-  font-size: 16px;
-}
-
-@media (hover: hover) {
-  .boton-claro:hover:not(:disabled) {
-    background: rgb(var(--sobre-color-rgb) / 0.12);
-  }
-}
-
 /* ---------- Chip de estado (ubicación) ---------- */
 
 .chip {
@@ -1757,6 +1968,14 @@ tr:last-child td {
   margin-left: auto;
   font-size: 11px;
   opacity: 0.7;
+}
+
+/* El aviso sólo trae margen abajo y el chip sólo arriba: dentro de .pantalla, que es flex
+   sin gap, los dos nacen pegados. Pasa con el fallo de guardado del recorrido y con el
+   panel que abre el propio chip, y en oscuro las dos cápsulas casi no se distinguen. 12px
+   es el mismo aire que el chip lleva arriba, así que queda parejo de los dos lados. */
+.chip + .aviso {
+  margin-top: 12px;
 }
 
 /* ---------- Foto guiada ---------- */
@@ -2087,6 +2306,13 @@ tr:last-child td {
   margin-bottom: 13px;
 }
 
+/* Misma idea que .tarjeta-resumen y .tarjeta-faltantes: la tarjeta se tiñe de lo que dice.
+   Sin esto, la lista de por qué un expediente no verifica sale con el mismo borde neutro
+   que las fechas, y al bajar a leerla el rojo del aviso ya salió de la pantalla. */
+.tarjeta-problemas {
+  border-color: rgb(var(--alerta-rgb) / 0.28);
+}
+
 .hito-final {
   padding-top: 34px;
 }
@@ -2263,6 +2489,12 @@ tr:last-child td {
   margin: 0;
   padding: 16px 18px;
   border-bottom: 1px solid var(--borde);
+}
+
+/* El último campo no lleva línea: pegada al borde inferior de la tarjeta se ve como un
+   filete doble, y el recorte del radio la corta antes de las esquinas. */
+.tarjeta-validacion .campo-validacion:last-child {
+  border-bottom: none;
 }
 
 .entrada-validacion {
@@ -2474,6 +2706,84 @@ tr:last-child td {
   font-size: 13px;
   font-weight: 600;
   box-shadow: var(--sombra);
+}
+
+/* ---------- Verificación pública ---------- */
+
+.tarjeta-titulo {
+  margin-bottom: 10px;
+}
+
+.lista-problemas {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.lista-problema {
+  margin-bottom: 6px;
+}
+
+.aviso-sello {
+  margin: 12px 0 0;
+}
+
+/* El eslabón es una .tarjeta-plana dentro de una .pila: el gap de la pila ya separa, el
+   margen propio de la tarjeta plana duplicaría. */
+.eslabon {
+  margin-bottom: 0;
+}
+
+.eslabon-encabezado {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.eslabon-tipo {
+  font-size: 14px;
+}
+
+.eslabon-hash {
+  margin-top: 4px;
+}
+
+.explicacion-verificacion {
+  margin-bottom: 0;
+}
+
+/*
+ * El borde va con :not(:last-child). Con el borde en todas, la última fila de cada tarjeta
+ * deja una raya a 20px del borde inferior —el padding de .tarjeta— con nada debajo, que se
+ * lee como una fila que no terminó de cargar. Justo en la pantalla donde alguien está
+ * buscando motivos para desconfiar del expediente.
+ */
+.fila-dato {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 7px 0;
+}
+
+.fila-dato:not(:last-child) {
+  border-bottom: 1px solid var(--borde);
+}
+
+.fila-dato-etiqueta {
+  min-width: 190px;
+  font-weight: 600;
+}
+
+/*
+ * min-width: 0 para que el hash en monoespaciada se parta dentro de la columna en vez de
+ * estirarla. En 375px la fila entra envuelta —190px de rótulo más 12 de gap más 180 de base
+ * no entran en los ~300px útiles de la tarjeta— y el valor se queda con todo el ancho; el
+ * gap de fila de 2px lo deja pegado a su rótulo, más cerca que de la fila siguiente.
+ */
+.fila-dato-valor {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-size: 14px;
 }
 
 @media (max-width: 520px) {

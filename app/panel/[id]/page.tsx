@@ -5,6 +5,7 @@ import { construirManifiesto } from '@/lib/hash'
 import { SECCIONES, GUIA_FOTOS } from '@/lib/cuestionario'
 import { ETIQUETA_NIVEL } from '@/lib/consistencia'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
 import { exigirRol } from '@/lib/sesion'
 import { AccionesGestion } from '@/app/components/AccionesGestion'
 
@@ -30,13 +31,12 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
 
   return (
     <main className="envoltura-ancha">
-      <Marca sub="Panel de siniestros" />
-      <AccionesGestion casoId={id} />
+      <Marca />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
+      <header className="encabezado-pagina encabezado-con-accion">
         <div>
-          <h1 style={{ marginBottom: 4 }}>{caso.id}</h1>
-          <p className="apagado" style={{ marginBottom: 0 }}>
+          <h1 className="titulo-pagina">{caso.id}</h1>
+          <p className="bajada-pagina">
             {caso.patente ? `${caso.patente} · ` : ''}
             {caso.asegurado || 'Sin asegurado declarado'}
             {' · '}
@@ -45,15 +45,19 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
             </span>
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <a className="boton boton-primario" href={`/api/casos/${id}/pdf?descargar=1`} style={{ width: 'auto' }}>
+        <div className="fila-botones">
+          <a className="boton boton-primario" href={`/api/casos/${id}/pdf?descargar=1`}>
             Descargar PDF
           </a>
           <Link className="boton boton-secundario" href={`/verificar?id=${id}`}>
             Verificar
           </Link>
         </div>
-      </div>
+      </header>
+
+      {/* Va después del encabezado: quien llega del listado necesita ver de qué actuación
+          es el formulario de tramitación antes que el formulario. */}
+      <AccionesGestion casoId={id} />
 
       <hr className="separador" />
 
@@ -66,7 +70,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
             determina responsabilidad ni concluye fraude.
           </p>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          <div className="insignias insignias-resumen">
             <span className="insignia" data-nivel="alerta">{consistencia.resumen.alertas} contradicciones</span>
             <span className="insignia" data-nivel="cobertura">{consistencia.resumen.banderas_cobertura} cobertura</span>
             <span className="insignia" data-nivel="atencion">{consistencia.resumen.atenciones} a revisar</span>
@@ -78,18 +82,18 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
               .filter((h) => h.nivel === nivel)
               .map((h, i) => (
                 <div className="aviso" data-nivel={nivel} key={`${nivel}-${i}`}>
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                  <div className="hallazgo-encabezado">
                     <span className="insignia" data-nivel={nivel}>{ETIQUETA_NIVEL[nivel]}</span>
                     <strong>{h.titulo}</strong>
                   </div>
-                  <div className="mini" style={{ color: 'inherit', opacity: 0.85 }}>
+                  <div className="mini hallazgo-detalle">
                     <div>
                       <strong>Declarado:</strong> {h.declarado}
                     </div>
                     <div>
                       <strong>Registro objetivo:</strong> {h.objetivo}
                     </div>
-                    <div style={{ marginTop: 4 }}>{h.detalle}</div>
+                    <div className="hallazgo-detalle-nota">{h.detalle}</div>
                   </div>
                 </div>
               )),
@@ -98,8 +102,8 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
       ) : null}
 
       {/* --- Datos objetivos --- */}
-      <section>
-        <h2 style={{ marginTop: 28 }}>Datos objetivos registrados</h2>
+      <section className="bloque-panel">
+        <h2>Datos objetivos registrados</h2>
         <div className="tarjeta">
           <Dato etiqueta="Apertura" valor={fecha(caso.creado_en)} />
           <Dato etiqueta="Cierre y sellado" valor={fecha(caso.cerrado_en)} />
@@ -129,7 +133,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
 
         {caso.clima ? (
           <div className="tarjeta">
-            <h3 style={{ marginBottom: 10 }}>Condiciones meteorológicas</h3>
+            <h3 className="titulo-tarjeta">Condiciones meteorológicas</h3>
             <Dato etiqueta="Condición" valor={caso.clima.descripcion} />
             <Dato etiqueta="Hora observada" valor={caso.clima.hora_observada.replace('T', ' ')} />
             <Dato etiqueta="Temperatura" valor={caso.clima.temperatura_c !== null ? `${caso.clima.temperatura_c} °C` : '-'} />
@@ -150,16 +154,14 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
                   : `${caso.clima.es_de_dia ? 'Diurna' : 'Nocturna'} (amanecer ${(caso.clima.amanecer ?? '').slice(11, 16)}, atardecer ${(caso.clima.atardecer ?? '').slice(11, 16)})`
               }
             />
-            <p className="mini" style={{ marginTop: 10, marginBottom: 0 }}>
-              Fuente: {caso.clima.fuente}
-            </p>
+            <p className="mini pie-fuente">Fuente: {caso.clima.fuente}</p>
           </div>
         ) : null}
       </section>
 
       {/* --- Declaración --- */}
-      <section>
-        <h2 style={{ marginTop: 28 }}>Declaración del conductor</h2>
+      <section className="bloque-panel">
+        <h2>Declaración del conductor</h2>
         {SECCIONES.map((s) => {
           const conRespuesta = s.preguntas.filter((p) => {
             const v = caso.respuestas[p.id]
@@ -168,7 +170,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
           if (conRespuesta.length === 0) return null
           return (
             <div className="tarjeta" key={s.id}>
-              <h3 style={{ marginBottom: 10, color: 'var(--tinta-3)' }}>{s.titulo}</h3>
+              <h3 className="titulo-tarjeta titulo-tarjeta-apagado">{s.titulo}</h3>
               {conRespuesta.map((p) => {
                 const v = caso.respuestas[p.id]
                 const texto = Array.isArray(v)
@@ -179,7 +181,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
                         .map(([k, x]) => `${k}: ${x}`)
                         .join(' · ')
                     : String(v)
-                return <Dato key={p.id} etiqueta={p.texto.replace(/\?$/, '')} valor={`${texto}${p.unidad ? ` ${p.unidad}` : ''}`} />
+                return <Dato key={p.id} etiqueta={p.texto.replace(/^¿|\?$/g, '')} valor={`${texto}${p.unidad ? ` ${p.unidad}` : ''}`} />
               })}
             </div>
           )
@@ -188,14 +190,14 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
 
       {/* --- Audios --- */}
       {audios.length > 0 ? (
-        <section>
-          <h2 style={{ marginTop: 28 }}>Relato en audio</h2>
+        <section className="bloque-panel">
+          <h2>Relato en audio</h2>
           <div className="tarjeta">
             {audios.map((a) => (
-              <div key={a.id} style={{ marginBottom: 14 }}>
+              <div className="pieza-audio" key={a.id}>
                 {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                <audio controls src={`/api/media/${a.id}`} style={{ width: '100%' }} />
-                <p className="mono" style={{ marginTop: 6, marginBottom: 0 }}>
+                <audio className="pieza-audio-reproductor" controls src={`/api/media/${a.id}`} />
+                <p className="mono pie-huella">
                   {a.id} · SHA-256 {a.sha256}
                 </p>
               </div>
@@ -205,22 +207,31 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
       ) : null}
 
       {/* --- Fotos --- */}
-      <section>
-        <h2 style={{ marginTop: 28 }}>Documentación fotográfica ({fotos.length})</h2>
+      <section className="bloque-panel">
+        <h2>Documentación fotográfica ({fotos.length})</h2>
         {fotos.length === 0 ? (
-          <p className="apagado">No se incorporaron fotografías.</p>
+          <div className="vacio">
+            <span className="vacio-icono">
+              <Icono nombre="camara" />
+            </span>
+            <h3 className="vacio-titulo">Sin fotografías incorporadas</h3>
+            <p className="vacio-texto">
+              Las fotos del lugar son lo que permite contrastar los daños declarados contra el estado real de los
+              vehículos. En esta actuación no se incorporó ninguna.
+            </p>
+          </div>
         ) : (
-          <div className="grilla-fotos" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+          <div className="grilla-fotos grilla-fotos-panel">
             {fotos.map((f) => {
               const guia = GUIA_FOTOS.find((g) => g.id === f.guia_id)
               return (
-                <a key={f.id} href={`/api/media/${f.id}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div className="miniatura" style={{ aspectRatio: '4/3' }}>
+                <a key={f.id} className="foto-panel" href={`/api/media/${f.id}`} target="_blank" rel="noreferrer">
+                  <div className="miniatura">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`/api/media/${f.id}`} alt={guia?.titulo ?? 'Fotografía'} />
                   </div>
-                  <div className="mini" style={{ marginTop: 5 }}>
-                    <strong style={{ color: 'var(--tinta)' }}>{guia?.titulo ?? 'Toma libre'}</strong>
+                  <div className="mini foto-panel-pie">
+                    <strong className="foto-panel-titulo">{guia?.titulo ?? 'Toma libre'}</strong>
                     <div>{new Date(f.capturado_en).toLocaleString('es-AR')}</div>
                   </div>
                 </a>
@@ -231,10 +242,19 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
       </section>
 
       {/* --- Testigos --- */}
-      <section>
-        <h2 style={{ marginTop: 28 }}>Testigos ({testigos.length})</h2>
+      <section className="bloque-panel">
+        <h2>Testigos ({testigos.length})</h2>
         {testigos.length === 0 ? (
-          <p className="apagado">No se registraron testigos.</p>
+          <div className="vacio">
+            <span className="vacio-icono">
+              <Icono nombre="personas" />
+            </span>
+            <h3 className="vacio-titulo">Sin testigos registrados</h3>
+            <p className="vacio-texto">
+              Un testigo carga sus datos y su manifestación desde su propio teléfono, escaneando el QR en el lugar
+              del hecho. En esta actuación no se sumó ninguno.
+            </p>
+          </div>
         ) : (
           testigos.map((t) => (
             <div className="tarjeta" key={t.id}>
@@ -243,17 +263,15 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
               <Dato etiqueta="Teléfono" valor={t.telefono || '-'} />
               <Dato etiqueta="Registrado" valor={fecha(t.creado_en)} />
               {t.relato ? <Dato etiqueta="Manifestación" valor={t.relato} /> : null}
-              <p className="mono" style={{ marginTop: 8, marginBottom: 0 }}>
-                SHA-256 {t.sha256}
-              </p>
+              <p className="mono pie-huella">SHA-256 {t.sha256}</p>
             </div>
           ))
         )}
       </section>
 
       {/* --- Cadena de custodia --- */}
-      <section>
-        <h2 style={{ marginTop: 28 }}>Cadena de custodia</h2>
+      <section className="bloque-panel">
+        <h2>Cadena de custodia</h2>
         <p className="apagado">
           {manifiesto.cadena.length} eslabones · hash maestro <span className="mono">{manifiesto.hash_maestro}</span>
         </p>
@@ -271,11 +289,11 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
               {manifiesto.cadena.map((e) => (
                 <tr key={e.n}>
                   <td>{e.n}</td>
-                  <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
+                  <td className="celda-fecha">
                     {new Date(e.ts).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'medium' })}
                   </td>
                   <td>{e.tipo}</td>
-                  <td className="mono" style={{ maxWidth: 320 }}>
+                  <td className="mono celda-hash">
                     {e.hash}
                   </td>
                 </tr>
@@ -285,8 +303,8 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
         </div>
 
         {caso.sello ? (
-          <div className="tarjeta" style={{ marginTop: 14 }}>
-            <h3 style={{ marginBottom: 10 }}>Sellado</h3>
+          <div className="tarjeta tarjeta-sellado">
+            <h3 className="titulo-tarjeta">Sellado</h3>
             <Dato etiqueta="Sellado el" valor={fecha(caso.sello.sellado_en)} />
             <Dato etiqueta="Algoritmo" valor={caso.sello.firma.algoritmo} />
             <Dato etiqueta="Huella de clave pública" valor={<span className="mono">{caso.sello.firma.clave_publica_sha256}</span>} />
@@ -299,7 +317,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
               }
             />
             {caso.sello.firma.advertencia ? (
-              <div className="aviso" data-nivel="atencion" style={{ marginTop: 12, marginBottom: 0 }}>
+              <div className="aviso aviso-al-pie" data-nivel="atencion">
                 {caso.sello.firma.advertencia}
               </div>
             ) : null}
@@ -312,11 +330,9 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
 
 function Dato({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 14, padding: '7px 0', borderBottom: '1px solid var(--borde)', flexWrap: 'wrap' }}>
-      <span className="mini" style={{ minWidth: 200, flexShrink: 0, fontWeight: 600 }}>
-        {etiqueta}
-      </span>
-      <span style={{ flex: 1, minWidth: 200, fontSize: 14.5 }}>{valor}</span>
+    <div className="dato">
+      <span className="mini dato-etiqueta">{etiqueta}</span>
+      <span className="dato-valor">{valor}</span>
     </div>
   )
 }

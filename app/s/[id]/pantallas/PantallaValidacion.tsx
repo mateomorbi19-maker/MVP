@@ -125,7 +125,9 @@ export function PantallaValidacion({ casoId, seguir }: { casoId: string; seguir:
           </div>
         ) : null}
 
-        {pendientes.length > 0 ? (
+        {/* Mientras no llegó ninguna respuesta el cuerpo queda vacío y «Confirmar y seguir»
+            apagado sin motivo: sin este aviso no hay nada que diga que se está esperando. */}
+        {lecturas === null || pendientes.length > 0 ? (
           <div className="aviso" data-nivel="info">
             Leyendo los documentos...
           </div>

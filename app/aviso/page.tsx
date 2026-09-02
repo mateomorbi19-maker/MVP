@@ -21,6 +21,7 @@ function Aviso() {
   const accion = useSearchParams().get('accion')
   const telemetria = useSearchParams().get('t')
   const [abriendo, setAbriendo] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Si la notificación se venció sin respuesta, queda registrado.
@@ -35,30 +36,49 @@ function Aviso() {
 
   async function reportar() {
     setAbriendo(true)
+    setError(null)
     try {
       const res = await fetch('/api/casos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
-      const cuerpo = await res.json()
-      if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo abrir la actuación.')
+      // Un 502 del proxy o un portal cautivo de wifi contestan HTML: sin este resguardo el
+      // json() rompe antes de mirar el estado y el motivo del servidor se pierde abajo.
+      const cuerpo = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(cuerpo?.error ?? 'No se pudo abrir la actuación. Esperá unos segundos y volvé a tocar el botón.')
+        setAbriendo(false)
+        return
+      }
       recordarActuacion(cuerpo.id, cuerpo.secreto)
       router.push(`/s/${cuerpo.id}`)
     } catch {
+      // Un botón que vuelve solo a su rótulo se lee como que la aplicación no hizo nada. Acá
+      // el pedido no salió del teléfono: el mensaje del navegador viene en inglés y no dice
+      // qué hacer, así que se nombra lo único accionable parado en la calle, la señal.
+      setError('No se pudo contactar al servidor. Revisá la señal y volvé a tocar el botón.')
       setAbriendo(false)
     }
   }
 
   return (
     <main className="envoltura">
-      <Marca enlace={false} sub="¿Tuviste un accidente?" />
+      <Marca enlace={false} />
 
       <div className="emergencia">
         <h1>¿Estás bien?</h1>
-        <p>Si necesitás ayuda, llamá. Si estás bien, podés registrar lo que pasó.</p>
+        <p className="emergencia-descripcion">
+          Si necesitás ayuda, llamá. Si estás bien, podés registrar lo que pasó.
+        </p>
         <BotonesEmergencia />
       </div>
+
+      {error ? (
+        <div className="aviso" data-nivel="alerta">
+          {error}
+        </div>
+      ) : null}
 
       <div className="pila">
         <button className="boton-primario" onClick={reportar} disabled={abriendo}>

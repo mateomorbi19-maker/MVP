@@ -30,6 +30,36 @@ interface Resultado {
   problemas: string[]
 }
 
+/*
+ * El tipo de eslabón es un identificador de la base y queda escrito dentro del expediente
+ * sellado: no se renombra. Lo que se traduce es lo que se muestra, porque esta pantalla la
+ * lee un perito o un liquidador que no tiene por qué conocer los nombres de la base. Si
+ * mañana aparece un tipo sin rótulo, el respaldo lo deja legible igual en vez de esconderlo.
+ */
+const ROTULO_ESLABON: Record<string, string> = {
+  apertura_actuacion: 'Apertura de la actuación',
+  respuestas_registradas: 'Respuestas registradas',
+  ubicacion_registrada: 'Ubicación registrada',
+  fotografia_incorporada: 'Fotografía incorporada',
+  audio_incorporado: 'Relato en audio incorporado',
+  sensores_incorporados: 'Lecturas de sensores incorporadas',
+  extraccion_solicitada: 'Lectura automática solicitada',
+  lectura_automatica_registrada: 'Lectura automática registrada',
+  lectura_automatica_fallida: 'Lectura automática fallida',
+  datos_tercero_confirmados: 'Datos del tercero confirmados',
+  tercero_identificado: 'Tercero identificado',
+  testigo_registrado: 'Testigo registrado',
+  croquis_registrado: 'Croquis registrado',
+  datos_asegurado_registrados: 'Datos del asegurado registrados',
+  acta_firmada_asegurado: 'Acta firmada por el asegurado',
+  informe_consistencia_generado: 'Informe de consistencia generado',
+  caso_vinculado_a_cuenta: 'Actuación vinculada a una cuenta',
+  cierre_actuacion: 'Cierre y sellado de la actuación',
+}
+
+const rotuloEslabon = (tipo: string) =>
+  ROTULO_ESLABON[tipo] ?? tipo.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
+
 function Verificador() {
   const parametros = useSearchParams()
   const [id, setId] = useState(parametros.get('id') ?? '')
@@ -66,6 +96,16 @@ function Verificador() {
     if (inicial) verificar(inicial)
   }, [parametros, verificar])
 
+  /*
+   * Va por submit del formulario y no por onClick del botón: con el teclado abierto en un
+   * teléfono, «Verificar» queda tapado, y sin <form> la tecla de retorno no dispara nada.
+   * Con formulario, iOS además rotula esa tecla como «Ir» en vez de dejarla inerte.
+   */
+  function enviar(e: React.FormEvent) {
+    e.preventDefault()
+    verificar(id, hash)
+  }
+
   return (
     <main className="envoltura">
       <Marca />
@@ -78,7 +118,7 @@ function Verificador() {
         </p>
       </header>
 
-      <div className="tarjeta">
+      <form className="tarjeta" onSubmit={enviar}>
         <div className="campo">
           <label htmlFor="id">Número de actuación</label>
           <input
@@ -96,27 +136,21 @@ function Verificador() {
           <input id="hash" type="text" placeholder="Opcional" value={hash} onChange={(e) => setHash(e.target.value.trim())} />
         </div>
         {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
-        <button className="boton-primario" onClick={() => verificar(id, hash)} disabled={cargando || id.length < 5}>
+        <button className="boton-primario" type="submit" disabled={cargando || id.length < 5}>
           {cargando ? 'Verificando...' : 'Verificar'}
         </button>
-      </div>
+      </form>
 
       {resultado ? (
         <>
-          <div className="aviso" data-nivel={resultado.valido ? 'ok' : 'alerta'}>
-            <strong>
-              {resultado.valido
-                ? 'Expediente íntegro. La cadena de custodia es consistente.'
-                : 'La verificación detectó problemas de integridad.'}
-            </strong>
-          </div>
+          <Veredicto resultado={resultado} />
 
           {resultado.problemas.length > 0 ? (
-            <div className="tarjeta">
+            <div className="tarjeta tarjeta-problemas">
               <h3>Problemas detectados</h3>
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <ul className="lista-problemas">
                 {resultado.problemas.map((p, i) => (
-                  <li key={i} style={{ marginBottom: 6 }}>
+                  <li key={i} className="lista-problema">
                     {p}
                   </li>
                 ))}
@@ -125,7 +159,7 @@ function Verificador() {
           ) : null}
 
           <div className="tarjeta">
-            <h3 style={{ marginBottom: 10 }}>Datos de la verificación</h3>
+            <h3 className="tarjeta-titulo">Datos de la verificación</h3>
             <Fila etiqueta="Actuación" valor={resultado.id} />
             <Fila etiqueta="Estado" valor={resultado.estado === 'cerrado' ? 'Cerrada y sellada' : 'En curso (aún no sellada)'} />
             <Fila etiqueta="Abierta" valor={new Date(resultado.abierta_en).toLocaleString('es-AR')} />
@@ -140,7 +174,7 @@ function Verificador() {
               <Fila
                 etiqueta="Hash aportado"
                 valor={
-                  <span style={{ color: resultado.coincide_con_hash_aportado ? 'var(--ok)' : 'var(--alerta)', fontWeight: 600 }}>
+                  <span className="insignia" data-nivel={resultado.coincide_con_hash_aportado ? 'ok' : 'alerta'}>
                     {resultado.coincide_con_hash_aportado ? 'Coincide' : 'No coincide'}
                   </span>
                 }
@@ -150,7 +184,7 @@ function Verificador() {
 
           {resultado.sello ? (
             <div className="tarjeta">
-              <h3 style={{ marginBottom: 10 }}>Sellado</h3>
+              <h3 className="tarjeta-titulo">Sellado</h3>
               <Fila etiqueta="Sellado el" valor={new Date(resultado.sello.sellado_en).toLocaleString('es-AR')} />
               <Fila etiqueta="Algoritmo de firma" valor={resultado.sello.algoritmo} />
               <Fila etiqueta="Huella de clave pública" valor={<span className="mono">{resultado.sello.clave_publica_sha256}</span>} />
@@ -166,7 +200,7 @@ function Verificador() {
                 <Fila etiqueta="Hash del token TSA" valor={<span className="mono">{resultado.sello.tsa_token_sha256}</span>} />
               ) : null}
               {resultado.sello.advertencia ? (
-                <div className="aviso" data-nivel="atencion" style={{ marginTop: 12, marginBottom: 0 }}>
+                <div className="aviso aviso-sello" data-nivel="atencion">
                   {resultado.sello.advertencia}
                 </div>
               ) : null}
@@ -174,17 +208,17 @@ function Verificador() {
           ) : null}
 
           <div className="tarjeta">
-            <h3 style={{ marginBottom: 10 }}>Cadena de custodia</h3>
+            <h3 className="tarjeta-titulo">Cadena de custodia</h3>
             <div className="pila">
               {resultado.cadena.map((e) => (
-                <div key={e.n} className="tarjeta-plana" style={{ marginBottom: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: 14 }}>
-                      {e.n}. {e.tipo}
+                <div key={e.n} className="tarjeta-plana eslabon">
+                  <div className="eslabon-encabezado">
+                    <strong className="eslabon-tipo">
+                      {e.n}. {rotuloEslabon(e.tipo)}
                     </strong>
                     <span className="mini">{new Date(e.ts).toLocaleString('es-AR')}</span>
                   </div>
-                  <div className="mono" style={{ marginTop: 4 }}>
+                  <div className="mono eslabon-hash">
                     {e.hash}
                   </div>
                 </div>
@@ -194,7 +228,7 @@ function Verificador() {
 
           <div className="tarjeta-plana">
             <h3>Cómo funciona</h3>
-            <p className="mini" style={{ marginBottom: 0 }}>
+            <p className="mini explicacion-verificacion">
               Cada acción sobre el expediente genera un asiento cuyo hash incorpora el hash del asiento anterior. La
               verificación recalcula toda la cadena desde el primer eslabón. Si un solo dato hubiera sido modificado,
               suprimido o reordenado después de registrarse, el recálculo no coincidiría y esta pantalla lo informaría.
@@ -206,13 +240,45 @@ function Verificador() {
   )
 }
 
+/*
+ * Tres estados, no dos. Una actuación abierta puede tener la cadena perfecta y aun así no
+ * hay sello: decirle «íntegro» a un perito ahí promete una garantía que todavía no se dio.
+ * La verificación pública de /v/[id] ya distingue los tres; ésta tiene que decir lo mismo.
+ *
+ * La rama de alerta no dice «la cadena no cierra»: `problemas` también se llena cuando el
+ * hash que pegó la persona no coincide, y ahí la cadena está intacta. Qué falló lo dice la
+ * tarjeta de problemas.
+ */
+function Veredicto({ resultado }: { resultado: Resultado }) {
+  if (!resultado.valido) {
+    return (
+      <div className="aviso" data-nivel="alerta">
+        <strong>La verificación detectó problemas de integridad.</strong>
+      </div>
+    )
+  }
+  if (resultado.estado !== 'cerrado') {
+    return (
+      <div className="aviso" data-nivel="atencion">
+        <strong>La actuación existe y su cadena cierra, pero todavía no fue sellada.</strong>
+        <p className="aviso-detalle">
+          Hasta que se cierre se le pueden seguir agregando eslabones. Lo que queda sellado es el expediente cerrado.
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div className="aviso" data-nivel="ok">
+      <strong>Expediente íntegro. La cadena de custodia es consistente.</strong>
+    </div>
+  )
+}
+
 function Fila({ etiqueta, valor }: { etiqueta: string; valor: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', gap: 12, padding: '7px 0', borderBottom: '1px solid var(--borde)', flexWrap: 'wrap' }}>
-      <span className="mini" style={{ minWidth: 190, fontWeight: 600 }}>
-        {etiqueta}
-      </span>
-      <span style={{ flex: 1, minWidth: 180, fontSize: 14 }}>{valor}</span>
+    <div className="fila-dato">
+      <span className="mini fila-dato-etiqueta">{etiqueta}</span>
+      <span className="fila-dato-valor">{valor}</span>
     </div>
   )
 }

@@ -131,13 +131,21 @@ export function DetectorImpacto() {
     return (
       <div className="aviso" data-nivel="alerta">
         <strong>¿Estás bien?</strong>
-        <div className="mini">
+        <p className="aviso-detalle">
           El teléfono detectó un golpe de {veredicto.picoG.toFixed(1)} g. Si no contestás en {restante} segundos, te
           vamos a mostrar las opciones de ayuda.
-        </div>
-        <div className="fila-botones">
+        </p>
+        {/* Apilados y a ancho completo: en dos columnas a 375px «Necesito ayuda» envuelve, y la
+            acción que escala queda debajo de la que descarta el aviso. */}
+        <div className="pila">
           <button
-            className="boton boton-secundario"
+            className="boton-primario"
+            onClick={() => router.push(`/aviso${telemetriaId ? `?t=${telemetriaId}` : ''}`)}
+          >
+            Necesito ayuda
+          </button>
+          <button
+            className="boton-secundario boton-ancho"
             onClick={() => {
               if (telemetriaId) {
                 fetch(`/api/telemetria/${telemetriaId}/respuesta`, {
@@ -151,9 +159,6 @@ export function DetectorImpacto() {
           >
             Estoy bien
           </button>
-          <button className="boton boton-primario" onClick={() => router.push(`/aviso${telemetriaId ? `?t=${telemetriaId}` : ''}`)}>
-            Necesito ayuda
-          </button>
         </div>
       </div>
     )
@@ -162,10 +167,23 @@ export function DetectorImpacto() {
   return (
     <div className="tarjeta">
       <h3>Modo viaje</h3>
-      <p className="apagado mini">
+      <p className="apagado">
         Con la aplicación abierta, el teléfono escucha el acelerómetro y te pregunta si detecta un impacto. Nunca llama
         solo a emergencias.
       </p>
+
+      {/* El límite se lee ANTES de encender, no después: quien enciende creyendo que lo cubre
+          con la pantalla bloqueada no vuelve a leer la letra chica del pie. */}
+      <div className="aviso" data-nivel="info">
+        <strong>Funciona sólo con la aplicación abierta y a la vista.</strong>
+        <div className="aviso-detalle">
+          Cuando el teléfono se bloquea o pasás a otra aplicación, el navegador suspende la lectura de los sensores: no
+          hay forma de evitarlo desde una aplicación web, ni en iPhone ni en Android.
+        </div>
+        <div className="aviso-detalle">
+          Leer los sensores consume batería, así que conviene tener el teléfono enchufado.
+        </div>
+      </div>
 
       {estado === 'escuchando' ? (
         <>
@@ -192,13 +210,6 @@ export function DetectorImpacto() {
           Este navegador no expone el acelerómetro.
         </div>
       ) : null}
-
-      <p className="mini">
-        <strong>Funciona sólo con la aplicación abierta y a la vista.</strong> Cuando el teléfono se bloquea o pasás a
-        otra aplicación, el navegador suspende la lectura de los sensores: no hay forma de evitarlo desde una aplicación
-        web, ni en iPhone ni en Android. Y leer los sensores consume batería, así que conviene tener el teléfono
-        enchufado.
-      </p>
     </div>
   )
 }

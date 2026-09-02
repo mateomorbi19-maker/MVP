@@ -76,8 +76,9 @@ export default function Perfil() {
     } finally {
       /*
        * El finally va acá y no en el catch —como en /entrar y /registro— porque esas dos
-       * navegan al terminar bien y ésta se queda: si sólo se apagara en el error, el botón
-       * quedaría deshabilitado para siempre despues de un guardado exitoso.
+       * sacan el formulario de pantalla al terminar bien y ésta se queda: si sólo se apagara
+       * en el error, el botón quedaría deshabilitado para siempre despues de un guardado
+       * exitoso.
        */
       setEnviando(false)
     }
@@ -143,6 +144,15 @@ export default function Perfil() {
             A quién avisarle si el teléfono detecta un impacto y no respondés. Avisale a esa persona que la cargaste:
             son sus datos, no los tuyos.
           </p>
+          {/* El aviso va antes de los campos y no al final de la tarjeta, que es donde uno lo
+              pondría por instinto. Con el teclado abierto sus 135px empujaban el botón Guardar
+              fuera del viewport justo cuando la persona termina de escribir la relación. Y dice
+              qué hace y qué no hace el sistema con un teléfono ajeno: eso se lee antes de
+              pedirlo, no después de haberlo cargado. */}
+          <div className="aviso" data-nivel="info">
+            La aplicación <strong>no llama ni manda mensajes por su cuenta</strong>: no hay forma de hacerlo desde el
+            navegador. Lo que hace es abrirte el marcador con el número puesto, para que toques una sola vez.
+          </div>
           <div className="campo">
             <label htmlFor="c_nombre">Nombre</label>
             <input id="c_nombre" type="text" {...campoContacto('nombre')} />
@@ -155,10 +165,6 @@ export default function Perfil() {
             <label htmlFor="c_relacion">Relación</label>
             <input id="c_relacion" type="text" placeholder="Pareja, hermano, un amigo..." {...campoContacto('relacion')} />
           </div>
-          <div className="aviso" data-nivel="info">
-            La aplicación <strong>no llama ni manda mensajes por su cuenta</strong>: no hay forma de hacerlo desde el
-            navegador. Lo que hace es abrirte el marcador con el número puesto, para que toques una sola vez.
-          </div>
         </div>
 
         {aviso ? <div className="aviso" data-nivel={aviso.nivel}>{aviso.texto}</div> : null}
@@ -169,6 +175,10 @@ export default function Perfil() {
       </form>
       )}
 
+      {/* El botón azul a ancho completo pegado al borde de arriba de la tarjeta se lee como su
+          encabezado, y el pulgar cae sobre «Encender el modo viaje» en vez de sobre Guardar.
+          Misma separación que /cuenta entre los accesos y las acciones de sesión. */}
+      <div className="separacion-bloque" />
       <DetectorImpacto />
 
       <p className="centrado">

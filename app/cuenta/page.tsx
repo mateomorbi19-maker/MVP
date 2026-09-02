@@ -51,9 +51,32 @@ const SECCIONES = [
   },
 ] as const
 
+/*
+ * El rol viene del esquema, en minúscula. Suelto abajo del nombre se lee como un dato
+ * interno filtrado a la pantalla, y a un asegurado no le dice nada: lo son todos. Sólo se
+ * rotula cuando cambia lo que la persona puede hacer.
+ */
+const ROTULO_ROL = {
+  productor: 'Productor de seguros',
+  aseguradora: 'Equipo de la aseguradora',
+} as const
+
 export default async function Cuenta() {
   const sesion = await leerSesion()
   if (!sesion) redirect('/entrar?volver=/cuenta')
+
+  /*
+   * Sin nombre cargado el título ya es el DNI —pasa con toda cuenta dada de alta por la
+   * aseguradora sin cargar el nombre—, y repetirlo abajo deja el mismo número en dos
+   * renglones pegados. Se unen sólo las partes que existen para que la separación nunca
+   * quede colgando de un punto final.
+   */
+  const bajada = [
+    sesion.nombre ? `DNI ${sesion.dni}` : null,
+    sesion.rol === 'asegurado' ? null : ROTULO_ROL[sesion.rol],
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <main className="envoltura">
@@ -62,7 +85,7 @@ export default async function Cuenta() {
       <header className="encabezado-pagina">
         <h1 className="titulo-pagina">{sesion.nombre ?? `DNI ${sesion.dni}`}</h1>
         <p className="bajada-pagina">
-          DNI {sesion.dni} · {sesion.rol}
+          {bajada || 'Desde acá llegás a tu póliza, a tus actuaciones y a tus datos, y cerrás la sesión.'}
         </p>
       </header>
 

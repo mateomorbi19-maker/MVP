@@ -43,7 +43,17 @@ export default function MiPoliza() {
         if (!r.ok) throw new Error(c?.error ?? 'No se pudieron leer las pólizas.')
         setPolizas(c)
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Error inesperado.'))
+      // Un fallo de red llega como TypeError y su mensaje viene del navegador, en inglés:
+      // «Failed to fetch» no le dice a nadie que lo que falta es señal.
+      .catch((e) =>
+        setError(
+          e instanceof TypeError
+            ? 'No se pudo conectar con el servidor. Revisá que tengas señal o wifi y volvé a cargar la pantalla.'
+            : e instanceof Error
+              ? e.message
+              : 'No se pudieron leer las pólizas. Volvé a cargar la pantalla en un minuto.',
+        ),
+      )
 
   useEffect(() => {
     cargar()
@@ -113,15 +123,31 @@ export default function MiPoliza() {
           </p>
           {p.productor ? <p className="mini">Productor: {p.productor.nombre}</p> : null}
 
-          <h4>Documentación</h4>
+          <h4 className="rotulo">Documentación</h4>
           {p.documentos.length === 0 ? <p className="apagado mini">Todavía no adjuntaste nada.</p> : null}
+          {/*
+            Sigue siendo un <a> y no un <Link>: /api/documentos/… es una descarga que sirve un
+            route handler, no una ruta de la aplicación.
+          */}
           {p.documentos.map((d) => (
-            <p className="mini" key={d.id}>
-              <a className="enlace" href={`/api/documentos/${d.id}`} target="_blank" rel="noreferrer">
-                {d.titulo || d.tipo}
-              </a>{' '}
-              <span className="mono">{d.sha256.slice(0, 12)}…</span>
-            </p>
+            <a
+              className="acceso"
+              href={`/api/documentos/${d.id}`}
+              target="_blank"
+              rel="noreferrer"
+              key={d.id}
+            >
+              <span className="acceso-icono">
+                <Icono nombre="archivo" />
+              </span>
+              <span className="acceso-texto">
+                <span className="acceso-titulo">{d.titulo || d.tipo}</span>
+                <span className="acceso-detalle mono">{d.sha256.slice(0, 12)}…</span>
+              </span>
+              <span className="acceso-flecha" aria-hidden="true">
+                →
+              </span>
+            </a>
           ))}
 
           <label className="boton boton-secundario">
@@ -189,9 +215,15 @@ export default function MiPoliza() {
         </button>
       )}
 
-      <p className="mini centrado">
-        <Link href="/cuenta" className="enlace">Volver a mi cuenta</Link>
-      </p>
+      {/*
+        Sin sesión el pie sobra: /cuenta rebota a /entrar?volver=/cuenta y la persona pierde
+        que lo que quería ver era su póliza.
+      */}
+      {sinSesion ? null : (
+        <p className="mini centrado pie-sesion">
+          <Link href="/cuenta" className="enlace">Volver a mi cuenta</Link>
+        </p>
+      )}
     </main>
   )
 }

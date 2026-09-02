@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
 
 /**
  * Carga del otro conductor, desde su propio teléfono.
@@ -11,7 +12,9 @@ import { Marca } from '@/app/components/Marca'
  *
  * Dice con todas las letras qué está consintiendo y qué NO: que sus datos entren al
  * expediente, y que eso no significa reconocer responsabilidad ni aceptar la versión del
- * hecho de la otra parte, que ni siquiera se le muestra acá.
+ * hecho de la otra parte, que ni siquiera se le muestra acá. Y lo dice arriba, antes del
+ * formulario: dentro del consentimiento queda en el renglón siete de la letra chica, que
+ * es justo donde el desconfiado no llega.
  */
 export default function PaginaTercero({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -57,10 +60,26 @@ export default function PaginaTercero({ params }: { params: Promise<{ id: string
         body: JSON.stringify({ ...datos, consentimiento: true, ...(coords ?? {}) }),
       })
       const cuerpo = await res.json()
-      if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo registrar.')
+      if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo registrar. Volvé a tocar "Registrar mis datos".')
       setListo(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error inesperado.')
+      /*
+       * Acá el navegador habla en inglés y quien lee es el otro conductor, parado al lado
+       * de su auto: un fetch que no llega a conectar —lo más probable, porque está en la
+       * calle— rechaza con un TypeError cuyo mensaje es «Failed to fetch», o «Load failed»
+       * en iPhone. Y si contesta un portal cautivo de wifi o un proxy con HTML en vez de
+       * JSON, el res.json() de arriba corre antes del chequeo de res.ok y rechaza con un
+       * SyntaxError: «Unexpected token '<'». Ninguno de los dos se le muestra crudo, y
+       * ninguno se disimula con un .catch() sobre el parseo: eso convertiría el HTML de un
+       * portal cautivo en «Datos registrados».
+       */
+      setError(
+        e instanceof TypeError
+          ? 'No hay señal para enviarlo. Movete unos metros, o pasá a datos móviles, y volvé a tocar "Registrar mis datos".'
+          : e instanceof SyntaxError || !(e instanceof Error)
+            ? 'No se pudo registrar: el servidor no contestó lo esperado. Esperá unos segundos y volvé a tocar "Registrar mis datos".'
+            : e.message,
+      )
     } finally {
       setEnviando(false)
     }
@@ -75,26 +94,51 @@ export default function PaginaTercero({ params }: { params: Promise<{ id: string
     return (
       <main className="envoltura">
         <Marca enlace={false} />
-        <div className="aviso" data-nivel="ok">Datos registrados. Gracias.</div>
-        <h1>Listo</h1>
-        <p className="apagado">
-          Tus datos quedaron incorporados al expediente de este siniestro, con la fecha y la hora exactas. Puede que la
-          aseguradora te contacte más adelante.
-        </p>
-        <p className="mini">Actuación {id}</p>
+
+        <div className="hito">
+          <div className="hito-simbolo">
+            <Icono nombre="tilde" />
+          </div>
+          <h1 className="titulo-pagina hito-titulo">Quedó registrado</h1>
+          <p className="bajada-pagina">
+            Tus datos quedaron incorporados al expediente de este siniestro, con la fecha y la hora exactas. Puede que
+            la aseguradora te contacte más adelante.
+          </p>
+        </div>
+
+        <div className="tarjeta tarjeta-actuacion centrado">
+          <h3 className="tarjeta-actuacion-titulo">Número de actuación</h3>
+          <p className="numero-actuacion tarjeta-actuacion-numero">{id}</p>
+          <p className="mini tarjeta-actuacion-nota">
+            Anotalo: es con lo que podés pedir después el acceso o la supresión de tus datos.
+          </p>
+        </div>
       </main>
     )
   }
 
   return (
     <main className="envoltura">
-      <Marca enlace={false} sub={`Actuación ${id}`} />
+      {/*
+        La marca va sin enlace, a diferencia del resto de las pantallas: quien lee esto no
+        es el asegurado ni tiene sesión, y llevarlo al inicio de la aplicación lo saca del
+        formulario sin manera de volver.
+      */}
+      <Marca enlace={false} />
 
-      <h1>Tus datos, para el registro del siniestro</h1>
-      <p className="apagado">
-        Los carga cada uno por su lado. Que queden tus datos correctos te conviene tanto como al otro: es lo que
-        después permite que las aseguradoras se entiendan sin que ustedes tengan que volver a encontrarse.
-      </p>
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Tus datos, para el registro del siniestro</h1>
+        <p className="bajada-pagina">
+          Te los pide la otra persona involucrada: el código que escaneaste salió de su teléfono. Con tu nombre
+          alcanza; lo demás sumalo si lo tenés a mano. Cada uno carga lo suyo por su lado, y es lo que después
+          permite que las aseguradoras se entiendan sin que ustedes tengan que volver a encontrarse.
+        </p>
+      </header>
+
+      <div className="aviso" data-nivel="info">
+        <strong>Dejar tus datos no es reconocer responsabilidad.</strong> Tampoco estás aceptando la versión del hecho
+        de la otra parte: acá no se te muestra ni se te pide que la firmes.
+      </div>
 
       <div className="tarjeta">
         <div className="campo">
@@ -111,7 +155,7 @@ export default function PaginaTercero({ params }: { params: Promise<{ id: string
         </div>
         <div className="campo">
           <label htmlFor="patente">Patente de tu vehículo</label>
-          <input id="patente" type="text" {...campo('patente')} />
+          <input id="patente" type="text" placeholder="AB 123 CD" autoCapitalize="characters" {...campo('patente')} />
         </div>
         <div className="campo">
           <label htmlFor="marca_modelo">Marca y modelo</label>
@@ -128,7 +172,7 @@ export default function PaginaTercero({ params }: { params: Promise<{ id: string
 
         <button
           type="button"
-          className="opcion"
+          className="opcion opcion-consentimiento"
           data-elegida={consentimiento}
           onClick={() => setConsentimiento(!consentimiento)}
         >
@@ -143,18 +187,24 @@ export default function PaginaTercero({ params }: { params: Promise<{ id: string
           </span>
         </button>
 
+        {/*
+          Los derechos de acceso, rectificación y supresión van dentro de la tarjeta y
+          antes del botón, no al pie de la página: con siete campos arriba, al pie quedan
+          casi dos pantallas por debajo de «Registrar mis datos», y así se consiente
+          «conforme a la Ley 25.326» sin haber visto nunca qué se puede hacer después.
+        */}
+        <p className="nota-datos-personales">
+          Podés pedir el acceso, la rectificación o la supresión de tus datos en cualquier momento. Al suprimirlos,
+          el expediente conserva sólo un código que prueba que tu carga existió, sin permitir reconstruirla. La
+          autoridad de control es la Agencia de Acceso a la Información Pública.
+        </p>
+
         {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
 
         <button className="boton-primario" onClick={enviar} disabled={enviando}>
           {enviando ? 'Registrando...' : 'Registrar mis datos'}
         </button>
       </div>
-
-      <p className="mini">
-        Podés pedir el acceso, la rectificación o la supresión de tus datos en cualquier momento. Al suprimirlos, el
-        expediente conserva sólo un código que prueba que tu carga existió, sin permitir reconstruirla. La autoridad de
-        control es la Agencia de Acceso a la Información Pública.
-      </p>
     </main>
   )
 }

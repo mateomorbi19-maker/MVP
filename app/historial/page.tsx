@@ -37,7 +37,17 @@ export default function Historial() {
         if (!r.ok) throw new Error(c?.error ?? 'No se pudo leer el historial.')
         setFilas(c)
       })
-      .catch((e) => setError(e instanceof Error ? e.message : 'Error inesperado.'))
+      // Un fallo de red llega como TypeError y su mensaje viene del navegador, en inglés:
+      // «Failed to fetch» no le dice a nadie que lo que falta es señal.
+      .catch((e) =>
+        setError(
+          e instanceof TypeError
+            ? 'No se pudo conectar con el servidor. Revisá que tengas señal o wifi y volvé a cargar la pantalla.'
+            : e instanceof Error
+              ? e.message
+              : 'No se pudo leer el historial. Volvé a cargar la pantalla en un minuto.',
+        ),
+      )
   }, [])
 
   return (
@@ -72,10 +82,14 @@ export default function Historial() {
       {(filas ?? []).map((f) => (
         <div className="tarjeta" key={f.id}>
           <div className="numero-actuacion">{f.id}</div>
-          <span className="insignia" data-nivel={f.estado === 'cerrado' ? 'ok' : 'neutra'}>
-            {f.estado === 'cerrado' ? 'Sellada' : 'En curso'}
-          </span>
+          {/*
+            La insignia encabeza la línea de datos en vez de ser un renglón suelto: .numero-actuacion
+            es de bloque, y metida adentro heredaría la monoespaciada y el corte de palabra del número.
+          */}
           <p className="mini">
+            <span className="insignia" data-nivel={f.estado === 'cerrado' ? 'ok' : 'neutra'}>
+              {f.estado === 'cerrado' ? 'Sellada' : 'En curso'}
+            </span>{' '}
             {fecha(f.creado_en)}
             {f.direccion ? ` · ${f.direccion.split(',').slice(0, 2).join(', ')}` : ''}
             {f.patente ? ` · ${f.patente}` : ''}
@@ -99,9 +113,15 @@ export default function Historial() {
         </div>
       ))}
 
-      <p className="mini centrado">
-        <Link href="/cuenta" className="enlace">Volver a mi cuenta</Link>
-      </p>
+      {/*
+        Sin sesión el pie sobra: /cuenta rebota a /entrar?volver=/cuenta y la persona pierde
+        que lo que quería ver eran sus actuaciones.
+      */}
+      {sinSesion ? null : (
+        <p className="mini centrado pie-sesion">
+          <Link href="/cuenta" className="enlace">Volver a mi cuenta</Link>
+        </p>
+      )}
     </main>
   )
 }

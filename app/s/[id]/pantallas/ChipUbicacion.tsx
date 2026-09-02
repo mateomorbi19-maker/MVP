@@ -77,9 +77,19 @@ export function ChipUbicacion({
 
   return (
     <>
+      {/*
+        Mismo armado que las variantes ok y pidiendo: ícono, punto y texto. Sin el ícono la
+        fila se corre 32 px al fallar el GPS a mitad del recorrido, y la única línea que
+        habla de ubicación se queda sin el símbolo que dice de qué habla: en rojo y sin
+        ícono se lee como un error genérico. El texto se acorta y lleva .chip-texto para
+        que en 375 px entre el ícono sin que la línea desborde.
+      */}
       <button className="chip" data-estado="error" onClick={() => setAbierto((a) => !a)}>
+        <span className="chip-icono">
+          <Icono nombre="ubicacion" />
+        </span>
         <span className="punto" data-estado="error" />
-        <span>Sin ubicación · tocá para resolverlo</span>
+        <span className="chip-texto">Sin ubicación · cómo resolverlo</span>
         <span className="chip-flecha">{abierto ? '▲' : '▼'}</span>
       </button>
 
