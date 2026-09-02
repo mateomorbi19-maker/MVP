@@ -1319,8 +1319,8 @@ function PantallaRevision({
         <div className="rotulo">Último paso</div>
         <h1 className="pregunta">Antes de cerrar</h1>
         <p className="pregunta-ayuda">
-          Al cerrar, el expediente se sella y ya no admite cambios. Es lo que le da valor: nadie puede modificarlo
-          después, ni vos.
+          Al cerrar, el expediente se sella. Cualquier cambio posterior queda en evidencia al verificarlo, y el número
+          de actuación permite que lo compruebe cualquiera.
         </p>
 
         <div className="tarjeta">

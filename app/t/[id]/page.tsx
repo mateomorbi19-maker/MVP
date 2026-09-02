@@ -128,8 +128,9 @@ export default function PaginaTestigo({ params }: { params: Promise<{ id: string
       </div>
 
       <p className="mini">
-        Podés pedir el acceso, la rectificación o la supresión de tus datos en cualquier momento. La autoridad de
-        control es la Agencia de Acceso a la Información Pública.
+        Podés pedir el acceso, la rectificación o la supresión de tus datos en cualquier momento. Al suprimirlos, el
+        expediente conserva sólo un código que prueba que tu declaración existió, sin permitir reconstruirla. La
+        autoridad de control es la Agencia de Acceso a la Información Pública.
       </p>
     </main>
   )
