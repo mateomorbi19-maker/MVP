@@ -305,6 +305,16 @@ npm run contrato && npm run tipos && npm run prueba
 npm run build
 ```
 
+`npm run contrato` son 19 comprobaciones. Tres de ellas existen porque el defecto que
+buscan **no falla en ningún otro lado** y sólo se ve abriendo la pantalla justa en el
+estado justo:
+
+| Comprobación | Qué pasa si no está |
+| --- | --- |
+| Toda clase del marcado está definida en `globals.css` | Una clase mal escrita no rompe la compilación, no tira nada en consola y no falla ninguna prueba: el elemento sale sin estilo. Con estados que aparecen poco —un vacío, un 401, un token vencido— llega a producción sin que nadie lo haya visto. `.emergencias-lugar` estuvo así. Las clases armadas con interpolación quedan afuera |
+| Los estilos en línea respetan su cupo | El cupo **sólo baja**. Hoy hay un solo estilo en línea en todo el repositorio, el de `Flujo.tsx`, y tiene mínimo además de máximo porque transporta el avance del recorrido como propiedad personalizada. Si necesitás subir un máximo, lo que falta es una clase |
+| La cámara sigue siendo cámara y no galería | Sin `capture` el navegador abre la galería y la evidencia deja de ser una toma del lugar. La excepción está en `ENTRADAS_SIN_CAPTURE`: `/poliza` adjunta documentación cargada antes del hecho, y su `accept` declara PDF, así que ahí `capture` impedía elegir el archivo |
+
 Y **a mano, en un teléfono real**, que es lo único que ninguna de las tres cubre:
 
 - El gesto de atrás de Android vuelve a la pregunta anterior, no sale de la aplicación.

@@ -113,11 +113,22 @@ export default function MiPoliza() {
 
       {(polizas ?? []).map((p) => (
         <div className="tarjeta" key={p.id}>
-          <h3>
+          <h3 className="titulo-tarjeta">
             {p.aseguradora} · {p.numero}
           </h3>
-          {p.principal ? <span className="insignia" data-nivel="ok">Principal</span> : null}
+          {/*
+            La insignia encabeza la línea de datos y no va como renglón suelto, igual que en
+            /historial: sola entre el título y los datos queda a 0px del título y a 0px del
+            párrafo, sin pertenecer a ninguno de los dos.
+          */}
           <p className="mini">
+            {p.principal ? (
+              <>
+                <span className="insignia" data-nivel="ok">
+                  Principal
+                </span>{' '}
+              </>
+            ) : null}
             {[p.marca_modelo, p.anio, p.patente, p.cobertura].filter(Boolean).join(' · ') || 'Sin datos del vehículo'}
             {p.vigencia_hasta ? ` · vence ${p.vigencia_hasta}` : ''}
           </p>
@@ -155,7 +166,6 @@ export default function MiPoliza() {
             <input
               type="file"
               accept="application/pdf,image/*"
-              capture="environment"
               className="entrada-oculta"
               onChange={(e) => {
                 const f = e.target.files?.[0]

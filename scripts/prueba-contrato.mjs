@@ -148,6 +148,18 @@ const RUTAS_SIN_ERROR_API = {
     'es el endpoint de diagnóstico: estadoBase() ya atrapa todo y devuelve el detalle accionable con su propio 503. Envolverlo en errorApi cambiaría ese mensaje por uno genérico, que es justo lo contrario de para qué existe.',
 }
 
+/*
+ * Entradas de archivo que NO llevan capture, con el motivo.
+ *
+ * La regla existe por la pantalla de foto del recorrido: ahi la evidencia tiene que ser una
+ * toma del lugar, y sin capture el navegador abre la galeria. Fuera del recorrido esa misma
+ * regla se da vuelta.
+ */
+const ENTRADAS_SIN_CAPTURE = {
+  'app/poliza/page.tsx':
+    'no es evidencia del hecho sino documentacion cargada antes, y el accept declara application/pdf: la poliza y la VTV llegan como PDF por correo. Con capture el navegador va derecho a la camara y el PDF no se puede elegir NUNCA, asi que el accept prometia algo que la pantalla no dejaba hacer.',
+}
+
 const ELEMENTOS_ADMITIDOS = {
   '.qr-imagen svg': 'el SVG lo inyecta la biblioteca de códigos QR, no lo escribe nadie acá',
   '.boton-gigante span': 'el subtítulo del botón de inicio',
@@ -393,8 +405,10 @@ console.log('\n[4] Marcado del que depende la funcionalidad')
   const malos = []
   for (const ruta of todosTsx) {
     const cuerpo = leer(ruta)
-    for (const m of cuerpo.matchAll(/<input[^>]*type="file"[^>]*>/g)) {
-      if (!m[0].includes('capture=')) malos.push(`${normalizar(ruta)}: entrada de archivo sin capture`)
+    if (!ENTRADAS_SIN_CAPTURE[normalizar(ruta)]) {
+      for (const m of cuerpo.matchAll(/<input[^>]*type="file"[^>]*>/g)) {
+        if (!m[0].includes('capture=')) malos.push(`${normalizar(ruta)}: entrada de archivo sin capture`)
+      }
     }
     if (/<input[^>]*type="file"/.test(cuerpo) && !/<label/.test(cuerpo)) {
       malos.push(`${normalizar(ruta)}: la entrada de archivo no está dentro de un <label>`)
@@ -404,7 +418,7 @@ console.log('\n[4] Marcado del que depende la funcionalidad')
     'la cámara sigue siendo cámara y no galería',
     malos.length === 0,
     malos.join('\n         ') +
-      '\n         El disparador es un <label> que envuelve el <input type="file" capture>. Un <button> no abre el selector de archivos, y sin capture se abre la galería: la evidencia deja de ser una toma del lugar.',
+      '\n         El disparador es un <label> que envuelve el <input type="file" capture>. Un <button> no abre el selector de archivos, y sin capture se abre la galería: la evidencia deja de ser una toma del lugar. Si tu pantalla no captura evidencia del hecho, agregala a ENTRADAS_SIN_CAPTURE con el motivo.',
   )
 }
 

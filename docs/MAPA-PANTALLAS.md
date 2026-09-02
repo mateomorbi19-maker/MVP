@@ -88,8 +88,8 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | Emergencia | `pantallas/PantallaEmergencia.tsx` | `.emergencia`, `.boton-llamada` | ninguno (`tel:`) |
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
 | Una foto | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-tomada`, `.entrada-oculta`, `.miniatura` | `POST /api/casos/[id]/media` |
-| Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
-| Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
+| Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
+| Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
 | Ubicación | `pantallas/ChipUbicacion.tsx` | `.chip[data-estado]`, `.punto[data-estado]`, `.chip-flecha` | `POST /api/casos/[id]/ubicacion` |
 | Conmutador | `Flujo.tsx` | `.envoltura-flujo`, `.pantalla[data-paso][data-bloque]`, `.progreso-fino`, `.progreso-fino-relleno`, `.volver` | — |
 
@@ -132,7 +132,7 @@ componente de pregunta de la etapa 4.
 | Pantalla | Archivo | Clases |
 | --- | --- | --- |
 | Corte | `pantallas/PantallaCorte.tsx` | `.hito`, `.hito-simbolo`, `.numero-actuacion` |
-| Relato ampliado | `pantallas/PantallaPregunta.tsx` (tipo `parrafo`) | `.ayuda`, `.campo-grande` |
+| Relato ampliado | `pantallas/PantallaPregunta.tsx` (tipo `parrafo`) | `.guia-relato`, `.campo-grande` |
 | Croquis | `pantallas/PantallaCroquis.tsx` + `components/CroquisVisor.tsx` | `.croquis`, `.croquis-lienzo`, `.croquis-calzada`, `.croquis-linea`, `.croquis-vehiculo`, `.croquis-flecha`, `.croquis-impacto` |
 | Carátula | `pantallas/PantallaDatos.tsx` | `.campo`, `.campo-grande` |
 

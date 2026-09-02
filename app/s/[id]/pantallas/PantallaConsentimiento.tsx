@@ -50,7 +50,7 @@ export function PantallaConsentimiento({
           {svg ? (
             <div className="qr qr-imagen" dangerouslySetInnerHTML={{ __html: svg }} />
           ) : (
-            <p className="apagado">Generando el código...</p>
+            <div className="qr-esperando">Generando el código...</div>
           )}
         </div>
 
