@@ -83,11 +83,17 @@ export default async function Cuenta() {
 
       <div className="separacion-bloque" />
 
-      <CambiarClave />
-      <CerrarSesion />
+      {/* Sin .pila los dos son inline-flex sueltos: a 375px envuelven pegados y a 393px
+          entran en la misma linea, sin un pixel entre uno y otro. */}
+      <div className="pila">
+        <CambiarClave />
+        <CerrarSesion />
+      </div>
 
-      <p className="mini centrado">
-        <Link href="/" className="enlace">Volver al inicio</Link>
+      <p className="centrado">
+        <Link href="/" className="boton boton-fantasma">
+          Volver al inicio
+        </Link>
       </p>
     </main>
   )

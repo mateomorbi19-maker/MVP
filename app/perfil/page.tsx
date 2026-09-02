@@ -20,6 +20,7 @@ export default function Perfil() {
   const [contacto, setContacto] = useState<Contacto>({ nombre: '', telefono: '', relacion: '' })
   const [aviso, setAviso] = useState<{ nivel: 'ok' | 'alerta'; texto: string } | null>(null)
   const [sinSesion, setSinSesion] = useState(false)
+  const [enviando, setEnviando] = useState(false)
 
   useEffect(() => {
     fetch('/api/perfil')
@@ -47,17 +48,39 @@ export default function Perfil() {
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
-    const res = await fetch('/api/perfil', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ titular, contacto }),
-    })
-    const c = await res.json().catch(() => ({}))
-    setAviso(
-      res.ok
-        ? { nivel: 'ok', texto: 'Guardado.' }
-        : { nivel: 'alerta', texto: c?.error ?? 'No se pudo guardar.' },
-    )
+    setEnviando(true)
+    setAviso(null)
+    try {
+      const res = await fetch('/api/perfil', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titular, contacto }),
+      })
+      const c = await res.json().catch(() => ({}))
+      setAviso(
+        res.ok
+          ? { nivel: 'ok', texto: 'Guardado.' }
+          : { nivel: 'alerta', texto: c?.error ?? 'No se pudo guardar.' },
+      )
+    } catch {
+      /*
+       * Sin red el fetch rechaza. Sin este catch, tocar Guardar no cambiaba nada en
+       * pantalla y la persona volvia a tocar. El mensaje no culpa a la señal: el fetch
+       * rechaza igual cuando el que no contesta es el servidor.
+       */
+      setAviso({
+        nivel: 'alerta',
+        texto:
+          'No se pudo llegar al servidor. Revisá la conexión y volvé a tocar Guardar: lo que escribiste sigue en pantalla.',
+      })
+    } finally {
+      /*
+       * El finally va acá y no en el catch —como en /entrar y /registro— porque esas dos
+       * navegan al terminar bien y ésta se queda: si sólo se apagara en el error, el botón
+       * quedaría deshabilitado para siempre despues de un guardado exitoso.
+       */
+      setEnviando(false)
+    }
   }
 
   /*
@@ -140,16 +163,18 @@ export default function Perfil() {
 
         {aviso ? <div className="aviso" data-nivel={aviso.nivel}>{aviso.texto}</div> : null}
 
-        <button className="boton-primario boton-ancho" type="submit">
-          Guardar
+        <button className="boton-primario boton-ancho" type="submit" disabled={enviando}>
+          {enviando ? 'Guardando...' : 'Guardar'}
         </button>
       </form>
       )}
 
       <DetectorImpacto />
 
-      <p className="mini centrado">
-        <Link href="/cuenta" className="enlace">Volver a mi cuenta</Link>
+      <p className="centrado">
+        <Link href="/cuenta" className="boton boton-fantasma">
+          Volver a mi cuenta
+        </Link>
       </p>
     </main>
   )

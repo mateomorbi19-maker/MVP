@@ -78,8 +78,8 @@ export default function Registro() {
         </button>
       </form>
 
-      <p className="mini centrado">
-        <Link href="/entrar" className="enlace">Ya tengo cuenta</Link>
+      <p className="centrado">
+        <Link href="/entrar" className="boton boton-secundario">Ya tengo cuenta</Link>
       </p>
     </main>
   )

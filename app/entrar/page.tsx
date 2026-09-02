@@ -1,8 +1,8 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Marca } from '@/app/components/Marca'
 
 /**
@@ -13,9 +13,8 @@ import { Marca } from '@/app/components/Marca'
  * mandarle el acta al productor. Un formulario entre la persona y la evidencia perecedera
  * es exactamente lo que hace que alguien con adrenalina abandone.
  */
-function Formulario() {
+export default function Entrar() {
   const router = useRouter()
-  const volver = useSearchParams().get('volver') || '/cuenta'
   const [dni, setDni] = useState('')
   const [clave, setClave] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +32,13 @@ function Formulario() {
       })
       const cuerpo = await res.json()
       if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo iniciar sesión.')
+      /*
+       * Se lee aca y no con useSearchParams. Ese hook empuja al cliente todo el arbol
+       * hasta el Suspense mas cercano, y como el Suspense envolvia la pantalla entera, el
+       * HTML prerenderizado de /entrar salia vacio: ni marca, ni titulo, ni el boton. La
+       * gemela /registro, que no usa el hook, si trae todo. Aca ya estamos en el navegador.
+       */
+      const volver = new URLSearchParams(window.location.search).get('volver') || '/cuenta'
       router.push(volver)
       router.refresh()
     } catch (e) {
@@ -83,24 +89,22 @@ function Formulario() {
         </button>
       </form>
 
-      <p className="mini centrado">
-        ¿No tenés cuenta? <Link href="/registro" className="enlace">Registrate</Link>
+      {/* Como boton y no como enlace suelto: de enlace medía 59x17px de area de toque,
+          y es el unico camino a crear una cuenta desde esta pantalla. */}
+      <p className="centrado">
+        <Link href="/registro" className="boton boton-secundario">
+          ¿No tenés cuenta? Registrate
+        </Link>
       </p>
       <p className="mini centrado">
         Si olvidaste la contraseña, pedile a tu aseguradora que te la reinicie: por ahora no hay recuperación
         automática, porque el DNI es un dato público y un reinicio pedido sólo con el DNI sería una puerta abierta.
       </p>
-      <p className="mini centrado">
-        <Link href="/" className="enlace">Volver al inicio</Link>
+      <p className="centrado">
+        <Link href="/" className="boton boton-fantasma">
+          Volver al inicio
+        </Link>
       </p>
     </main>
-  )
-}
-
-export default function Entrar() {
-  return (
-    <Suspense fallback={null}>
-      <Formulario />
-    </Suspense>
   )
 }
