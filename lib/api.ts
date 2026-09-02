@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ErrorBaseDeDatos, traducirErrorBase } from './db'
+import { ErrorActuacionCerrada } from './hash'
 
 /**
  * Respuesta de error uniforme.
@@ -9,6 +10,16 @@ import { ErrorBaseDeDatos, traducirErrorBase } from './db'
  * Los errores inesperados sí quedan genéricos hacia afuera y con detalle en el log.
  */
 export function errorApi(contexto: string, err: unknown, mensajeGenerico: string): NextResponse {
+  /*
+   * Cada handler comprueba el estado antes de escribir, pero entre esa lectura y la
+   * escritura entra el cierre. registrarEvento lo detecta con el caso bloqueado, y eso
+   * llega hasta acá: sin esta rama, una carrera perfectamente normal se le muestra al
+   * cliente como un error interno y la aplicación reintenta para siempre.
+   */
+  if (err instanceof ErrorActuacionCerrada) {
+    return NextResponse.json({ error: err.message, tipo: 'cerrada' }, { status: 409 })
+  }
+
   const base = err instanceof ErrorBaseDeDatos ? err : traducirErrorBase(err)
 
   if (base) {

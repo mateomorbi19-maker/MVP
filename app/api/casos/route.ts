@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
-import { registrarEvento } from '@/lib/hash'
+import { registrarEvento, VERSION_MANIFIESTO } from '@/lib/hash'
 import { listarCasos, limpiarDatosAsegurado } from '@/lib/casos'
 
 export const runtime = 'nodejs'
@@ -18,14 +18,39 @@ export async function POST(req: Request) {
   try {
     const cuerpo = await req.json().catch(() => ({}))
     const datos = limpiarDatosAsegurado(cuerpo)
-    const id = nuevoId()
     const pg = await db()
 
-    await pg.query(
-      `INSERT INTO casos (id, poliza, patente, asegurado, telefono)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, datos.poliza, datos.patente, datos.asegurado, datos.telefono],
-    )
+    /*
+     * Reintento por colisión de número.
+     *
+     * nuevoId() son 6 caracteres sobre un alfabeto de 32: unas 1.07e9 combinaciones, que
+     * por la paradoja del cumpleaños dan alrededor de 50% de probabilidad de al menos una
+     * colisión a las ~33.000 actuaciones. Sin reintento, esa colisión es un 500 genérico
+     * justo cuando la persona toca "Tuve un accidente" parada al lado del auto.
+     *
+     * La versión del manifiesto se escribe acá y no se deja en el DEFAULT de la columna:
+     * el DEFAULT es '1.0' para las filas que ya existían, y toda actuación nueva tiene
+     * que nacer en la versión vigente. Ver VERSION_MANIFIESTO en lib/hash.ts.
+     */
+    let id = ''
+    for (let intento = 0; intento < 5; intento++) {
+      const candidato = nuevoId()
+      try {
+        await pg.query(
+          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [candidato, datos.poliza, datos.patente, datos.asegurado, datos.telefono, VERSION_MANIFIESTO],
+        )
+        id = candidato
+        break
+      } catch (err) {
+        // 23505 = unique_violation. Cualquier otra cosa no se resuelve reintentando.
+        if ((err as { code?: string })?.code !== '23505') throw err
+      }
+    }
+    if (!id) {
+      throw new Error('No se pudo generar un número de actuación libre después de cinco intentos.')
+    }
 
     await registrarEvento(id, 'apertura_actuacion', {
       poliza: datos.poliza,
