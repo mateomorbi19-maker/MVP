@@ -142,6 +142,7 @@ ALTER TABLE testigos ENABLE ROW LEVEL SECURITY;
 
 ```bash
 npm run prueba    # pruebas de la lógica pura, sin base de datos
+npm run contrato  # el borde entre el trabajo visual y el funcional
 npm run tipos     # chequeo de tipos
 npm run build     # build de producción
 npm run e2e       # circuito completo contra un servidor ya levantado
@@ -152,6 +153,13 @@ quede fuera del recorrido, que no se pidan fotos del tercero cuando no hay terce
 encadenado de hashes —incluido que alterar o suprimir un eslabón rompa la validación—, el
 motor de consistencia y la generación del PDF de punta a punta. Deja un expediente de
 ejemplo en `data/expediente-de-prueba.pdf`.
+
+`npm run contrato` verifica que un cambio puramente visual no pueda romper la
+funcionalidad en silencio: que no se renombre un id de pregunta, que no cambie el texto de
+una opción —que no es copy sino el dato que guardan los expedientes sellados—, que la
+entrada de la cámara siga siendo cámara y no galería, que ningún color quede fuera de los
+tokens, y una docena más. El documento que verifica es `docs/CONTRATO-UI.md`, y es lectura
+obligatoria antes de tocar pantallas o estilos.
 
 `npm run e2e` necesita `npm run dev` corriendo aparte y una base configurada: recorre el
 circuito real, desde el alta sin datos hasta el sello de tiempo y la verificación pública.
@@ -225,13 +233,16 @@ juntar los miles de choques etiquetados que necesita un modelo propio.
 ```
 app/
   page.tsx               inicio: un botón, "Tuve un accidente"
-  s/[id]/Flujo.tsx       el recorrido: una pregunta por pantalla
+  s/[id]/Flujo.tsx       el conmutador: decide qué pantalla se muestra
+  s/[id]/pantallas/      una pantalla por archivo
+  s/[id]/tipos.ts        los tipos que comparten las pantallas
   t/[id]/                carga de testigo por QR
   panel/                 listado y detalle para la aseguradora
   verificar/             verificador público de integridad
   api/                   rutas de servidor
 lib/
-  cuestionario.ts        las preguntas, las tomas fotográficas y el orden del recorrido
+  cuestionario.ts        las preguntas, las tomas fotográficas y los valores
+  recorrido.ts           qué pantallas hay, en qué orden y en cuál se retoma
   consistencia.ts        motor de contrastes
   hash.ts                cadena de custodia y manifiesto
   sello.ts               firma y sello de tiempo RFC 3161
@@ -241,16 +252,24 @@ lib/
   db.ts                  Postgres y esquema
   almacenamiento.ts      archivos en el volumen
   local.ts               qué actuación quedó abierta en este teléfono
+docs/
+  CONTRATO-UI.md         qué puede tocar un agente visual y qué no
+  MAPA-PANTALLAS.md      de cada pantalla del mockup al archivo que la dibuja
 scripts/
   prueba-logica.mjs      pruebas sin base de datos
+  prueba-contrato.mjs    el contrato de interfaz
   prueba-e2e.mjs         circuito completo contra un servidor levantado
 ```
 
 `lib/cuestionario.ts` es el único lugar donde se toca el contenido del cuestionario:
-`SECCIONES` define las preguntas y `RECORRIDO` el orden en que se intercalan con las
-pantallas propias (fotos, testigos, corte). **Los ids de las preguntas son API** —los usan
-el motor de consistencia, el PDF y la validación del `PATCH`—: se pueden reordenar, no
-renombrar.
+`SECCIONES` define las preguntas, `RECORRIDO` el orden en que se intercalan con las
+pantallas propias (fotos, testigos, corte) y `VALOR` los textos de las respuestas cerradas.
+**Los ids de las preguntas son API** —los usan el motor de consistencia, el PDF y la
+validación del `PATCH`—: se pueden reordenar, no renombrar. **Y el texto de una opción
+tampoco es copy**: es el valor que se guarda en `casos.respuestas`, ya escrito dentro de
+expedientes sellados, y contra el que el motor de consistencia compara por igualdad
+literal. Por eso los arrays de opciones se arman desde `VALOR` y `lib/consistencia.ts` lo
+importa, en lugar de repetir los textos.
 
 Cada pantalla del recorrido es una entrada del historial del navegador (`?paso=`), así que
 el gesto de atrás del teléfono vuelve a la pregunta anterior en vez de salirse de la
