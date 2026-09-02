@@ -129,6 +129,30 @@ El pie que dice que el croquis es declarativo y no un peritaje es obligatorio en
 vistas y en el PDF. No es una nota al pie decorativa: es lo que evita que un dibujo armado
 eligiendo de una lista se lea como una reconstrucción.
 
+## 6b · La firma
+
+| | |
+| --- | --- |
+| Archivo | `pantallas/PantallaFirma.tsx` + `components/LienzoFirma.tsx` |
+| Clases | `.lienzo-firma`, `.lienzo-firma-area`, `.tarjeta`, `.campo`, `.mono`, `.omitir` |
+| Endpoints | `GET /api/casos/[id]/acta` · `POST /api/casos/[id]/firma` |
+
+Etapa propia, antes de la revisión y no dentro de ella: la revisión ya es la pantalla más
+cargada del recorrido y meter el lienzo ahí empuja a firmar sin leer.
+
+**Intocable:**
+
+- El canvas recibe `width` y `height` en píxeles reales desde JavaScript, no desde CSS.
+  Con el tamaño puesto por CSS el navegador escala el bitmap y el trazo sale borroso y
+  corrido respecto del dedo.
+- `touch-action: none` sobre `.lienzo-firma`. Sin eso, arrastrar el dedo hace scroll de la
+  página en vez de dibujar: no se puede firmar en un teléfono.
+- `.lienzo-firma-area` lleva alto en píxeles y **no** en `dvh`, `svh` ni `lvh`. Esas
+  unidades cambian cuando el navegador móvil esconde la barra de direcciones, y el trazo se
+  re-escala mientras la persona está firmando.
+- **«Cerrar sin firmar» nunca desaparece.** La firma es opcional y su ausencia no genera
+  ningún reproche en el informe.
+
 ## 7 · Generando el acta
 
 | | |

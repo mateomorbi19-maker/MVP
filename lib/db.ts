@@ -158,6 +158,12 @@ CREATE TABLE IF NOT EXISTS medias (
 );
 CREATE INDEX IF NOT EXISTS medias_caso_idx ON medias (caso_id);
 
+-- La firma entra como una media más para que la cadena de custodia y el manifiesto la
+-- incorporen sin código nuevo. Lo que 'tipo' no alcanza a decir es QUIÉN firmó y SOBRE QUÉ
+-- contenido exacto: sin el hash del acta, la firma es un dibujo suelto.
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS firmante     TEXT;
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS hash_firmado TEXT;
+
 CREATE TABLE IF NOT EXISTS testigos (
   id              TEXT PRIMARY KEY,
   caso_id         TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,

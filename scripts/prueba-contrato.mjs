@@ -331,7 +331,13 @@ console.log('\n[4] Marcado del que depende la funcionalidad')
 }
 
 {
-  const conRespuestas = pantallas.filter((r) => /\brespuestas\b\s*[,:}]/.test(leer(r))).map(normalizar)
+  /*
+   * Se busca `respuestas` como PROP: al principio de una línea, que es como se escribe
+   * tanto en la desestructuración como en el tipo. Buscarlo en cualquier posición daba
+   * falsos positivos con expresiones legítimas como `acta.resumen.respuestas`, y un
+   * verificador que grita en falso se apaga a la tercera semana.
+   */
+  const conRespuestas = pantallas.filter((r) => /^\s*respuestas[,:]/m.test(leer(r))).map(normalizar)
   verificar(
     'ninguna pantalla del recorrido recibe el objeto de respuestas',
     conRespuestas.length === 0,

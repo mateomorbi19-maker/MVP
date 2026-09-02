@@ -53,6 +53,7 @@ export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'testigos' }
   | { clave: string; bloque: Bloque; tipo: 'consentimiento' }
   | { clave: string; bloque: Bloque; tipo: 'validacion' }
+  | { clave: string; bloque: Bloque; tipo: 'firma' }
   | { clave: string; bloque: Bloque; tipo: 'corte' }
   /**
    * `masDeDosVehiculos` viaja resuelto: la pantalla no puede comparar contra el texto de

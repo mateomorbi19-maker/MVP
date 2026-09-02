@@ -765,6 +765,7 @@ export type Etapa =
   | { tipo: 'croquis' }
   | { tipo: 'consentimiento' }
   | { tipo: 'validacion' }
+  | { tipo: 'firma' }
   | { tipo: 'datos' }
   | { tipo: 'revision' }
   | { tipo: 'final' }
@@ -803,6 +804,12 @@ export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'relato_casa' },
   { tipo: 'croquis' },
   { tipo: 'datos' },
+  /*
+   * La firma va antes de la revisión y NO dentro de ella. La revisión ya es la pantalla más
+   * cargada del recorrido —lo que se sella, los faltantes, el aviso de ubicación y el botón
+   * de cerrar—, y meter el lienzo ahí empuja a firmar sin leer. Firmar es un acto aparte.
+   */
+  { tipo: 'firma' },
   { tipo: 'revision' },
   { tipo: 'final' },
 ]

@@ -1324,3 +1324,33 @@ tr:last-child td {
   font-size: 14px;
   line-height: 1.6;
 }
+
+/* ---------- Firma ---------- */
+
+/*
+ * El alto va en píxeles y NO en unidades de viewport dinámicas (dvh, svh, lvh).
+ *
+ * Con dvh la caja cambia cuando el navegador móvil esconde o muestra la barra de
+ * direcciones al hacer scroll. El canvas se re-mide con un ResizeObserver y lo tolera,
+ * pero el trazo se re-escala mientras la persona está firmando, y ésta es la pieza que se
+ * ata al hash del acta.
+ */
+.lienzo-firma-area {
+  height: 200px;
+  border: 2px dashed var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  overflow: hidden;
+}
+
+/*
+ * touch-action: none es funcional, no cosmético: sin eso, arrastrar el dedo hace scroll de
+ * la página en vez de dibujar, y no se puede firmar en un teléfono.
+ */
+.lienzo-firma {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}

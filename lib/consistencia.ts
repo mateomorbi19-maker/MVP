@@ -33,6 +33,7 @@ export interface InformeConsistencia {
     fotos_presentes: number
     tiene_audio: boolean
     tiene_relato_escrito: boolean
+    firmado: boolean
     testigos: number
   }
 }
@@ -45,6 +46,7 @@ interface Entrada {
   fotos: Array<{ guia_id: string | null }>
   fotosObligatorias: string[]
   tieneAudio: boolean
+  tieneFirma: boolean
   testigos: number
 }
 
@@ -423,6 +425,15 @@ export function analizar(e: Entrada): InformeConsistencia {
       fotos_presentes: guiasPresentes.size,
       tiene_audio: e.tieneAudio,
       tiene_relato_escrito: tieneRelatoEscrito,
+      /*
+       * La ausencia de firma se informa, pero NO genera un hallazgo de «a revisar».
+       *
+       * «Cerrar sin firmar» es una salida que el propio producto ofrece, y la firma no es
+       * obligatoria. Marcarla como algo a revisar sería reprocharle a la persona haber
+       * usado una opción que le dimos, y convertiría al motor de contradicciones en un
+       * calificador de conducta. Ese es justamente el límite que el motor no cruza.
+       */
+      firmado: e.tieneFirma,
       testigos: e.testigos,
     },
   }

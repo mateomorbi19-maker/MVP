@@ -15,6 +15,7 @@ import { PantallaCorte } from './pantallas/PantallaCorte'
 import { PantallaCroquis } from './pantallas/PantallaCroquis'
 import { PantallaConsentimiento } from './pantallas/PantallaConsentimiento'
 import { PantallaValidacion } from './pantallas/PantallaValidacion'
+import { PantallaFirma } from './pantallas/PantallaFirma'
 import { PantallaDatos } from './pantallas/PantallaDatos'
 import { PantallaRevision } from './pantallas/PantallaRevision'
 import { PantallaFinal } from './pantallas/PantallaFinal'
@@ -459,6 +460,10 @@ export function Flujo(props: Props) {
         ) : null}
 
         {actual?.tipo === 'datos' ? <PantallaDatos datos={datos} anotar={anotarDato} seguir={() => mover(1)} /> : null}
+
+        {actual?.tipo === 'firma' ? (
+          <PantallaFirma casoId={props.casoId} nombreSugerido={datos.asegurado} seguir={() => mover(1)} />
+        ) : null}
 
         {actual?.tipo === 'revision' ? (
           <PantallaRevision

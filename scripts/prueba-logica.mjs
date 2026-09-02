@@ -16,6 +16,7 @@ import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
 import { PLANTILLAS, figurasDelCroquis, limpiarCroquis } from '../lib/croquis.ts'
 import { MAPEO, PROVEEDOR_SIMULADO, extraccionActiva, vistaParaAsegurado } from '../lib/extraccion.ts'
+import { DECLARACION, construirActa } from '../lib/acta.ts'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
@@ -649,6 +650,81 @@ verificar(
   limpiarCroquis({ ...PLANTILLAS[0].croquis, vehiculos: [{ rol: 'propio', x: 10, y: 10, rumbo: 450 }] })
     ?.vehiculos[0].rumbo === 90,
 )
+
+/* ---------- 8. El acta que se firma ---------- */
+console.log('\n[8] El acta que se firma')
+
+{
+  const casoBase = {
+    id: 'ADS-ACTA00',
+    creado_en: '2026-08-19T12:00:00.000Z',
+    cerrado_en: null,
+    estado: 'abierto',
+    poliza: 'POL-1',
+    patente: 'AB123CD',
+    asegurado: 'Juan Pérez',
+    telefono: '11 5555 5555',
+    respuestas: { heridos: 'No, nadie', velocidad: 40 },
+    gps: { lat: -34.6, lon: -58.4, precision_m: 10, capturado_en: '2026-08-19T12:00:00.000Z' },
+    direccion: 'Avenida Rivadavia 5000',
+    clima: null,
+    consistencia: null,
+    hash_maestro: null,
+    sello: null,
+    manifiesto_version: '1.1',
+    usuario_id: null,
+    productor_id: null,
+    croquis: null,
+  }
+  const media = (id) => ({
+    id,
+    caso_id: casoBase.id,
+    tipo: 'foto',
+    guia_id: 'dano_propio',
+    archivo: 'x',
+    mime: 'image/jpeg',
+    bytes: 10,
+    sha256: sha256(id),
+    gps: null,
+    capturado_en: '2026-08-19T12:01:00.000Z',
+    firmante: null,
+    hash_firmado: null,
+  })
+  const medias = [media('IMG-2'), media('IMG-1')]
+
+  const a = construirActa(casoBase, medias, [])
+  verificar('el acta es determinista', a.hash === construirActa(casoBase, medias, []).hash)
+  verificar(
+    'el orden en que llegan las piezas no cambia el acta',
+    a.hash === construirActa(casoBase, [...medias].reverse(), []).hash,
+  )
+  verificar('cambiar una respuesta cambia el acta', a.hash !== construirActa({ ...casoBase, respuestas: { ...casoBase.respuestas, velocidad: 60 } }, medias, []).hash)
+  verificar('cambiar la carátula cambia el acta', a.hash !== construirActa({ ...casoBase, patente: 'ZZ999ZZ' }, medias, []).hash)
+  verificar('agregar una pieza cambia el acta', a.hash !== construirActa(casoBase, [...medias, media('IMG-3')], []).hash)
+
+  /*
+   * El croquis vive en una columna propia: no está en respuestas ni en las piezas. Sin
+   * esto, entre la firma y el cierre se podía cambiar entero sin que la firma lo detectara,
+   * y el croquis es la reconstrucción de cómo ocurrió el hecho.
+   */
+  const conCroquis = construirActa({ ...casoBase, croquis: PLANTILLAS[0].croquis }, medias, [])
+  verificar('el croquis entra en lo que se firma', a.hash !== conCroquis.hash)
+  verificar(
+    'y cambiar el croquis cambia el acta',
+    conCroquis.hash !== construirActa({ ...casoBase, croquis: PLANTILLAS[1].croquis }, medias, []).hash,
+  )
+
+  /*
+   * La firma NO entra en el acta que ella misma firma: si entrara, firmar cambiaría el
+   * hash de lo firmado y ninguna firma podría verificar nunca.
+   */
+  const conFirma = [...medias, { ...media('FIR-1'), tipo: 'firma' }]
+  verificar('la propia firma queda fuera del acta', a.hash === construirActa(casoBase, conFirma, []).hash)
+
+  verificar('la declaración lleva versión', DECLARACION.version.startsWith('acta-asegurado-'))
+  verificar('la declaración dice que es firma electrónica y no digital', DECLARACION.texto.includes('art. 5'))
+  verificar('y aclara que no tiene las presunciones de los arts. 7 y 8', DECLARACION.texto.includes('arts. 7 y 8'))
+}
 
 /* ---------- Resultado ---------- */
 console.log(`\n${pruebas - fallos}/${pruebas} verificaciones pasaron`)

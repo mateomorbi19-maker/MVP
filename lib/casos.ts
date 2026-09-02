@@ -1,5 +1,6 @@
 import { db } from './db'
 import { construirManifiesto } from './hash'
+import { construirActa } from './acta'
 import { analizar, type InformeConsistencia } from './consistencia'
 import { fotosObligatorias } from './cuestionario'
 import type { Clima } from './clima'
@@ -96,6 +97,8 @@ export interface Media {
   sha256: string
   gps: { lat: number; lon: number } | null
   capturado_en: string
+  firmante: string | null
+  hash_firmado: string | null
 }
 
 export async function listarMedias(casoId: string): Promise<Media[]> {
@@ -112,6 +115,8 @@ export async function listarMedias(casoId: string): Promise<Media[]> {
     sha256: m.sha256,
     gps: m.gps,
     capturado_en: iso(m.capturado_en),
+    firmante: m.firmante ?? null,
+    hash_firmado: m.hash_firmado ?? null,
   }))
 }
 
@@ -156,6 +161,7 @@ export async function calcularConsistencia(casoId: string): Promise<InformeConsi
     fotos: medias.filter((m) => m.tipo === 'foto').map((m) => ({ guia_id: m.guia_id })),
     fotosObligatorias: fotosObligatorias(caso.respuestas),
     tieneAudio: medias.some((m) => m.tipo === 'audio'),
+    tieneFirma: medias.some((m) => m.tipo === 'firma'),
     testigos: testigos.length,
   })
 }
@@ -185,6 +191,7 @@ export async function datosExpediente(casoId: string): Promise<DatosExpediente |
       direccion: caso.direccion,
     },
     croquis: caso.croquis,
+    hash_acta_actual: construirActa(caso, medias, testigos).hash,
     clima: caso.clima,
     consistencia,
     manifiesto,
