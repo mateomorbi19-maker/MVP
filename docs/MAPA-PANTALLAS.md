@@ -36,7 +36,7 @@ el acta.
 | | |
 | --- | --- |
 | Archivo | `app/page.tsx` |
-| Clases | `.inicio`, `.inicio-centro`, `.inicio-pie`, `.boton-gigante`, `.enlaces-pie`, `.aviso[data-nivel]` |
+| Clases | `.inicio`, `.denuncia`, `.denuncia-pasos`, `.denuncia-paso`, `.denuncia-resguardo`, `.boton-gigante`, `.bloque-inicio`, `.acceso`, `.inicio-pie`, `.aviso[data-nivel]` |
 | Endpoints | `GET /api/salud` al montar · `POST /api/casos` al tocar el botón |
 | Cupo de estilos en línea | 3 |
 
@@ -45,18 +45,36 @@ ninguna consulta. Es un Client Component a propósito: si el inicio pasara a res
 el servidor, con la base lenta o caída la persona vería un error en vez del botón. El
 aviso de sistema no operativo aparece *encima* pero no lo desplaza ni lo tapa.
 
-Las emergencias 911 / 100 / 107 y los accesos a póliza e historial que muestra el mockup
-llegan con el módulo de cuentas.
+El texto sobre `.denuncia` es siempre `--sobre-color` y **no cambia con el tema**: el azul
+saturado del degradado no tiene versión clara, así que invertirlo con el tema oscuro deja
+texto claro sobre fondo claro. Lo que sí cambia con el tema es todo lo que está fuera de la
+tarjeta: `.bloque-titulo`, `.acceso` y el `.aviso` del pie.
+
+Las emergencias 911 / 100 / 107 salen de `lib/emergencias.ts` a través de
+`<BotonesEmergencia>`, el mismo componente que usa la pantalla de emergencia del recorrido
+y `/aviso`. Los tres números están en un solo lugar.
 
 ## 3 · Ingreso
 
-**Estado: no construida.** Llega con el módulo de cuentas.
+| | |
+| --- | --- |
+| Archivo | `app/entrar/page.tsx` (y `app/registro/page.tsx` para el alta) |
+| Clases | `.encabezado-pagina`, `.titulo-pagina`, `.bajada-pagina`, `.tarjeta`, `.campo` |
+| Endpoint | `POST /api/sesion` |
 
-Decisión de producto que cambia el mockup: **el ingreso no va a ser la primera pantalla.**
+Decisión de producto que cambia el mockup: **el ingreso no es la primera pantalla.**
 El botón «Tuve un accidente» sigue sin pedir nada. La sesión sirve para ver la póliza, el
 historial y mandarle el acta al productor, y para vincular después una actuación que se
 abrió sin identificarse. Un formulario entre la persona y la evidencia perecedera es
 exactamente lo que hace que alguien con adrenalina abandone.
+
+No hay «olvidé mi contraseña», y la pantalla lo dice en vez de disimularlo: sin un canal de
+entrega verificado, un reinicio pedido con el DNI es una toma de cuenta directa, porque el
+DNI es un dato público. El reinicio lo hace la aseguradora.
+
+Las tres pantallas con sesión —`/poliza`, `/historial`, `/perfil`— resuelven el 401 con
+`<SinSesion>`, que no es una alerta roja sino un estado con su propia salida a `/entrar`,
+y que vuelve a la pantalla de origen después de entrar.
 
 ## 4 · Modo lugar del hecho
 
@@ -225,4 +243,29 @@ Dos cosas que hay que saber antes de tocar cualquier texto que termine acá:
 | --- | --- | --- |
 | Carga de testigo | `app/t/[id]/page.tsx` | El testigo escanea el QR y carga sus datos desde su propio teléfono, con consentimiento expreso |
 | Verificador público | `app/verificar/page.tsx` | Cualquiera comprueba la integridad de un expediente con su número |
+| Consentimiento del tercero | `app/c/[id]/page.tsx` | El otro conductor presta consentimiento desde su teléfono antes de que se lea su documento |
 | Panel de la aseguradora | `app/panel/page.tsx`, `app/panel/[id]/page.tsx` | Listado y detalle, con el informe de consistencia |
+| Cuenta | `app/cuenta/page.tsx` | Quién sos, cambiar la contraseña, cerrar sesión, y los accesos al resto |
+| Mis actuaciones | `app/historial/page.tsx` | Las actuaciones de la persona, con el estado de cada trámite |
+| Mi póliza | `app/poliza/page.tsx` | Pólizas y documentación del vehículo, cargadas antes del choque |
+| Mis datos | `app/perfil/page.tsx` | Carátula precargada, contacto de confianza y modo viaje |
+| Aviso de impacto | `app/aviso/page.tsx` | Lo que abre la notificación del detector. Los tres botones que en iPhone no caben dentro de la notificación |
+
+---
+
+## Lo que comparten todas las pantallas fuera del recorrido
+
+Abren igual: `<Marca />` sin `sub`, y después un `<header className="encabezado-pagina">`
+con `.titulo-pagina` y `.bajada-pagina`. La marca dice de quién es la aplicación; el
+encabezado dice en qué pantalla estás. Cuando hay una acción al costado del título, el
+header lleva además `.encabezado-con-accion`, que apila en vertical por debajo de 700px.
+
+| Situación | Clases | Regla |
+| --- | --- | --- |
+| No hay nada cargado todavía | `.vacio`, `.vacio-icono`, `.vacio-titulo`, `.vacio-texto` | El texto dice **para qué sirve** lo que falta, no sólo que falta |
+| Hace falta una cuenta | `<SinSesion volver que>` | No es una alerta roja: es un estado con salida a `/entrar`, y vuelve a la pantalla de origen |
+| Fila que lleva a otra pantalla | `.acceso` y sus partes | Icono, título, detalle y flecha. Un botón apilado no dice qué hay del otro lado |
+
+Los iconos salen de `app/components/Iconos.tsx` y son once: `archivo`, `personas`,
+`camara`, `compartir`, `descargar`, `escudo`, `microfono`, `telefono`, `tilde`,
+`ubicacion`, `verificar`.

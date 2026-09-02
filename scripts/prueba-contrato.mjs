@@ -308,6 +308,45 @@ verificar(
   )
 }
 
+{
+  /*
+   * Toda clase que el marcado usa tiene que existir en globals.css.
+   *
+   * Es la falla que menos se nota y mas caro sale: una clase mal escrita en un className
+   * no rompe la compilacion, no tira ningun error en consola y no falla ninguna prueba.
+   * El elemento sale sin estilo, y eso solo se descubre abriendo esa pantalla en ese
+   * estado. Con estados que aparecen poco —un vacio, un 401, un token vencido— puede
+   * llegar a produccion sin que nadie lo haya visto nunca.
+   *
+   * Las clases que se arman con una interpolacion quedan afuera: `croquis-${tipo}` sale
+   * de un dato y no se puede resolver leyendo el archivo.
+   */
+  /* Un caracter que no es blanco y no puede estar en un nombre de clase. */
+  const DINAMICA = '#'
+  const definidas = new Set()
+  for (const m of css.matchAll(/[.]([a-zA-Z][-\w]*)/g)) definidas.add(m[1])
+
+  const huerfanas = new Map()
+  for (const ruta of todosTsx) {
+    const cuerpo = leer(ruta)
+    for (const m of cuerpo.matchAll(/className=(?:"([^"]*)"|[{]`([^`]*)`[}])/g)) {
+      const crudo = (m[1] ?? m[2] ?? '').replace(/[$][{][^}]*[}]/g, DINAMICA)
+      for (const clase of crudo.split(/\s+/)) {
+        if (!clase || clase.includes(DINAMICA) || definidas.has(clase)) continue
+        if (!huerfanas.has(clase)) huerfanas.set(clase, new Set())
+        huerfanas.get(clase).add(normalizar(ruta))
+      }
+    }
+  }
+
+  verificar(
+    'toda clase del marcado está definida en globals.css',
+    huerfanas.size === 0,
+    [...huerfanas].map(([c, donde]) => `.${c} (${[...donde].join(', ')})`).join(', ') +
+      '\n         Una clase que no existe no falla: el elemento sale sin estilo y sólo se ve abriendo esa pantalla en ese estado.',
+  )
+}
+
 /* ---------- 4. Marcado del que depende la funcionalidad ---------- */
 console.log('\n[4] Marcado del que depende la funcionalidad')
 

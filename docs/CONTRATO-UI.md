@@ -45,6 +45,26 @@ que no verifica.
 - **Íconos, ilustraciones y recursos** nuevos.
 - **`app/components/Marca.tsx`** y el aspecto del encabezado.
 
+### Lo que ya está resuelto y conviene reusar
+
+Hay cuatro piezas compartidas por las pantallas de fuera del recorrido. No son
+obligatorias, pero antes de inventar una variante mirá si alguna sirve: la razón por la que
+existen es que cada pantalla resolvía lo mismo de una manera distinta, y al abrirlas una
+detrás de otra no parecían del mismo sistema.
+
+| Pieza | Clases o componente | Para qué |
+| --- | --- | --- |
+| Encabezado de pantalla | `.encabezado-pagina` con `.titulo-pagina` y `.bajada-pagina` | La `<Marca />` dice de quién es la aplicación; el encabezado dice en qué pantalla estás. Con encabezado, la marca va **sin** la prop `sub` |
+| Encabezado con acción | `+ .encabezado-con-accion` | Título a la izquierda y un botón a la derecha. Apila en vertical por debajo de 700px |
+| Estado vacío | `.vacio`, `.vacio-icono`, `.vacio-titulo`, `.vacio-texto` | Cuando todavía no hay nada cargado. El texto dice **para qué sirve** lo que falta |
+| Hace falta una cuenta | `<SinSesion volver que>` | El 401. No va en rojo: no es una falla, es un estado con salida a `/entrar` |
+| Fila que lleva a otro lado | `.acceso` y sus partes | Icono, título, detalle y flecha |
+
+Los íconos disponibles en `app/components/Iconos.tsx` son once: `archivo`, `personas`,
+`camara`, `compartir`, `descargar`, `escudo`, `microfono`, `telefono`, `tilde`,
+`ubicacion`, `verificar`. Agregar uno es bienvenido; usar un nombre que no está en la lista
+no compila.
+
 ## Lista roja: esto se pide, no se hace
 
 Cada punto tiene su motivo. Ninguno es una manía.
