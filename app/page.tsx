@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Marca } from './components/Marca'
 import { InstalarApp } from './components/InstalarApp'
 import { BarraCuenta } from './components/BarraCuenta'
+import { BotonesEmergencia } from './components/BotonesEmergencia'
 import { actuacionAbierta, recordarActuacion } from '@/lib/local'
 
 /**
@@ -83,6 +84,12 @@ export default function Inicio() {
       </div>
 
       <div className="inicio-pie">
+        {/* Marcado estático: es lo último que tiene que seguir andando si falla todo lo demás. */}
+        <details className="tarjeta-plana">
+          <summary>¿Necesitás ayuda urgente?</summary>
+          <BotonesEmergencia />
+        </details>
+
         <InstalarApp />
         <p className="mini centrado" style={{ margin: 0 }}>
           Vamos a pedirte permiso de ubicación, cámara y micrófono para registrar dónde, cuándo y cómo ocurrió.

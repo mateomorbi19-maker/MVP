@@ -250,6 +250,83 @@ ALTER TABLE casos ADD COLUMN IF NOT EXISTS secreto_sha256 TEXT;
 CREATE INDEX IF NOT EXISTS casos_usuario_idx   ON casos (usuario_id, creado_en DESC);
 CREATE INDEX IF NOT EXISTS casos_productor_idx ON casos (productor_id, creado_en DESC);
 
+-- ===================== Póliza y productor =====================
+
+-- El productor existe como destinatario ANTES de tener cuenta: la aseguradora carga su
+-- ficha para poder asignarlo, y recién cuando se le abre el acceso al panel se le crea el
+-- usuario y se lo enlaza acá. Por eso es una tabla propia con usuario_id opcional, y no
+-- un usuario con rol 'productor' a secas.
+CREATE TABLE IF NOT EXISTS productores (
+  id          TEXT PRIMARY KEY,
+  nombre      TEXT NOT NULL,
+  email       TEXT NOT NULL,
+  telefono    TEXT,
+  aseguradora TEXT NOT NULL,
+  usuario_id  TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
+  activo      BOOLEAN NOT NULL DEFAULT true,
+  creado_en   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS productores_email_uidx   ON productores (lower(email));
+CREATE UNIQUE INDEX IF NOT EXISTS productores_usuario_uidx ON productores (usuario_id) WHERE usuario_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS polizas (
+  id             TEXT PRIMARY KEY,
+  usuario_id     TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  numero         TEXT NOT NULL,
+  aseguradora    TEXT NOT NULL,
+  patente        TEXT,
+  marca_modelo   TEXT,
+  anio           SMALLINT,
+  cobertura      TEXT,
+  vigencia_desde DATE,
+  vigencia_hasta DATE,
+  productor_id   TEXT REFERENCES productores(id) ON DELETE SET NULL,
+  principal      BOOLEAN NOT NULL DEFAULT false,
+  creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS polizas_usuario_idx   ON polizas (usuario_id);
+CREATE INDEX IF NOT EXISTS polizas_productor_idx ON polizas (productor_id);
+-- La unicidad NO es global: dos personas pueden ser titular y cónyuge de la misma póliza.
+CREATE UNIQUE INDEX IF NOT EXISTS polizas_numero_uidx    ON polizas (usuario_id, upper(numero));
+-- Una sola principal por persona: es la que precarga la carátula de una actuación nueva.
+CREATE UNIQUE INDEX IF NOT EXISTS polizas_principal_uidx ON polizas (usuario_id) WHERE principal;
+
+-- Cédula verde, licencia, VTV, la póliza en PDF. Van con carpeta y lista blanca propias:
+-- sumarle application/pdf a la lista de las fotos del siniestro permitiría subir un PDF
+-- como 'fotografía del hecho', y entraría al manifiesto como pieza fotográfica.
+CREATE TABLE IF NOT EXISTS documentos_poliza (
+  id        TEXT PRIMARY KEY,
+  poliza_id TEXT NOT NULL REFERENCES polizas(id) ON DELETE CASCADE,
+  tipo      TEXT NOT NULL,
+  titulo    TEXT,
+  archivo   TEXT NOT NULL,
+  mime      TEXT NOT NULL,
+  bytes     INTEGER NOT NULL,
+  sha256    TEXT NOT NULL,
+  vence_el  DATE,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS documentos_poliza_idx ON documentos_poliza (poliza_id, creado_en DESC);
+
+-- Contacto de confianza para el escalamiento por impacto.
+-- Es un dato personal de alguien que NO está presente para consentir su tratamiento: se
+-- guarda el mínimo, se usa sólo para eso, y no entra al expediente ni al PDF.
+CREATE TABLE IF NOT EXISTS contactos_confianza (
+  id             TEXT PRIMARY KEY,
+  usuario_id     TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  nombre         TEXT NOT NULL,
+  telefono       TEXT NOT NULL,
+  relacion       TEXT,
+  creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Uno por persona en esta versión. Es un índice y no una clave primaria: el día que haga
+-- falta un segundo contacto se borra el índice y no se migra nada.
+CREATE UNIQUE INDEX IF NOT EXISTS contactos_confianza_usuario_uidx ON contactos_confianza (usuario_id);
+
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS poliza_id TEXT REFERENCES polizas(id) ON DELETE SET NULL;
+
 -- Impide reescribir la historia: los eventos no se actualizan ni se borran.
 CREATE OR REPLACE FUNCTION eventos_solo_insercion() RETURNS trigger AS $fn$
 BEGIN
@@ -271,7 +348,7 @@ CREATE TRIGGER eventos_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

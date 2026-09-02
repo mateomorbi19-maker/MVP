@@ -1,5 +1,7 @@
 'use client'
 
+import { BotonesEmergencia } from '@/app/components/BotonesEmergencia'
+
 import { type Paso } from '@/lib/recorrido'
 
 /* ================= Emergencia ================= */
@@ -21,16 +23,7 @@ export function PantallaEmergencia({ variante, seguir }: { variante: 'confirmado
               ? 'Ante la duda, llamá. Una ambulancia que llega de más no cuesta nada; una que no llega, sí.'
               : 'Primero la gente. El registro queda guardado y podés volver cuando la situación esté controlada.'}
           </p>
-          <div className="pila">
-            <a href="tel:107" className="boton boton-llamada">
-              107
-              <span>Emergencias médicas</span>
-            </a>
-            <a href="tel:911" className="boton boton-llamada">
-              911
-              <span>Policía</span>
-            </a>
-          </div>
+          <BotonesEmergencia soloLugar />
         </div>
       </div>
 

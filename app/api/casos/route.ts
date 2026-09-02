@@ -6,6 +6,7 @@ import { listarCasos, limpiarDatosAsegurado } from '@/lib/casos'
 import { hashToken, nuevoToken } from '@/lib/claves'
 import { anotarPosesion } from '@/lib/posesion'
 import { alcanceDe, exigirRol } from '@/lib/sesion'
+import { precargaDe } from '@/lib/polizas'
 import { leerSesion } from '@/lib/sesion'
 
 export const runtime = 'nodejs'
@@ -45,14 +46,30 @@ export async function POST(req: Request) {
     const secreto = nuevoToken()
     const sesion = await leerSesion()
 
+    /*
+     * Precarga de la carátula desde la póliza, sólo con sesión.
+     *
+     * Con más de una póliza NO se precarga la patente: si la persona chocó con el otro
+     * auto, poner la del principal mete un dato falso en la carátula, y la carátula
+     * termina dentro del expediente sellado y del informe de consistencia. Los cuatro
+     * campos siguen siendo editables al final del recorrido.
+     */
+    const precarga = sesion ? await precargaDe(sesion.usuario_id) : null
+    const conPrecarga = {
+      poliza: datos.poliza ?? precarga?.poliza ?? null,
+      patente: datos.patente ?? precarga?.patente ?? null,
+      asegurado: datos.asegurado ?? precarga?.asegurado ?? null,
+      telefono: datos.telefono ?? precarga?.telefono ?? null,
+    }
+
     let id = ''
     for (let intento = 0; intento < 5; intento++) {
       const candidato = nuevoId()
       try {
         await pg.query(
-          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version, secreto_sha256, usuario_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [candidato, datos.poliza, datos.patente, datos.asegurado, datos.telefono, VERSION_MANIFIESTO, hashToken(secreto), sesion?.usuario_id ?? null],
+          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version, secreto_sha256, usuario_id, poliza_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [candidato, conPrecarga.poliza, conPrecarga.patente, conPrecarga.asegurado, conPrecarga.telefono, VERSION_MANIFIESTO, hashToken(secreto), sesion?.usuario_id ?? null, precarga?.poliza_id ?? null],
         )
         id = candidato
         break
@@ -66,15 +83,15 @@ export async function POST(req: Request) {
     }
 
     await registrarEvento(id, 'apertura_actuacion', {
-      poliza: datos.poliza,
-      patente: datos.patente,
+      poliza: conPrecarga.poliza,
+      patente: conPrecarga.patente,
       user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null,
     })
 
     // Anota qué navegador tiene este id: es lo que le habilita las fotos y el expediente.
     await anotarPosesion(id)
 
-    return NextResponse.json({ id, secreto }, { status: 201 })
+    return NextResponse.json({ id, secreto, precarga_ambigua: precarga?.ambigua ?? false }, { status: 201 })
   } catch (err) {
     return errorApi('casos:POST', err, 'No se pudo crear la actuación.')
   }

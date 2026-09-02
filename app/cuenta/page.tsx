@@ -32,6 +32,9 @@ export default async function Cuenta() {
           <Link className="boton boton-secundario" href="/poliza">
             Mi póliza y documentación
           </Link>
+          <Link className="boton boton-secundario" href="/perfil">
+            Mis datos y contacto de confianza
+          </Link>
           {sesion.rol !== 'asegurado' ? (
             <Link className="boton boton-secundario" href="/panel">
               Panel de siniestros
