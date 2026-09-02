@@ -150,7 +150,38 @@ La tentación es real: la interfaz ya usa `✓` y `→` en otros lugares, así q
 estilo hacia el cuestionario es lo natural. `npm run contrato` lo detecta para los textos
 del cuestionario, que son los que terminan impresos.
 
-### 10. El código de servidor
+### 10. El lienzo de la firma
+
+`.lienzo-firma` lleva `touch-action: none`: sin eso, arrastrar el dedo hace scroll de la
+página en vez de dibujar, y no se puede firmar en un teléfono. El canvas recibe su tamaño
+en píxeles reales desde JavaScript, no desde CSS, y `.lienzo-firma-area` lleva alto en
+píxeles y **no** en `dvh`, `svh` ni `lvh`: esas unidades cambian cuando el navegador móvil
+esconde la barra de direcciones, y el trazo se re-escala mientras la persona firma. Es la
+pieza que se ata al hash del acta.
+
+### 11. El croquis
+
+`.croquis` declara `aspect-ratio: 1` y no recibe `width` y `height` por separado, ni
+`padding` ni `border` sobre el propio `<svg>` —el borde va en `.croquis-lienzo`—. El
+`viewBox` es `0 0 100 100` y no se toca. Con una caja de otra proporción el dibujo se apaisa
+adentro, y el croquis de la pantalla deja de coincidir con el que se imprime en el
+expediente sellado.
+
+### 12. Los avisos que dicen un límite
+
+Hay textos que parecen relleno y no lo son. Antes de acortar o borrar uno, mirá si dice algo
+de esta lista:
+
+- «La hora y el lugar los pone el sistema, no el archivo» (pantalla de foto).
+- «Lectura de demostración… no salen de la foto» (revisión de la lectura automática).
+- El pie del croquis, que aclara que es declarativo y no un peritaje.
+- «Funciona sólo con la aplicación abierta» (modo viaje).
+- «La aplicación no llama ni manda mensajes por su cuenta» (contacto de confianza).
+- Todo lo que diga firma **electrónica**, art. 5 de la Ley 25.506, y los arts. 7 y 8.
+
+Ninguno es cosmético: cada uno evita que el producto prometa algo que no hace.
+
+### 13. El código de servidor
 
 `lib/`, `app/api/`, y el armado del recorrido en `lib/recorrido.ts`.
 
@@ -166,6 +197,11 @@ app/
   s/[id]/pantallas/*.tsx      una pantalla por archivo  <- acá se trabaja
   globals.css                 TODO el estilo             <- y acá
   components/                 lo compartido entre pantallas
+  entrar/ registro/ cuenta/   sesión
+  poliza/ historial/ perfil/  la mitad identificada
+  t/[id]/ c/[id]/             carga de testigo y de tercero, por QR
+  v/[id]/ e/[id]/             verificación pública y apertura desde el correo
+  aviso/                      a dónde lleva la notificación de impacto
 lib/
   recorrido.ts                qué pantallas hay y en cuál se retoma
   cuestionario.ts             las preguntas, las tomas y los VALORES
