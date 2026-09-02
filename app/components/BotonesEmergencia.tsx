@@ -9,8 +9,14 @@ import { Icono } from './Iconos'
  */
 export function BotonesEmergencia({ soloLugar = false }: { soloLugar?: boolean }) {
   const lista: Emergencia[] = soloLugar ? EMERGENCIAS_EN_EL_LUGAR : EMERGENCIAS
+  /*
+   * `emergencias` sola ya da la grilla de una columna, que es lo que la pantalla del lugar
+   * necesita. Antes decia `emergencias emergencias-lugar` y esa segunda clase no existia
+   * en la hoja: no se veia rota, pero cualquier ajuste a la variante del lugar se habria
+   * escrito contra una clase que el CSS no conoce, sin que nada fallara.
+   */
   return (
-    <div className={soloLugar ? 'emergencias emergencias-lugar' : 'emergencias emergencias-inicio'}>
+    <div className={soloLugar ? 'emergencias' : 'emergencias emergencias-inicio'}>
       {lista.map((e) => (
         <a
           key={e.numero}

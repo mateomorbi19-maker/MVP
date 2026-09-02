@@ -316,25 +316,70 @@ verificar(
    * no rompe la compilacion, no tira ningun error en consola y no falla ninguna prueba.
    * El elemento sale sin estilo, y eso solo se descubre abriendo esa pantalla en ese
    * estado. Con estados que aparecen poco —un vacio, un 401, un token vencido— puede
-   * llegar a produccion sin que nadie lo haya visto nunca.
+   * llegar a produccion sin que nadie lo haya visto nunca. Paso: `.emergencias-lugar` se
+   * uso durante meses sin existir en la hoja.
    *
-   * Las clases que se arman con una interpolacion quedan afuera: `croquis-${tipo}` sale
-   * de un dato y no se puede resolver leyendo el archivo.
+   * Hay que mirar las tres formas de className, y la tercera es la que se escapa:
+   *
+   *   className="a b"                          literal
+   *   className={`a ${x ? 'b' : 'c'}`}         plantilla con interpolacion
+   *   className={x ? 'a b' : 'c d'}            expresion suelta  <-- esta
+   *
+   * Por eso no alcanza una expresion regular sobre el atributo: hay que balancear las
+   * llaves y sacar TODO literal de adentro. Lo unico que queda afuera es el nombre que se
+   * arma pegando texto —`croquis-${tipo}`—, que sale de un dato y no se puede resolver
+   * leyendo el archivo.
    */
-  /* Un caracter que no es blanco y no puede estar en un nombre de clase. */
-  const DINAMICA = '#'
   const definidas = new Set()
   for (const m of css.matchAll(/[.]([a-zA-Z][-\w]*)/g)) definidas.add(m[1])
 
+  /** El contenido de un {...} equilibrado que empieza en `desde`. */
+  function expresion(texto, desde) {
+    let nivel = 0
+    for (let i = desde; i < texto.length; i++) {
+      if (texto[i] === '{') nivel++
+      else if (texto[i] === '}') {
+        nivel--
+        if (nivel === 0) return texto.slice(desde + 1, i)
+      }
+    }
+    return ''
+  }
+
+  /*
+   * Un literal que viene despues de una comparacion es un valor con el que se compara, no
+   * una clase: en `className={estado === 'cerrado' ? 'a' : 'b'}`, «cerrado» no es una
+   * clase. Hoy no hay ninguno asi, pero la comprobacion tiene que aguantar el que venga.
+   */
+  const COMPARACION = /[=!]==?\s*$/
+
   const huerfanas = new Map()
+  const anotar = (clase, ruta) => {
+    if (!clase || definidas.has(clase)) return
+    if (!huerfanas.has(clase)) huerfanas.set(clase, new Set())
+    huerfanas.get(clase).add(normalizar(ruta))
+  }
+
   for (const ruta of todosTsx) {
     const cuerpo = leer(ruta)
-    for (const m of cuerpo.matchAll(/className=(?:"([^"]*)"|[{]`([^`]*)`[}])/g)) {
-      const crudo = (m[1] ?? m[2] ?? '').replace(/[$][{][^}]*[}]/g, DINAMICA)
-      for (const clase of crudo.split(/\s+/)) {
-        if (!clase || clase.includes(DINAMICA) || definidas.has(clase)) continue
-        if (!huerfanas.has(clase)) huerfanas.set(clase, new Set())
-        huerfanas.get(clase).add(normalizar(ruta))
+    for (const m of cuerpo.matchAll(/className=/g)) {
+      const i = m.index + 'className='.length
+      if (cuerpo[i] === '"') {
+        const fin = cuerpo.indexOf('"', i + 1)
+        for (const c of cuerpo.slice(i + 1, fin).split(/\s+/)) anotar(c, ruta)
+        continue
+      }
+      if (cuerpo[i] !== '{') continue
+      const dentro = expresion(cuerpo, i)
+      // Todo literal de la expresion: comillas simples, dobles y plantillas.
+      for (const lit of dentro.matchAll(/'([^']*)'|"([^"]*)"|`([^`]*)`/g)) {
+        if (COMPARACION.test(dentro.slice(0, lit.index))) continue
+        /*
+         * Lo pegado a una interpolacion no se puede resolver: en `croquis-${tipo}` el
+         * nombre entero sale de un dato. Se corta ahi y se descarta el pedazo.
+         */
+        const texto = (lit[1] ?? lit[2] ?? lit[3] ?? '').replace(/\S*[$][{][^}]*[}]\S*/g, ' ')
+        for (const c of texto.split(/\s+/)) anotar(c, ruta)
       }
     }
   }

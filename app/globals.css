@@ -399,8 +399,15 @@ label {
  * ingreso y en el registro. Con la polaridad al reves, el tipo que alguien agregue manana
  * ya queda estilado, y lo unico que hay que acordarse es de excluir lo que no es un campo
  * de texto.
+ *
+ * La lista de exclusion va dentro de :where() para que no pese. Siete :not([type='...'])
+ * dan especificidad (0,7,1): sin el :where(), este bloque le gana a cualquier clase que
+ * se le ponga al campo desde el marcado, y la clase deja de pintar sin que falle nada.
+ * Le pasaba a .entrada-validacion y a las dos declaraciones de .campo-grande, que
+ * declaraban un alto de 62px que nunca se aplico. Si sacas el :where(), esas clases se
+ * apagan en silencio.
  */
-input:not([type='file']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='submit']):not([type='button']),
+input:where(:not([type='file']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='submit']):not([type='button'])),
 textarea,
 select {
   width: 100%;
@@ -1422,10 +1429,15 @@ tr:last-child td {
   height: 10px;
 }
 
+/*
+ * Sin !important. Los llevaba para ganarle al selector base de campos, que hasta que se
+ * envolvio en :where() valia (0,7,1) y le ganaba a cualquier clase. El alto de 62px no
+ * estaba marcado y por eso era el unico de los tres que no se aplicaba.
+ */
 .campo-grande {
-  font-size: 18px !important;
+  font-size: 18px;
   min-height: 62px;
-  padding: 16px !important;
+  padding: 16px;
 }
 
 .zonas-grandes {
@@ -1487,8 +1499,14 @@ tr:last-child td {
 }
 
 @media (hover: hover) {
-  .omitir:hover {
-    color: var(--tinta-2);
+  /*
+   * Antes repetia --tinta-2, el color que .omitir ya tiene: un hover que no movia un
+   * pixel. «Lo reviso despues» y «Omitir» eran los unicos controles del sistema sin
+   * respuesta al pasar el mouse. El :not(:disabled) es para el «Borrar» del lienzo de
+   * firma, que esta deshabilitado mientras no hay trazo.
+   */
+  .omitir:hover:not(:disabled) {
+    color: var(--tinta);
   }
 }
 
@@ -1618,6 +1636,39 @@ tr:last-child td {
 
 .emergencias-inicio .boton-llamada-detalle {
   display: none;
+}
+
+/*
+ * Dentro de la tarjeta roja los botones van siempre en fila, con el numero escrito.
+ *
+ * La grilla de tres columnas es la del inicio, donde la aplicacion se mira sin urgencia y
+ * el rotulo alcanza. Aca no: por encima de 520px esa grilla vuelve, y con ella el
+ * `display: none` de la linea del numero, asi que el 107 habria que deducirlo de la
+ * palabra «Ambulancia». Pasa en una tablet y en el mismo telefono acostado, que es como
+ * queda tirado en el asiento.
+ *
+ * `.emergencia` envuelve solo las dos pantallas rojas —la del recorrido y /aviso—; el
+ * inicio usa `.bloque-inicio` y conserva sus tres columnas.
+ */
+.emergencia .emergencias-inicio {
+  grid-template-columns: 1fr;
+}
+
+.emergencia .emergencias-inicio .boton-llamada {
+  min-height: 86px;
+  flex-direction: row;
+  gap: 12px;
+  text-align: left;
+}
+
+.emergencia .emergencias-inicio .boton-llamada-contenido {
+  display: grid;
+  flex: 1;
+  text-align: left;
+}
+
+.emergencia .emergencias-inicio .boton-llamada-detalle {
+  display: block;
 }
 
 @media (hover: hover) {
@@ -2341,7 +2392,17 @@ tr:last-child td {
 }
 
 /* La guía del relato ampliado: sugerencia, no formulario. */
-.ayuda {
+/*
+ * La guia del relato ampliado: sugerencia, no formulario.
+ *
+ * Se llamaba .ayuda y habia otra .ayuda mas arriba, con la misma especificidad: esta
+ * ganaba por estar mas abajo y le imponia su sangria de 20px al parrafo de ayuda de
+ * /verificar, que quedaba corrido respecto de su rotulo y de su campo. Los 20px son la
+ * sangria de las viñetas —no hay regla `ul` en esta hoja y el navegador pondria 40px—,
+ * no aire de parrafo, asi que no puede compartir clase con el parrafo que cuelga de un
+ * rotulo.
+ */
+.guia-relato {
   margin: 0 0 14px;
   padding-left: 20px;
   color: var(--tinta-2);
@@ -2381,12 +2442,29 @@ tr:last-child td {
 }
 
 /* Aviso de piezas sin subir. Fijo abajo: tiene que verse desde cualquier pantalla. */
+/*
+ * Aviso de piezas sin subir. Fijo abajo, pero POR ARRIBA de la barra de accion y sin
+ * recibir el toque.
+ *
+ * Estaba a 10px del borde inferior, que es exactamente donde vive el boton principal de
+ * `.barra-accion`. Con z-index 20 contra el 15 de la barra y sin pointer-events, el chip
+ * cubria los dos tercios inferiores del boton «Seguir» y ademas se comia el dedo. Y
+ * aparecia justo cuando hay piezas sin subir, o sea cuando no hay señal: el momento en
+ * que mas falta hace poder avanzar.
+ *
+ * Los 164px salen de la barra mas alta que existe —foto tomada, corte, final—: 1 de
+ * borde + 14 de relleno + 60 del boton principal + 8 de separacion + 52 del secundario +
+ * 10 de relleno = 145, mas 11 de aire. El inset de seguridad se cuenta dos veces porque
+ * lo llevan los dos: la barra en su relleno y `.envoltura-flujo` en el suyo.
+ */
 .chip-cola {
   position: fixed;
   left: 50%;
-  bottom: calc(10px + env(safe-area-inset-bottom));
+  bottom: calc(164px + 2 * env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 20;
+  /* Es un role="status": informa, no se toca. Sin esto intercepta el toque del boton. */
+  pointer-events: none;
   max-width: calc(100% - 24px);
   padding: 8px 14px;
   border-radius: 999px;

@@ -68,13 +68,15 @@ function Verificador() {
 
   return (
     <main className="envoltura">
-      <Marca sub="Verificación pública de integridad" />
+      <Marca />
 
-      <h1>Verificar un expediente</h1>
-      <p className="apagado">
-        Cualquiera puede comprobar acá que un expediente no fue modificado después de sellarse. No hace falta
-        identificarse ni tener acceso a su contenido: basta el número de actuación.
-      </p>
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Verificar un expediente</h1>
+        <p className="bajada-pagina">
+          Cualquiera puede comprobar acá que un expediente no fue modificado después de sellarse. No hace falta
+          identificarse ni tener acceso a su contenido: basta el número de actuación.
+        </p>
+      </header>
 
       <div className="tarjeta">
         <div className="campo">

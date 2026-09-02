@@ -97,7 +97,7 @@ export function PantallaPregunta({
         {pregunta.tipo === 'parrafo' ? (
           <>
             {pregunta.id === 'relato_ampliado' ? (
-              <ul className="ayuda">
+              <ul className="guia-relato">
                 {GUIA_RELATO.map((linea) => (
                   <li key={linea}>{linea}</li>
                 ))}

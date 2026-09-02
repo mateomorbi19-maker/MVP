@@ -43,11 +43,19 @@ export default function AbrirEntrega({ params }: { params: Promise<{ id: string 
 
   return (
     <main className="envoltura">
-      <Marca sub="Expediente de siniestro" />
+      <Marca />
+
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">{caso ? 'Ya podés ver el expediente' : 'Te entregaron un expediente'}</h1>
+        <p className="bajada-pagina">
+          {caso
+            ? 'Quedó asociado a este navegador. Podés volver a abrirlo desde acá.'
+            : 'Tocá el botón para abrirlo. El enlace sirve una sola vez: desde ahí queda asociado a este navegador.'}
+        </p>
+      </header>
 
       {caso ? (
         <div className="tarjeta">
-          <div className="aviso" data-nivel="ok">Listo. Ya podés ver el expediente.</div>
           <div className="numero-actuacion">{caso}</div>
           <div className="pila">
             <a className="boton boton-primario" href={`/api/casos/${caso}/pdf?descargar=1`}>
@@ -60,10 +68,6 @@ export default function AbrirEntrega({ params }: { params: Promise<{ id: string 
         </div>
       ) : (
         <div className="tarjeta">
-          <h1>Te entregaron un expediente</h1>
-          <p className="apagado">
-            Tocá el botón para abrirlo. El enlace sirve una sola vez: desde ahí queda asociado a este navegador.
-          </p>
           {!token ? (
             <div className="aviso" data-nivel="alerta">
               Al enlace le falta la parte final. Copialo entero desde el correo, incluyendo todo lo que va después del
@@ -71,7 +75,7 @@ export default function AbrirEntrega({ params }: { params: Promise<{ id: string 
             </div>
           ) : null}
           {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
-          <button className="boton-primario" onClick={abrir} disabled={!token || abriendo}>
+          <button className="boton-primario boton-ancho" onClick={abrir} disabled={!token || abriendo}>
             {abriendo ? 'Abriendo...' : 'Abrir el expediente'}
           </button>
         </div>
