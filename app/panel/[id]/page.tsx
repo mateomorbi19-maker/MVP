@@ -6,6 +6,7 @@ import { SECCIONES, GUIA_FOTOS } from '@/lib/cuestionario'
 import { ETIQUETA_NIVEL } from '@/lib/consistencia'
 import { Marca } from '@/app/components/Marca'
 import { exigirRol } from '@/lib/sesion'
+import { AccionesGestion } from '@/app/components/AccionesGestion'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
   return (
     <main className="envoltura-ancha">
       <Marca sub="Panel de siniestros" />
+      <AccionesGestion casoId={id} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
         <div>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { EntregaExpediente } from '@/app/components/EntregaExpediente'
 
 /* ================= Final ================= */
 
@@ -31,9 +32,6 @@ export function PantallaFinal({ casoId, cierre }: { casoId: string; cierre: { ha
         ) : null}
 
         <div className="pila">
-          <a className="boton boton-primario" href={`/api/casos/${casoId}/pdf?descargar=1`}>
-            Descargar el expediente en PDF
-          </a>
           <a className="boton boton-secundario" href={`/api/casos/${casoId}/pdf`} target="_blank" rel="noreferrer">
             Verlo en pantalla
           </a>
@@ -42,6 +40,8 @@ export function PantallaFinal({ casoId, cierre }: { casoId: string; cierre: { ha
           </Link>
         </div>
       </div>
+
+      <EntregaExpediente casoId={casoId} />
 
       <p className="mini">
         Guardá el número de actuación. Cualquiera puede comprobar con él que el expediente no fue modificado, sin

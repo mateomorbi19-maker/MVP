@@ -399,16 +399,80 @@ CREATE INDEX IF NOT EXISTS extracciones_caso_idx ON extracciones (caso_id, cread
 -- pantalla gana la última: el mismo criterio que ya usa la pantalla de fotos.
 CREATE UNIQUE INDEX IF NOT EXISTS extracciones_media_idx ON extracciones (media_id);
 
+-- ===================== Entrega y tramitación =====================
+--
+-- NINGÚN registro de entrega ni de gestión entra en la tabla de eventos, y la razón es
+-- concreta: el verificador público recalcula el manifiesto sobre TODOS los eventos del
+-- caso y lo compara contra el hash sellado. Un solo eslabón posterior al cierre convertiría
+-- "expediente íntegro" en "el expediente fue modificado después de cerrarse" en TODA
+-- actuación entregada o comentada.
+--
+-- Se consideró y se descartó cortar el manifiesto en el eslabón de cierre: sería
+-- retrocompatible, pero rompe una propiedad hoy limpia —que cualquier fila agregada a
+-- eventos rompe la verificación— y con el corte alguien con escritura en la base podría
+-- apilar filas con pinta de eventos del acta sin que la verificación lo note.
+
+CREATE TABLE IF NOT EXISTS envios (
+  id                 TEXT PRIMARY KEY,
+  caso_id            TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
+  destinatario       TEXT NOT NULL,
+  productor_id       TEXT REFERENCES productores(id) ON DELETE SET NULL,
+  canal              TEXT NOT NULL DEFAULT 'email',
+  estado             TEXT NOT NULL DEFAULT 'pendiente',
+  intentos           SMALLINT NOT NULL DEFAULT 0,
+  error              TEXT,
+  token_sha256       TEXT,
+  expira_en          TIMESTAMPTZ,
+  abierto_en         TIMESTAMPTZ,
+  creado_en          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  enviado_en         TIMESTAMPTZ,
+  proximo_intento_en TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS envios_caso_idx      ON envios (caso_id, creado_en DESC);
+CREATE INDEX IF NOT EXISTS envios_pendientes_idx ON envios (proximo_intento_en) WHERE estado = 'pendiente';
+
+-- La tramitación, con cadena propia anclada al hash maestro del acta.
+-- Queda auditada y atada al expediente, pero FUERA de él. Los comentarios del productor
+-- son prueba de un tercero sobre el trámite, no del hecho, y al asegurado se le prometió
+-- que el expediente ya no admite cambios.
+CREATE TABLE IF NOT EXISTS gestiones (
+  id           BIGSERIAL PRIMARY KEY,
+  caso_id      TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
+  ts           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  tipo         TEXT NOT NULL,
+  actor        TEXT,
+  detalle      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  hash_previo  TEXT,
+  hash         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS gestiones_caso_idx ON gestiones (caso_id, id);
+
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS estado_gestion TEXT NOT NULL DEFAULT 'sin_enviar';
+CREATE INDEX IF NOT EXISTS casos_gestion_idx ON casos (estado_gestion);
+
+-- Los expedientes sellados antes de que existiera la columna arrancan como no enviados.
+-- El WHERE lo hace idempotente: en el segundo arranque no toca ninguna fila.
+UPDATE casos SET estado_gestion = 'sin_enviar'
+ WHERE estado = 'cerrado' AND estado_gestion IS DISTINCT FROM 'sin_enviar' AND estado_gestion = '';
+
 -- Impide reescribir la historia: los eventos no se actualizan ni se borran.
+-- UNA sola definición, que sirve a las dos tablas append-only. Con una función por tabla,
+-- cualquiera que la redefiniera después en este mismo string ganaría en silencio: SCHEMA
+-- se ejecuta como una sola consulta multi-sentencia y Postgres se queda con la última.
 CREATE OR REPLACE FUNCTION eventos_solo_insercion() RETURNS trigger AS $fn$
 BEGIN
-  RAISE EXCEPTION 'La tabla de eventos es append-only: no admite UPDATE ni DELETE';
+  RAISE EXCEPTION 'La tabla % es append-only: no admite UPDATE ni DELETE. Para corregir algo, registrá una entrada nueva.', TG_TABLE_NAME;
 END;
 $fn$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS eventos_inmutables ON eventos;
 CREATE TRIGGER eventos_inmutables
   BEFORE UPDATE OR DELETE ON eventos
+  FOR EACH ROW EXECUTE FUNCTION eventos_solo_insercion();
+
+DROP TRIGGER IF EXISTS gestiones_inmutables ON gestiones;
+CREATE TRIGGER gestiones_inmutables
+  BEFORE UPDATE OR DELETE ON gestiones
   FOR EACH ROW EXECUTE FUNCTION eventos_solo_insercion();
 `
 
@@ -420,7 +484,7 @@ CREATE TRIGGER eventos_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

@@ -178,7 +178,22 @@ correcto está en el componente.
 | Clases | `.tarjeta`, `.centrado`, `.numero-actuacion`, `.mono` |
 | Endpoints | `GET /api/casos/[id]/pdf` · `GET /api/casos/[id]/pdf?descargar=1` |
 
-Compartir por WhatsApp y enviar al productor llegan con el módulo de entrega.
+La entrega vive en `components/EntregaExpediente.tsx`: descargar, compartir y mandárselo al
+productor.
+
+**Compartir usa el share sheet del propio teléfono** (`navigator.share`), no una
+integración con WhatsApp. No hace falta ninguna API, la persona elige por dónde mandarlo, y
+funciona igual con Telegram, con el correo o con AirDrop. Cuando el navegador no lo soporta
+—Firefox de escritorio, Chrome sin archivos— el plan B es descargar y compartir el enlace
+de verificación, que es lo que la persona iba a mandar igual.
+
+## 8b · Páginas de la entrega
+
+| Pantalla | Archivo | Para qué |
+| --- | --- | --- |
+| Verificación pública | `app/v/[id]/page.tsx` | Lo que abre el código impreso en el acta. **Sin un solo dato personal**: número, fechas, hash e integridad. Para ver el contenido hace falta la actuación, una cuenta o el enlace de entrega. |
+| Abrir desde el correo | `app/e/[id]/page.tsx` | El token llega en el fragmento de la URL, después del `#`, y se consume por POST con un clic. Los escáneres de enlaces corporativos visitan todos los enlaces de un correo antes que nadie: el fragmento no viaja al servidor, así que no pueden quemar un token de un solo uso. |
+| Tramitación | `components/AccionesGestion.tsx` (en `/panel/[id]`) | Confirmar recepción, poner en trámite, comentar. Cadena propia, anclada al hash del acta pero fuera de ella. |
 
 ## 9 · El acta en PDF
 

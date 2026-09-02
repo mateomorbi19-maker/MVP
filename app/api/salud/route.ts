@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { estadoBase } from '@/lib/db'
+import { faltaParaCorreo } from '@/lib/correo'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,10 +13,16 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   const base = await estadoBase()
+  /*
+   * El correo NO afecta el ok general: sin SMTP el sistema arranca y funciona, y la entrega
+   * al productor sigue disponible por su bandeja. Lo que no hace es fingir que lo mandó.
+   */
+  const falta = faltaParaCorreo()
   return NextResponse.json(
     {
       ok: base.ok,
       base,
+      correo: { ok: falta === null, detalle: falta ?? 'Servidor de correo configurado.' },
       configuracion: {
         DATABASE_URL: process.env.DATABASE_URL ? 'definida' : 'FALTA',
         URL_PUBLICA: process.env.URL_PUBLICA ?? '(sin definir: se deduce del host)',
