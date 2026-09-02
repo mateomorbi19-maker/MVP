@@ -2,27 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { ZONAS_IMPACTO, type Pregunta } from '@/lib/cuestionario'
 import {
-  RECORRIDO,
-  ZONAS_IMPACTO,
-  fotosVisibles,
-  preguntasVisibles,
-  seccionPorId,
-  type Bloque,
-  type GuiaFoto,
-  type Pregunta,
-  type Seccion,
-} from '@/lib/cuestionario'
+  construirPasos,
+  pasoInicial,
+  respondida,
+  vacia,
+  type MediaMinima,
+  type Paso,
+  type Respuestas,
+} from '@/lib/recorrido'
 import { olvidarActuacion, recordarActuacion } from '@/lib/local'
 
-type Respuestas = Record<string, unknown>
 /** Motivo por el que no se pudo obtener la ubicación, para poder explicar qué hacer. */
 type FalloGps = {
   codigo: number
   motivo: 'denegado' | 'no_disponible' | 'demora' | 'no_soportado' | 'servidor' | 'sin_respuesta'
   detalle?: string
 } | null
-type Media = { id: string; tipo: string; guia_id: string | null }
+type Media = MediaMinima
 type Testigo = { id: string; nombre: string }
 type Ubicacion = { lat: number; lon: number; direccion: string | null } | null
 type Datos = { poliza: string; patente: string; asegurado: string; telefono: string }
@@ -37,90 +35,6 @@ interface Props {
   mediasIniciales: Media[]
   testigosIniciales: Testigo[]
   ubicacionInicial: Ubicacion
-}
-
-/* ================= El recorrido ================= */
-
-type Paso =
-  | { clave: string; bloque: Bloque; tipo: 'pregunta'; seccion: Seccion; pregunta: Pregunta }
-  | { clave: string; bloque: Bloque; tipo: 'emergencia' }
-  | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
-  | { clave: string; bloque: Bloque; tipo: 'testigos' }
-  | { clave: string; bloque: Bloque; tipo: 'corte' }
-  | { clave: string; bloque: Bloque; tipo: 'datos' }
-  | { clave: string; bloque: Bloque; tipo: 'revision' }
-  | { clave: string; bloque: Bloque; tipo: 'final' }
-
-const vacia = (v: unknown): boolean =>
-  v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)
-
-/** El relato no vive en las respuestas sino en los archivos: se comprueba aparte. */
-function respondida(pregunta: Pregunta, respuestas: Respuestas, medias: Media[]): boolean {
-  if (pregunta.tipo === 'audio') return medias.some((m) => m.tipo === 'audio')
-  return !vacia(respuestas[pregunta.id])
-}
-
-/**
- * Arma la lista plana de pantallas a partir de las respuestas actuales.
- *
- * Se recalcula en cada cambio porque las preguntas condicionales aparecen y
- * desaparecen: por eso la navegación va por clave y no por índice.
- */
-function construirPasos(respuestas: Respuestas): Paso[] {
-  const pasos: Paso[] = []
-
-  for (const etapa of RECORRIDO) {
-    if (etapa.tipo === 'seccion') {
-      const seccion = seccionPorId(etapa.id)
-      if (!seccion) continue
-      for (const pregunta of preguntasVisibles(seccion, respuestas)) {
-        pasos.push({ clave: `p:${pregunta.id}`, bloque: seccion.bloque, tipo: 'pregunta', seccion, pregunta })
-        // La pantalla de llamada va pegada a la respuesta que la dispara.
-        const heridos = respuestas.heridos
-        if (pregunta.id === 'heridos' && typeof heridos === 'string' && heridos !== 'No, nadie') {
-          pasos.push({ clave: 'emergencia', bloque: 'seguridad', tipo: 'emergencia' })
-        }
-      }
-      continue
-    }
-
-    if (etapa.tipo === 'fotos') {
-      const guias = fotosVisibles(respuestas)
-      guias.forEach((guia, i) =>
-        pasos.push({
-          clave: `f:${guia.id}`,
-          bloque: 'lugar',
-          tipo: 'foto',
-          guia,
-          numero: i + 1,
-          total: guias.length,
-        }),
-      )
-      continue
-    }
-
-    const bloque: Bloque = etapa.tipo === 'testigos' || etapa.tipo === 'corte' ? 'lugar' : 'despues'
-    pasos.push({ clave: etapa.tipo, bloque, tipo: etapa.tipo } as Paso)
-  }
-
-  return pasos
-}
-
-/**
- * Dónde retomar.
- *
- * Desde que el último bloque se puede completar más tarde, volver siempre a la
- * primera pregunta sería inaceptable: la persona ya contestó veinte pantallas.
- * Se retoma en lo primero que quedó sin hacer.
- */
-function pasoInicial(pasos: Paso[], respuestas: Respuestas, medias: Media[]): string {
-  for (const paso of pasos) {
-    if (paso.tipo === 'pregunta' && !respondida(paso.pregunta, respuestas, medias)) return paso.clave
-    if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {
-      return paso.clave
-    }
-  }
-  return 'revision'
 }
 
 /* ================= Componente principal ================= */
@@ -506,7 +420,7 @@ export function Flujo(props: Props) {
           />
         ) : null}
 
-        {actual?.tipo === 'emergencia' ? <PantallaEmergencia respuestas={respuestas} seguir={() => mover(1)} /> : null}
+        {actual?.tipo === 'emergencia' ? <PantallaEmergencia variante={actual.variante} seguir={() => mover(1)} /> : null}
 
         {actual?.tipo === 'foto' ? (
           <PantallaFoto key={actual.clave} paso={actual} medias={medias} subir={subir} seguir={() => mover(1)} />
@@ -831,8 +745,12 @@ function CamposPersona({
 
 /* ================= Emergencia ================= */
 
-function PantallaEmergencia({ respuestas, seguir }: { respuestas: Respuestas; seguir: () => void }) {
-  const dudoso = respuestas.heridos === 'No lo sé'
+/**
+ * No recibe `respuestas` a propósito: ver el comentario de `Paso` en lib/recorrido.ts.
+ * La variante se decide con los valores del cuestionario, fuera de esta pantalla.
+ */
+function PantallaEmergencia({ variante, seguir }: { variante: 'confirmado' | 'dudoso'; seguir: () => void }) {
+  const dudoso = variante === 'dudoso'
 
   return (
     <>

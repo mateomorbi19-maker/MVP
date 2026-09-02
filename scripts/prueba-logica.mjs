@@ -15,6 +15,7 @@ import { analizar } from '../lib/consistencia.ts'
 import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
+import { construirPasos, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 
 let fallos = 0
 let pruebas = 0
@@ -100,6 +101,108 @@ verificar(
   'las preguntas no tienen ids repetidos',
   new Set(SECCIONES.flatMap((s) => s.preguntas.map((p) => p.id))).size ===
     SECCIONES.reduce((n, s) => n + s.preguntas.length, 0),
+)
+
+/* ---------- 0b. Armado del recorrido ---------- */
+console.log('\n[0b] Armado del recorrido')
+
+/*
+ * Los textos van escritos a mano, igual que en el motor de consistencia: si alguien
+ * cambia la redacción de una respuesta de "heridos", esto tiene que fallar. Es la
+ * pantalla que decide si se llama a una ambulancia.
+ */
+const sinContestar = construirPasos({})
+verificar(
+  'sin contestar nada, la primera pantalla es la de heridos',
+  sinContestar[0]?.clave === 'p:heridos',
+  sinContestar[0]?.clave,
+)
+verificar(
+  'sin contestar nada no aparece la pantalla de emergencia',
+  !sinContestar.some((p) => p.tipo === 'emergencia'),
+)
+
+const conHeridos = construirPasos({ heridos: 'Sí, hay heridos' })
+const iHeridos = conHeridos.findIndex((p) => p.clave === 'p:heridos')
+verificar(
+  'declarar heridos inserta la pantalla de emergencia justo después',
+  conHeridos[iHeridos + 1]?.tipo === 'emergencia',
+  conHeridos[iHeridos + 1]?.clave,
+)
+verificar(
+  'con heridos confirmados la variante es la imperativa',
+  conHeridos[iHeridos + 1]?.variante === 'confirmado',
+  conHeridos[iHeridos + 1]?.variante,
+)
+
+const conDuda = construirPasos({ heridos: 'No lo sé' })
+verificar(
+  'no saber si hay heridos también lleva a la pantalla de emergencia',
+  conDuda.some((p) => p.tipo === 'emergencia'),
+)
+verificar(
+  'la duda usa la variante que no da una orden',
+  conDuda.find((p) => p.tipo === 'emergencia')?.variante === 'dudoso',
+)
+
+verificar(
+  'responder que no hay heridos no muestra la pantalla de emergencia',
+  !construirPasos({ heridos: 'No, nadie' }).some((p) => p.tipo === 'emergencia'),
+)
+
+verificar(
+  'quien chocó contra un objeto fijo no ve las fotos del otro vehículo',
+  !construirPasos({ tipo_siniestro: 'Colisión con objeto fijo' }).some((p) => p.clave === 'f:patente_tercero'),
+)
+verificar(
+  'quien chocó contra otro vehículo sí las ve',
+  construirPasos({ tipo_siniestro: 'Colisión con otro vehículo' }).some((p) => p.clave === 'f:patente_tercero'),
+)
+
+verificar('el recorrido termina en la pantalla final', sinContestar[sinContestar.length - 1]?.tipo === 'final')
+
+/* Dónde se retoma. */
+verificar(
+  'sin nada contestado se retoma en la primera pregunta',
+  pasoInicial(sinContestar, {}, []) === 'p:heridos',
+)
+
+/*
+ * Con todo contestado y todas las fotos obligatorias sacadas, se retoma en la revisión.
+ * Las respuestas se completan iterando porque contestar hace aparecer preguntas nuevas.
+ */
+let respuestasCompletas = {}
+for (let vuelta = 0; vuelta < 6; vuelta++) {
+  for (const paso of construirPasos(respuestasCompletas)) {
+    if (paso.tipo !== 'pregunta') continue
+    if (!vacia(respuestasCompletas[paso.pregunta.id])) continue
+    const p = paso.pregunta
+    respuestasCompletas[p.id] =
+      p.tipo === 'numero' ? 1 : p.tipo === 'multiple' ? [p.opciones[0]] : p.opciones ? p.opciones[0] : 'algo'
+  }
+}
+const pasosCompletos = construirPasos(respuestasCompletas)
+const mediasCompletas = [
+  { id: 'AUD-1', tipo: 'audio', guia_id: null },
+  ...pasosCompletos
+    .filter((p) => p.tipo === 'foto' && p.guia.obligatoria)
+    .map((p, i) => ({ id: 'IMG-' + i, tipo: 'foto', guia_id: p.guia.id })),
+]
+verificar(
+  'con todo contestado y las fotos obligatorias sacadas, se retoma en la revisión',
+  pasoInicial(pasosCompletos, respuestasCompletas, mediasCompletas) === 'revision',
+  pasoInicial(pasosCompletos, respuestasCompletas, mediasCompletas),
+)
+
+/* El relato es audio: se comprueba contra los archivos, no contra las respuestas. */
+const preguntaRelato = seccionPorId('relato').preguntas[0]
+verificar(
+  'el relato no cuenta como respondido sin el audio',
+  !respondida(preguntaRelato, { relato: 'texto suelto' }, []),
+)
+verificar(
+  'el relato cuenta como respondido cuando existe el audio',
+  respondida(preguntaRelato, {}, [{ id: 'AUD-1', tipo: 'audio', guia_id: null }]),
 )
 
 /* ---------- 1. Serialización canónica y cadena ---------- */
