@@ -11,7 +11,10 @@ referencia las trae invertidas.
 
 ## 1 · Notificación en pantalla de bloqueo
 
-**Estado: no construida.** Llega con el módulo de notificaciones.
+| | |
+| --- | --- |
+| Archivos | `public/sw.js` (push y notificationclick) · `app/aviso/page.tsx` · `components/DetectorImpacto.tsx` |
+| Endpoints | `GET /api/push/clave-publica` · `POST /api/push/dispositivos` · `POST /api/telemetria` |
 
 Límite que hay que tener presente antes de maquetarla: **en iPhone no existe.** Web Push
 en iOS ignora por completo el arreglo `actions`, así que los tres botones del mockup

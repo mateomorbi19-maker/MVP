@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Marca } from '@/app/components/Marca'
+import { DetectorImpacto } from '@/app/components/DetectorImpacto'
 
 type Contacto = { nombre: string; telefono: string; relacion: string | null }
 
@@ -107,6 +108,8 @@ export default function Perfil() {
           Guardar
         </button>
       </form>
+
+      <DetectorImpacto />
 
       <p className="mini centrado">
         <Link href="/cuenta" className="enlace">Volver a mi cuenta</Link>

@@ -80,3 +80,56 @@ self.addEventListener('sync', (evento) => {
     }),
   )
 })
+
+/*
+ * Notificaciones.
+ *
+ * LÍMITE QUE NO SE PUEDE DISIMULAR: en iPhone, Web Push IGNORA por completo el arreglo de
+ * acciones. Los tres botones del mockup —llamar a emergencias, pedir asistencia, reportar
+ * el accidente— no se pueden dibujar dentro de una notificación de iOS. En Android sí,
+ * pero Chrome muestra como máximo DOS y la tercera desaparece sin error.
+ *
+ * Por eso se mandan igual, ordenadas por importancia, y el toque sobre la notificación
+ * lleva a una pantalla nuestra que tiene los mismos botones en grande. Eso es lo único que
+ * funciona en los dos lados.
+ */
+self.addEventListener('push', (evento) => {
+  let aviso = { titulo: 'Acta Digital', cuerpo: 'Tenés un aviso.', url: '/' }
+  try {
+    if (evento.data) aviso = { ...aviso, ...evento.data.json() }
+  } catch {
+    /* una carga que no es JSON no puede impedir que se muestre el aviso */
+  }
+
+  evento.waitUntil(
+    self.registration.showNotification(aviso.titulo, {
+      body: aviso.cuerpo,
+      icon: '/iconos/icono-192.png',
+      badge: '/iconos/icono-192.png',
+      tag: aviso.etiqueta || 'acta',
+      renotify: true,
+      requireInteraction: true,
+      data: { url: aviso.url },
+      actions: (aviso.acciones || []).slice(0, 2),
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (evento) => {
+  evento.notification.close()
+  const base = evento.notification.data?.url || '/'
+  // La acción elegida viaja en la URL: la pantalla decide qué mostrar primero.
+  const destino = evento.action ? `${base}${base.includes('?') ? '&' : '?'}accion=${evento.action}` : base
+
+  evento.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientes) => {
+      for (const c of clientes) {
+        if ('focus' in c) {
+          c.navigate(destino)
+          return c.focus()
+        }
+      }
+      return self.clients.openWindow(destino)
+    }),
+  )
+})

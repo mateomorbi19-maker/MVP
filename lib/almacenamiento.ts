@@ -16,6 +16,8 @@ export const DIR_DATOS = resolve(/* turbopackIgnore: true */ process.env.DIR_DAT
 export const DIR_MEDIA = join(DIR_DATOS, 'media')
 /** Documentación de la póliza. Carpeta aparte: no es evidencia del hecho. */
 export const DIR_DOCUMENTOS = join(DIR_DATOS, 'documentos')
+/** Series de sensores. Carpeta y validación propias: no son una fotografía. */
+export const DIR_SERIES = join(DIR_DATOS, 'series')
 
 const MIMES_PERMITIDOS = new Set([
   'image/jpeg',
@@ -147,5 +149,35 @@ export async function leerDocumento(rutaRelativa: string): Promise<Buffer> {
   if (!destino.startsWith(resolve(DIR_DOCUMENTOS))) {
     throw new ErrorArchivo('Ruta de archivo inválida.')
   }
+  return readFile(destino)
+}
+
+/* ================= Series de sensores ================= */
+
+/**
+ * Guarda una serie de lecturas como archivo JSON.
+ *
+ * NO pasa por guardarArchivo ni se le agrega application/json a MIMES_PERMITIDOS: esa lista
+ * la usa el POST de media del recorrido, y sumarle JSON permitiría subir un archivo
+ * arbitrario como «fotografía del siniestro», que entraría al manifiesto como pieza
+ * fotográfica del expediente sellado.
+ */
+export async function guardarSerie(casoId: string, mediaId: string, contenido: string): Promise<ArchivoGuardado> {
+  const datos = new TextEncoder().encode(contenido)
+  if (datos.length === 0) throw new ErrorArchivo('La serie llegó vacía.')
+  if (datos.length > TAMANO_MAXIMO) throw new ErrorArchivo('La serie de sensores es demasiado grande.')
+
+  const carpeta = join(DIR_SERIES, casoId)
+  await mkdir(carpeta, { recursive: true })
+  const nombre = `${mediaId}.json`
+  await writeFile(join(carpeta, nombre), datos)
+
+  return { archivo: `${casoId}/${nombre}`, sha256: sha256(datos), bytes: datos.length, mime: 'application/json' }
+}
+
+/** Lee una serie, con la misma guarda contra salirse del directorio. */
+export async function leerSerie(rutaRelativa: string): Promise<Buffer> {
+  const destino = resolve(DIR_SERIES, rutaRelativa)
+  if (!destino.startsWith(resolve(DIR_SERIES))) throw new ErrorArchivo('Ruta de archivo inválida.')
   return readFile(destino)
 }

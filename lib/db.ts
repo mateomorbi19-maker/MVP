@@ -500,6 +500,47 @@ ALTER TABLE medias ADD COLUMN IF NOT EXISTS origen           TEXT;
 -- CAPTURA y no por guía: si se generara por guía, «repetir la foto» devolvería la vieja.
 CREATE UNIQUE INDEX IF NOT EXISTS medias_idempotencia_uidx ON medias (idempotencia) WHERE idempotencia IS NOT NULL;
 
+-- ===================== Notificaciones y telemetría =====================
+
+CREATE TABLE IF NOT EXISTS dispositivos (
+  id            TEXT PRIMARY KEY,
+  usuario_id    TEXT REFERENCES usuarios(id) ON DELETE CASCADE,
+  endpoint      TEXT NOT NULL,
+  endpoint_sha256 TEXT NOT NULL,
+  p256dh        TEXT NOT NULL,
+  auth          TEXT NOT NULL,
+  plataforma    TEXT,
+  user_agent    TEXT,
+  huella_vapid  TEXT,
+  activo        BOOLEAN NOT NULL DEFAULT true,
+  baja_motivo   TEXT,
+  creado_en     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ultimo_uso    TIMESTAMPTZ
+);
+-- Idempotente por endpoint: re-suscribir el mismo teléfono reactiva la fila, no duplica.
+CREATE UNIQUE INDEX IF NOT EXISTS dispositivos_endpoint_uidx ON dispositivos (endpoint_sha256);
+
+-- Ingesta AGNÓSTICA DEL ORIGEN. Hoy la escribe el navegador; mañana puede escribirla un
+-- envoltorio nativo sin que el servidor cambie una línea. Por eso no hay ninguna columna
+-- que suponga de dónde vino.
+CREATE TABLE IF NOT EXISTS telemetria (
+  id          TEXT PRIMARY KEY,
+  usuario_id  TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
+  caso_id     TEXT REFERENCES casos(id) ON DELETE SET NULL,
+  ts          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  origen      TEXT NOT NULL DEFAULT 'navegador',
+  nivel       TEXT NOT NULL,
+  pico_g      REAL,
+  veredicto   JSONB NOT NULL DEFAULT '{}'::jsonb,
+  respuesta   TEXT,
+  respondido_en TIMESTAMPTZ,
+  gps         JSONB
+);
+CREATE INDEX IF NOT EXISTS telemetria_usuario_idx ON telemetria (usuario_id, ts DESC);
+
+-- De dónde salió la actuación: del botón, o de un impacto detectado.
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'boton';
+
 -- UNA sola definición, que sirve a las dos tablas append-only. Con una función por tabla,
 -- cualquiera que la redefiniera después en este mismo string ganaría en silencio: SCHEMA
 -- se ejecuta como una sola consulta multi-sentencia y Postgres se queda con la última.
@@ -536,7 +577,7 @@ CREATE TRIGGER gestiones_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos', 'dispositivos', 'telemetria'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

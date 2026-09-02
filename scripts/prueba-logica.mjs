@@ -17,6 +17,9 @@ import { generarExpediente } from '../lib/pdf.ts'
 import { PLANTILLAS, figurasDelCroquis, limpiarCroquis } from '../lib/croquis.ts'
 import { MAPEO, PROVEEDOR_SIMULADO, extraccionActiva, vistaParaAsegurado } from '../lib/extraccion.ts'
 import { DECLARACION, construirActa } from '../lib/acta.ts'
+import { cifrarCarga, derivarClaves } from '../lib/cifrado.ts'
+import { UMBRALES, analizarImpacto, planEscalamiento } from '../lib/impacto.ts'
+import { createDecipheriv, createECDH } from 'node:crypto'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
@@ -724,6 +727,91 @@ console.log('\n[8] El acta que se firma')
   verificar('la declaración lleva versión', DECLARACION.version.startsWith('acta-asegurado-'))
   verificar('la declaración dice que es firma electrónica y no digital', DECLARACION.texto.includes('art. 5'))
   verificar('y aclara que no tiene las presunciones de los arts. 7 y 8', DECLARACION.texto.includes('arts. 7 y 8'))
+}
+
+/* ---------- 10. Impacto y notificaciones ---------- */
+console.log('\n[10] Impacto y notificaciones')
+
+/*
+ * El cifrado de Web Push contra el VECTOR DE PRUEBA del RFC 8291 §5.
+ *
+ * Esta prueba es la razón por la que el cifrado se escribe a mano en vez de traer una
+ * biblioteca: el RFC publica un caso completo, así que se puede DEMOSTRAR que está bien.
+ * Si alguna vez falla, no se toca lib/cifrado.ts hasta entender por qué.
+ */
+{
+  const b = (x) => Buffer.from(x, 'base64url')
+  const uaPriv = b('q1dXpw3UpT5VOmu_cf_v6ih07Aems3njxI-JWgLcM94')
+  const uaPub = b('BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4')
+  const auth = b('BTBZMqHH6r4Tts7J_aSIgg')
+  const asPriv = b('yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw')
+  const sal = b('DGv6ra1nlYgDCS1FRnbzlw')
+  const esperado = 'When I grow up, I want to be a watermelon'
+  const CIFRADO_DEL_RFC = '8pfeW0KbunFT06SuDKoJH9Ql87S1QUrdirN6GcG7sFz1y1sqLgVi1VhjVkHsUoEsbI_0LpXMuGvnzQ'
+
+  const cuerpo = cifrarCarga(
+    { endpoint: '', p256dh: uaPub.toString('base64url'), auth: auth.toString('base64url') },
+    esperado,
+    sal,
+    asPriv,
+  )
+  verificar('el cifrado produce el texto del vector del RFC 8291', cuerpo.subarray(86).toString('base64url') === CIFRADO_DEL_RFC)
+
+  // Y descifrarlo desde el lado del navegador da el texto original.
+  const ecdh = createECDH('prime256v1')
+  ecdh.setPrivateKey(uaPriv)
+  const compartido = ecdh.computeSecret(cuerpo.subarray(21, 86))
+  const { cek, nonce } = derivarClaves(compartido, auth, uaPub, cuerpo.subarray(21, 86), cuerpo.subarray(0, 16))
+  const cif = cuerpo.subarray(86)
+  const d = createDecipheriv('aes-128-gcm', cek, nonce)
+  d.setAuthTag(cif.subarray(cif.length - 16))
+  const claro = Buffer.concat([d.update(cif.subarray(0, cif.length - 16)), d.final()])
+  verificar('el navegador puede descifrarlo', claro.subarray(0, claro.length - 1).toString('utf8') === esperado)
+  verificar('dos cifrados de lo mismo son distintos, porque la sal es al azar',
+    cifrarCarga({ endpoint: '', p256dh: uaPub.toString('base64url'), auth: auth.toString('base64url') }, esperado).toString('base64url') !==
+    cifrarCarga({ endpoint: '', p256dh: uaPub.toString('base64url'), auth: auth.toString('base64url') }, esperado).toString('base64url'))
+}
+
+/* El detector de impacto, contra series sintéticas. */
+{
+  const serie = (fn, n = 40) => Array.from({ length: n }, (_, i) => fn(i))
+  const quieto = serie((i) => ({ t: i * 20, ax: 0.2, ay: 0.1, az: 0.1, gTotal: 1, kmh: 50 }))
+  verificar('circular tranquilo no dispara nada', analizarImpacto(quieto).nivel === 'nada')
+
+  // Un choque: pico alto, sostenido, y la velocidad se cae.
+  const choque = serie((i) => {
+    const enPico = i >= 20 && i <= 24
+    const g = enPico ? 12 : i > 24 ? 3 : 0.3
+    return { t: i * 20, ax: g * 9.80665, ay: 0, az: 0, gTotal: 1 + g, kmh: i < 20 ? 55 : 2, giro: enPico ? 260 : 5 }
+  })
+  const v = analizarImpacto(choque)
+  verificar('un choque se detecta', v.nivel === 'confirmado', v.motivo)
+  verificar('con la caída de velocidad entre las señales', v.señales.caidaDeVelocidad)
+  verificar('y NUNCA propone llamar solo a emergencias', v.llamar_emergencias === false)
+
+  // Un pozo: un pico aislado y la velocidad sigue igual.
+  const pozo = serie((i) => ({
+    t: i * 20,
+    ax: i === 20 ? 6 * 9.80665 : 0.2,
+    ay: 0, az: 0, gTotal: i === 20 ? 7 : 1, kmh: 50,
+  }))
+  verificar('un pozo NO se confunde con un choque', analizarImpacto(pozo).nivel === 'nada', analizarImpacto(pozo).motivo)
+
+  // El teléfono que se cae al piso: caída libre antes del golpe.
+  const caida = serie((i) => ({
+    t: i * 20,
+    ax: i >= 20 && i <= 23 ? 20 * 9.80665 : 0.1,
+    ay: 0, az: 0,
+    gTotal: i >= 16 && i < 20 ? 0.05 : i >= 20 && i <= 23 ? 21 : 1,
+    kmh: 0,
+  }))
+  const vc = analizarImpacto(caida)
+  verificar('el teléfono que se cae NO se confunde con un choque', vc.nivel === 'nada', vc.motivo)
+  verificar('y el motivo lo dice', vc.descartes.some((d) => d.includes('caída libre')))
+
+  verificar('sin respuesta se escala, pero sin llamar solo', planEscalamiento(v, false).ofrecerEmergencias === true)
+  verificar('si la persona contesta, no se escala nada', planEscalamiento(v, true).ofrecerEmergencias === false)
+  verificar('los umbrales tienen valores de referencia razonables', UMBRALES.sospechaG >= 3 && UMBRALES.confirmadoG >= UMBRALES.sospechaG)
 }
 
 /* ---------- Resultado ---------- */

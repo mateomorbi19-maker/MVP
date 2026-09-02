@@ -196,35 +196,73 @@ El esquema de base de datos se crea solo en el primer arranque.
 - Clima y geocodificación reales (Open-Meteo y Nominatim, ambos gratuitos)
 - Mapa del lugar incrustado en el PDF (mosaicos de OpenStreetMap)
 - Cadena de custodia con hashes encadenados, más un trigger de Postgres que rechaza
-  `UPDATE` y `DELETE` sobre la tabla de eventos
+  `UPDATE` y `DELETE` sobre las tablas append-only
 - Motor de consistencia completo
-- Expediente PDF y verificador público
+- Expediente PDF, verificador público y página pública de verificación por QR
 - Sello de tiempo RFC 3161 contra una TSA pública (la solicitud DER se arma a mano
   en `lib/sello.ts`)
+- Cuentas con rol, sesiones y control de acceso sobre el panel, el listado, las
+  fotografías y el expediente
+- Póliza, documentación adjunta, historial y contacto de confianza
+- Croquis del hecho, con el mismo dibujo en la pantalla y en el expediente
+- Firma electrónica del asegurado, atada al hash del contenido que firma
+- Consentimiento del tercero desde su propio teléfono
+- Lectura automática de la documentación del tercero, **enchufable y apagada por defecto**
+- Entrega al productor por correo (SMTP propio) y por su bandeja, con enlace que vence
+- Cola de subida offline, para no perder la foto sin señal
+- Conservación, anonimización y baja de expedientes
+- Notificaciones push con VAPID, sin SDK, y detección de impacto en primer plano
 
 ### Falta antes de mostrárselo a una aseguradora
 
-1. **Autenticación.** El panel es abierto. Es un MVP de uso interno.
-2. **Firma digital de verdad.** Hoy se firma con una clave del servidor: eso es *firma
+1. **Firma digital de verdad.** Hoy se firma con una clave del servidor: eso es *firma
    electrónica* (art. 5, Ley 25.506), sin las presunciones de autoría e integridad de los
    arts. 7 y 8. Para tenerlas hace falta un certificado de **certificador licenciado**
    (Encode, Lakaut, Box Custodia o Digilogix) y firmar el PDF en formato PAdES. Está
    aislado en `lib/sello.ts` para que el cambio toque un solo archivo.
-3. **Transcripción del audio.** El audio se guarda y se hashea, pero no se transcribe.
-4. **Revisión del cuestionario por un abogado de tránsito.** Las 38 preguntas están
+2. **Revisión del cuestionario por un abogado de tránsito.** Las preguntas están
    redactadas con criterio de aseguradora, pero no las validó nadie del fuero. Es lo
    más importante de la lista: la tecnología la copia cualquiera, las preguntas correctas no.
-5. **Registro de la base ante la AAIP**, conforme a la Ley 25.326.
-6. **Retención y borrado de datos.** No hay política de expurgo implementada.
+3. **Registro de la base ante la AAIP**, conforme a la Ley 25.326.
+4. **Los plazos de conservación.** El mecanismo está y arranca en cero: los meses los pone
+   el abogado, según los plazos de prescripción que apliquen. Un plazo puesto al azar es
+   peor que no tener ninguno.
+5. **El consentimiento del tercero y la transferencia internacional**, si alguna vez se
+   enchufa un proveedor de lectura automática fuera del país. Los cinco pasos están
+   escritos al principio de `lib/extraccion.ts`.
+6. **Transcripción del audio.** El audio se guarda y se hashea, pero no se transcribe.
 7. **Nominatim y los mosaicos de OSM** son gratuitos pero piden volumen bajo. Con uso real
    hay que pasar a un proveedor propio.
 
-### Fuera de alcance (fase 2)
+### Lo que una aplicación web NO puede hacer, y hay que decirlo
 
-Detección automática del impacto y registro del recorrido previo. Requiere licenciar un SDK
-de telemática (Damoov, DriveQuant, Sentiance, Arity, CMT o IMS) — no se puede construir in
-house: un conductor promedio tiene un siniestro cada 7 a 15 años, así que no hay forma de
-juntar los miles de choques etiquetados que necesita un modelo propio.
+Esto reemplaza lo que este README decía antes —que la detección de impacto requería
+licenciar un SDK de telemática—. Es más matizado que eso.
+
+**Leer el acelerómetro se puede, y está hecho.** El detector cruza el pico de aceleración
+con la caída de velocidad del GPS y con el giróscopo, descarta la caída libre previa (el
+teléfono que se cae del soporte da entre 10 y 30 g, más que muchos choques) y descarta el
+pico aislado (un pozo). Corre con lógica pura y se prueba con series sintéticas.
+
+**Pero corre sólo con la aplicación abierta y a la vista.** Cuando pasa a segundo plano el
+navegador suspende el hilo de JavaScript, `DeviceMotionEvent` deja de emitir, y el service
+worker sólo se despierta cuando llega un push *desde el servidor*: nunca por su cuenta,
+nunca por un sensor, nunca por un temporizador. No hay API que lo cambie, ni en iOS ni en
+Android. **Una PWA no detecta un choque con la pantalla bloqueada.**
+
+**Las tres acciones de la notificación de bloqueo no existen en iPhone.** Web Push en iOS
+ignora por completo el arreglo `actions`. En Android existen, pero Chrome dibuja como
+máximo dos. Por eso el toque sobre la notificación lleva a `/aviso`, una pantalla propia con
+los tres botones en grande, que es lo único que funciona en los dos lados.
+
+**Y en iOS no hay Background Sync**: la cola de subida sólo avanza con la aplicación
+abierta, y Safari desaloja el almacenamiento del sitio a los siete días sin uso.
+
+Lo que sí queda listo: el backend es agnóstico del origen. La tabla de telemetría, los
+umbrales y el endpoint de ingesta no suponen de dónde vienen las lecturas, así que un
+envoltorio nativo —que sí puede leer sensores en segundo plano— no tendría que tocar el
+servidor. Esa sigue siendo la única forma de cumplir la sección 5 de la especificación al
+pie de la letra.
 
 ---
 
