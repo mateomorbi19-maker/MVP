@@ -5,6 +5,7 @@ import { fotosObligatorias } from './cuestionario'
 import type { Clima } from './clima'
 import type { Sello } from './sello'
 import type { DatosExpediente } from './pdf'
+import type { AlcanceCasos } from './sesion'
 
 export interface Caso {
   id: string
@@ -24,6 +25,8 @@ export interface Caso {
   sello: Sello | null
   /** Ver VERSION_MANIFIESTO en lib/hash.ts. Las actuaciones viejas conservan la suya. */
   manifiesto_version: string
+  usuario_id: string | null
+  productor_id: string | null
 }
 
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : String(v))
@@ -46,6 +49,8 @@ function mapear(fila: Record<string, unknown>): Caso {
     hash_maestro: (fila.hash_maestro as string) ?? null,
     sello: (fila.sello as Sello) ?? null,
     manifiesto_version: (fila.manifiesto_version as string) ?? '1.0',
+    usuario_id: (fila.usuario_id as string) ?? null,
+    productor_id: (fila.productor_id as string) ?? null,
   }
 }
 
@@ -55,9 +60,25 @@ export async function obtenerCaso(id: string): Promise<Caso | null> {
   return res.rows[0] ? mapear(res.rows[0]) : null
 }
 
-export async function listarCasos(): Promise<Caso[]> {
+/**
+ * Listado, siempre acotado a quién pregunta.
+ *
+ * No tiene valor por defecto a propósito, y es deliberadamente rompedor: con un default
+ * de "todos", cualquier llamador nuevo listaría la base entera sin darse cuenta. Y en
+ * esta base hay datos personales de terceros que ni siquiera son usuarios del sistema.
+ */
+export async function listarCasos(alcance: AlcanceCasos): Promise<Caso[]> {
   const pg = await db()
-  const res = await pg.query('SELECT * FROM casos ORDER BY creado_en DESC LIMIT 200')
+  if (alcance.tipo === 'todos') {
+    const res = await pg.query('SELECT * FROM casos ORDER BY creado_en DESC LIMIT 200')
+    return res.rows.map(mapear)
+  }
+  const columna = alcance.tipo === 'de_productor' ? 'productor_id' : 'usuario_id'
+  const valor = alcance.tipo === 'de_productor' ? alcance.productorId : alcance.usuarioId
+  const res = await pg.query(
+    `SELECT * FROM casos WHERE ${columna} = $1 ORDER BY creado_en DESC LIMIT 200`,
+    [valor],
+  )
   return res.rows.map(mapear)
 }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
+import { exigirAccesoCaso } from '@/lib/posesion'
 import { db } from '@/lib/db'
 import { registrarEvento, construirManifiesto } from '@/lib/hash'
 import { obtenerCaso, calcularConsistencia } from '@/lib/casos'
@@ -56,6 +57,7 @@ async function sellarYGuardar(casoId: string, hashMaestro: string) {
 export async function POST(_req: Request, { params }: Ctx) {
   const { id } = await params
   try {
+    await exigirAccesoCaso(id)
     const caso = await obtenerCaso(id)
     if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
 

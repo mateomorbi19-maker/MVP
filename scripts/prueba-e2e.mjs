@@ -22,12 +22,42 @@ function verificar(nombre, condicion, extra = '') {
   if (!condicion) fallos++
 }
 
+/*
+ * Frasco de cookies.
+ *
+ * Sin esto la prueba no representa a nadie: desde que existe la posesión de la actuación,
+ * el servidor le entrega las fotos y el expediente al navegador que abrió el caso, no a
+ * cualquiera que sepa el id. Un cliente sin cookies es exactamente el que hay que
+ * rechazar, así que el circuito tiene que comportarse como un navegador.
+ */
+const galletas = new Map()
+
+function guardarCookies(res) {
+  const crudas = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : []
+  for (const c of crudas) {
+    const [par] = c.split(';')
+    const i = par.indexOf('=')
+    if (i > 0) galletas.set(par.slice(0, i).trim(), par.slice(i + 1).trim())
+  }
+}
+
+const cabeceraCookies = () =>
+  galletas.size ? [...galletas].map(([k, v]) => `${k}=${v}`).join('; ') : undefined
+
 async function pedir(ruta, opciones = {}) {
-  const res = await fetch(`${BASE}${ruta}`, opciones)
+  const cookie = cabeceraCookies()
+  const res = await fetch(`${BASE}${ruta}`, {
+    ...opciones,
+    headers: { ...(opciones.headers ?? {}), ...(cookie ? { cookie } : {}) },
+  })
+  guardarCookies(res)
   const tipo = res.headers.get('content-type') || ''
   const cuerpo = tipo.includes('json') ? await res.json() : Buffer.from(await res.arrayBuffer())
   return { res, cuerpo }
 }
+
+/** Olvida las cookies: para comprobar que un cliente ajeno NO puede leer el expediente. */
+const olvidarCookies = () => galletas.clear()
 
 /** PNG mínimo pero válido, de color sólido, para que pdf-lib pueda incrustarlo. */
 function pngSolido(ancho, alto, [r, g, b]) {
@@ -346,6 +376,30 @@ console.log('\n[7b] Escritura concurrente con el cierre')
   // Volver a cerrar es idempotente y no puede mover el hash ya sellado.
   const { cuerpo: recierre } = await pedir(`/api/casos/${ID2}/cerrar`, { method: 'POST' })
   verificar('volver a cerrar no cambia el hash maestro', recierre.hash_maestro === cierre2.cuerpo.hash_maestro)
+}
+
+/* ---------- 7c. El expediente no es de cualquiera ---------- */
+console.log('\n[7c] El expediente no es de cualquiera')
+{
+  const guardadas = cabeceraCookies()
+  olvidarCookies()
+
+  const { res: sinAcceso } = await pedir(`/api/casos/${ID}`)
+  verificar('sin posesión no se puede leer la actuación', sinAcceso.status === 403, `status=${sinAcceso.status}`)
+
+  const { res: sinPdf } = await pedir(`/api/casos/${ID}/pdf`)
+  verificar('sin posesión no se puede bajar el expediente', sinPdf.status === 403, `status=${sinPdf.status}`)
+
+  const { res: sinListado } = await pedir('/api/casos')
+  verificar('sin sesión no se puede listar', sinListado.status === 401, `status=${sinListado.status}`)
+
+  // Devolver las cookies para el resto del circuito.
+  for (const par of (guardadas ?? '').split('; ')) {
+    const i = par.indexOf('=')
+    if (i > 0) galletas.set(par.slice(0, i), par.slice(i + 1))
+  }
+  const { res: recuperado } = await pedir(`/api/casos/${ID}`)
+  verificar('con la posesión de vuelta, se vuelve a poder leer', recuperado.status === 200)
 }
 
 /* ---------- 8. Expediente PDF ---------- */

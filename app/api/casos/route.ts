@@ -3,6 +3,10 @@ import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento, VERSION_MANIFIESTO } from '@/lib/hash'
 import { listarCasos, limpiarDatosAsegurado } from '@/lib/casos'
+import { hashToken, nuevoToken } from '@/lib/claves'
+import { anotarPosesion } from '@/lib/posesion'
+import { alcanceDe, exigirRol } from '@/lib/sesion'
+import { leerSesion } from '@/lib/sesion'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,14 +36,23 @@ export async function POST(req: Request) {
      * el DEFAULT es '1.0' para las filas que ya existían, y toda actuación nueva tiene
      * que nacer en la versión vigente. Ver VERSION_MANIFIESTO en lib/hash.ts.
      */
+    /*
+     * El secreto de apertura se devuelve UNA sola vez, acá, y de la base sólo se guarda su
+     * hash. Es la única prueba que después se acepta para reclamar esta actuación desde
+     * una cuenta: el id no alcanza, porque se dicta por teléfono, se imprime en el
+     * expediente y viaja dentro del QR que escanea cualquier testigo.
+     */
+    const secreto = nuevoToken()
+    const sesion = await leerSesion()
+
     let id = ''
     for (let intento = 0; intento < 5; intento++) {
       const candidato = nuevoId()
       try {
         await pg.query(
-          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [candidato, datos.poliza, datos.patente, datos.asegurado, datos.telefono, VERSION_MANIFIESTO],
+          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version, secreto_sha256, usuario_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [candidato, datos.poliza, datos.patente, datos.asegurado, datos.telefono, VERSION_MANIFIESTO, hashToken(secreto), sesion?.usuario_id ?? null],
         )
         id = candidato
         break
@@ -58,16 +71,26 @@ export async function POST(req: Request) {
       user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null,
     })
 
-    return NextResponse.json({ id }, { status: 201 })
+    // Anota qué navegador tiene este id: es lo que le habilita las fotos y el expediente.
+    await anotarPosesion(id)
+
+    return NextResponse.json({ id, secreto }, { status: 201 })
   } catch (err) {
     return errorApi('casos:POST', err, 'No se pudo crear la actuación.')
   }
 }
 
-/** Listado para el panel de la aseguradora. */
+/**
+ * Listado, acotado a quién pregunta.
+ *
+ * Dejó de ser público. La aseguradora ve todo, el productor ve los suyos, el asegurado
+ * los propios. Antes devolvía las doscientas actuaciones más recientes del sistema —con
+ * la patente, el nombre y el lugar del hecho— a cualquiera que supiera la ruta.
+ */
 export async function GET() {
   try {
-    const casos = await listarCasos()
+    const sesion = await exigirRol('asegurado', 'productor', 'aseguradora')
+    const casos = await listarCasos(alcanceDe(sesion))
     return NextResponse.json(
       casos.map((c) => ({
         id: c.id,

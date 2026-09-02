@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
+import { exigirAccesoCaso } from '@/lib/posesion'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso, listarMedias, listarTestigos, limpiarDatosAsegurado } from '@/lib/casos'
@@ -14,15 +15,20 @@ const IDS_VALIDOS = new Set(SECCIONES.flatMap((s) => s.preguntas.map((p) => p.id
 
 export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params
-  const caso = await obtenerCaso(id)
-  if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
+  try {
+    await exigirAccesoCaso(id)
+    const caso = await obtenerCaso(id)
+    if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
 
-  const [medias, testigos] = await Promise.all([listarMedias(id), listarTestigos(id)])
-  return NextResponse.json({
-    ...caso,
-    medias: medias.map((m) => ({ id: m.id, tipo: m.tipo, guia_id: m.guia_id, mime: m.mime, capturado_en: m.capturado_en })),
-    testigos: testigos.map((t) => ({ id: t.id, nombre: t.nombre, creado_en: t.creado_en })),
-  })
+    const [medias, testigos] = await Promise.all([listarMedias(id), listarTestigos(id)])
+    return NextResponse.json({
+      ...caso,
+      medias: medias.map((m) => ({ id: m.id, tipo: m.tipo, guia_id: m.guia_id, mime: m.mime, capturado_en: m.capturado_en })),
+      testigos: testigos.map((t) => ({ id: t.id, nombre: t.nombre, creado_en: t.creado_en })),
+    })
+  } catch (err) {
+    return errorApi('caso:GET', err, 'No se pudo leer la actuación.')
+  }
 }
 
 /**
@@ -35,6 +41,7 @@ export async function GET(_req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
+    await exigirAccesoCaso(id)
     const caso = await obtenerCaso(id)
     if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
     if (caso.estado === 'cerrado') {

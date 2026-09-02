@@ -72,6 +72,14 @@ export function Flujo(props: Props) {
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cola = useRef<Promise<void>>(Promise.resolve())
 
+  /*
+   * Anota que este navegador tiene el id de la actuación. Es lo que después le habilita
+   * las fotos, el audio y el expediente sin pedirle una cuenta.
+   */
+  useEffect(() => {
+    fetch(`/api/casos/${props.casoId}/posesion`, { method: 'POST' }).catch(() => {})
+  }, [props.casoId])
+
   useEffect(() => {
     recordarActuacion(props.casoId)
   }, [props.casoId])

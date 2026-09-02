@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
+import { exigirAccesoCaso } from '@/lib/posesion'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
@@ -23,6 +24,7 @@ const GUIAS = new Set(GUIA_FOTOS.map((g) => g.id))
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
+    await exigirAccesoCaso(id)
     const caso = await obtenerCaso(id)
     if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
     if (caso.estado === 'cerrado') {

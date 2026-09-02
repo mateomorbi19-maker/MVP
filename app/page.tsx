@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Marca } from './components/Marca'
 import { InstalarApp } from './components/InstalarApp'
-import { actuacionAbierta } from '@/lib/local'
+import { BarraCuenta } from './components/BarraCuenta'
+import { actuacionAbierta, recordarActuacion } from '@/lib/local'
 
 /**
  * Inicio.
@@ -44,6 +45,8 @@ export default function Inicio() {
       })
       const cuerpo = await res.json()
       if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo iniciar la actuación.')
+      // El secreto se devuelve una sola vez: si no se guarda ahora, se perdió.
+      recordarActuacion(cuerpo.id, cuerpo.secreto)
       router.push(`/s/${cuerpo.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error inesperado.')
@@ -85,10 +88,7 @@ export default function Inicio() {
           Vamos a pedirte permiso de ubicación, cámara y micrófono para registrar dónde, cuándo y cómo ocurrió.
           Los datos se usan sólo para documentar este siniestro ante tu aseguradora (Ley 25.326).
         </p>
-        <div className="enlaces-pie">
-          <Link href="/panel">Panel de siniestros</Link>
-          <Link href="/verificar">Verificar expediente</Link>
-        </div>
+        <BarraCuenta />
       </div>
     </main>
   )

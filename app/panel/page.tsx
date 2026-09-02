@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { listarCasos } from '@/lib/casos'
+import { alcanceDe, exigirRol } from '@/lib/sesion'
 import { Marca } from '@/app/components/Marca'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +9,8 @@ const fecha = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : '-'
 
 export default async function Panel() {
-  const casos = await listarCasos()
+  const sesion = await exigirRol('productor', 'aseguradora')
+  const casos = await listarCasos(alcanceDe(sesion))
 
   return (
     <main className="envoltura-ancha">
@@ -97,10 +99,10 @@ export default async function Panel() {
         </div>
       )}
 
-      <div className="aviso" data-nivel="atencion" style={{ marginTop: 22 }}>
-        <strong>Sin control de acceso.</strong> Este panel es abierto porque es un MVP de uso interno. Antes de
-        mostrárselo a una aseguradora con datos reales hay que ponerle autenticación.
-      </div>
+      <p className="mini" style={{ marginTop: 22 }}>
+        Sesión de {sesion.nombre ?? sesion.dni} ({sesion.rol}).{' '}
+        {sesion.rol === 'productor' ? 'Ves las actuaciones que te fueron asignadas.' : 'Ves todas las actuaciones.'}
+      </p>
     </main>
   )
 }

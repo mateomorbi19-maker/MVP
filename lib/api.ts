@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { ErrorBaseDeDatos, traducirErrorBase } from './db'
 import { ErrorActuacionCerrada } from './hash'
+import { ErrorAcceso } from './sesion'
 
 /**
  * Respuesta de error uniforme.
@@ -16,6 +17,14 @@ export function errorApi(contexto: string, err: unknown, mensajeGenerico: string
    * llega hasta acá: sin esta rama, una carrera perfectamente normal se le muestra al
    * cliente como un error interno y la aplicación reintenta para siempre.
    */
+  /*
+   * Falta de sesión o de permiso. Va antes que nada: un 401 no es un error del servidor,
+   * y devolverlo como 500 hace que el cliente reintente para siempre.
+   */
+  if (err instanceof ErrorAcceso) {
+    return NextResponse.json({ error: err.message, tipo: 'acceso' }, { status: err.estado })
+  }
+
   if (err instanceof ErrorActuacionCerrada) {
     return NextResponse.json({ error: err.message, tipo: 'cerrada' }, { status: 409 })
   }

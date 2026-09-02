@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
+import { exigirAccesoCaso } from '@/lib/posesion'
 import { datosExpediente } from '@/lib/casos'
 import { generarExpediente } from '@/lib/pdf'
 
@@ -13,6 +14,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function GET(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
+    await exigirAccesoCaso(id)
     const datos = await datosExpediente(id)
     if (!datos) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
 

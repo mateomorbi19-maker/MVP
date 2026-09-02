@@ -5,6 +5,7 @@ import { construirManifiesto } from '@/lib/hash'
 import { SECCIONES, GUIA_FOTOS } from '@/lib/cuestionario'
 import { ETIQUETA_NIVEL } from '@/lib/consistencia'
 import { Marca } from '@/app/components/Marca'
+import { exigirRol } from '@/lib/sesion'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,7 @@ const fecha = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-AR', { dateStyle: 'full', timeStyle: 'medium' }) : '-'
 
 export default async function DetalleCaso({ params }: { params: Promise<{ id: string }> }) {
+  await exigirRol('productor', 'aseguradora')
   const { id } = await params
   const caso = await obtenerCaso(id)
   if (!caso) notFound()

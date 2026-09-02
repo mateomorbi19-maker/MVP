@@ -16,6 +16,7 @@ import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
+import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
 
 let fallos = 0
 let pruebas = 0
@@ -516,6 +517,50 @@ verificar('empieza con la cabecera %PDF', Buffer.from(pdf.slice(0, 5)).toString(
 mkdirSync('data', { recursive: true })
 writeFileSync('data/expediente-de-prueba.pdf', pdf)
 console.log(`       -> data/expediente-de-prueba.pdf (${Math.round(pdf.length / 1024)} KB)`)
+
+/* ---------- 4. Identidad ---------- */
+console.log('\n[4] Identidad')
+
+{
+  const hash = await hashearClave('una clave larga 123')
+  verificar('el hash guarda sus parámetros', hash.startsWith('scrypt$32768$8$1$'), hash.slice(0, 30))
+  verificar('la clave correcta verifica', await verificarClave('una clave larga 123', hash))
+  verificar('una clave distinta no verifica', !(await verificarClave('otra clave larga', hash)))
+
+  const otro = await hashearClave('una clave larga 123')
+  verificar('la misma clave da hashes distintos, porque la sal es por usuario', hash !== otro)
+  verificar('y las dos verifican igual', await verificarClave('una clave larga 123', otro))
+
+  verificar('un hash corrupto no verifica y no explota', !(await verificarClave('lo que sea', 'basura')))
+  verificar('un hash vacío no verifica y no explota', !(await verificarClave('lo que sea', '')))
+
+  /*
+   * Verificar contra una clave que no existe tiene que costar lo mismo que contra una
+   * real: si el DNI inexistente respondiera al instante, el tiempo de respuesta diría qué
+   * DNI está registrado, y el DNI es un dato público.
+   */
+  verificar(
+    'la clave inexistente tiene la misma forma que un hash real',
+    CLAVE_INEXISTENTE.startsWith('scrypt$32768$8$1$') && !(await verificarClave('cualquiera', CLAVE_INEXISTENTE)),
+  )
+}
+
+verificar('el DNI se normaliza sacando puntos', normalizarDni('20.123.456') === '20123456')
+verificar('un DNI demasiado corto se rechaza', normalizarDni('123') === null)
+verificar('un DNI que no es texto se rechaza', normalizarDni(20123456) === null)
+
+verificar('una clave corta se rechaza', validarClave('corta', '20123456') !== null)
+verificar('una clave de sólo números se rechaza', validarClave('123456789', '20123456') !== null)
+verificar('una clave que contiene el DNI se rechaza', validarClave('clave20123456', '20123456') !== null)
+verificar('una clave razonable se acepta', validarClave('una clave larga 123', '20123456') === null)
+
+{
+  const a = nuevoToken()
+  const b = nuevoToken()
+  verificar('los tokens son largos y distintos', a.length >= 43 && a !== b, a.length + ' caracteres')
+  verificar('el hash del token es determinista', hashToken(a) === hashToken(a))
+  verificar('dos tokens distintos dan hashes distintos', hashToken(a) !== hashToken(b))
+}
 
 /* ---------- Resultado ---------- */
 console.log(`\n${pruebas - fallos}/${pruebas} verificaciones pasaron`)

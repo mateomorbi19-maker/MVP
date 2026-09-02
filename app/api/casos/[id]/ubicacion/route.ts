@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
+import { exigirAccesoCaso } from '@/lib/posesion'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
@@ -22,6 +23,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function POST(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
+    await exigirAccesoCaso(id)
     const caso = await obtenerCaso(id)
     if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
     if (caso.estado === 'cerrado') {

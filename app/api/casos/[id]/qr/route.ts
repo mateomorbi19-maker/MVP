@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import { errorApi } from '@/lib/api'
+import { exigirAccesoCaso } from '@/lib/posesion'
 import { urlPublica } from '@/lib/casos'
 
 export const runtime = 'nodejs'
@@ -12,6 +13,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export async function GET(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
+    await exigirAccesoCaso(id)
     const destino = `${urlPublica(req)}/t/${id}`
 
     const svg = await QRCode.toString(destino, {

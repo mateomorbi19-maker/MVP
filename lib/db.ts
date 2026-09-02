@@ -172,6 +172,84 @@ CREATE TABLE IF NOT EXISTS testigos (
 );
 CREATE INDEX IF NOT EXISTS testigos_caso_idx ON testigos (caso_id);
 
+-- ===================== Identidad =====================
+--
+-- El circuito anónimo NO pasa por acá: /s/[id] sigue funcionando por posesión del id, y
+-- el botón "Tuve un accidente" no pide nada. Estas tablas habilitan la mitad
+-- identificada del producto —panel, historial, póliza, entrega al productor— y cierran
+-- lo que hoy está abierto.
+
+CREATE TABLE IF NOT EXISTS usuarios (
+  id             TEXT PRIMARY KEY,
+  dni            TEXT NOT NULL,
+  clave_hash     TEXT NOT NULL,
+  nombre         TEXT,
+  telefono       TEXT,
+  email          TEXT,
+  rol            TEXT NOT NULL DEFAULT 'asegurado',
+  intentos       SMALLINT NOT NULL DEFAULT 0,
+  bloqueado_hasta TIMESTAMPTZ,
+  creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ultimo_acceso  TIMESTAMPTZ,
+  CONSTRAINT usuarios_rol_valido CHECK (rol IN ('asegurado', 'productor', 'aseguradora'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS usuarios_dni_uidx ON usuarios (dni);
+
+-- Se guarda el HASH del token, no el token. Si alguien lee la tabla no puede hacerse
+-- pasar por nadie: es la misma razón por la que no se guardan contraseñas en claro.
+CREATE TABLE IF NOT EXISTS sesiones (
+  token_sha256 TEXT PRIMARY KEY,
+  usuario_id   TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  creado_en    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expira_en    TIMESTAMPTZ NOT NULL,
+  user_agent   TEXT
+);
+CREATE INDEX IF NOT EXISTS sesiones_usuario_idx ON sesiones (usuario_id);
+CREATE INDEX IF NOT EXISTS sesiones_expira_idx ON sesiones (expira_en);
+
+-- Qué navegador tiene el id de qué actuación.
+--
+-- Es el nivel de acceso más bajo y el que sostiene el circuito anónimo: sin esto,
+-- cerrar el panel sería puro teatro, porque GET /api/media/[id] entrega cualquier
+-- fotografía del choque a quien adivine un IMG-XXXXXX.
+--
+-- La clave primaria es compuesta a propósito: un mismo teléfono puede tener abiertas
+-- dos actuaciones, y el enlace de una actuación se puede abrir desde otro dispositivo
+-- —el README promete retomar desde el mismo enlace—.
+CREATE TABLE IF NOT EXISTS posesiones (
+  caso_id      TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
+  token_sha256 TEXT NOT NULL,
+  creado_en    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ultimo_uso   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (caso_id, token_sha256)
+);
+
+-- Bitácora administrativa. NO es la cadena de custodia.
+--
+-- Todo lo que ocurre DESPUÉS del sellado va acá y no a eventos: un eslabón nuevo
+-- cambiaría el hash maestro que recalcula el verificador público, y un expediente
+-- intacto pasaría a informarse como alterado, para siempre.
+CREATE TABLE IF NOT EXISTS bitacora (
+  id         BIGSERIAL PRIMARY KEY,
+  ts         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  tipo       TEXT NOT NULL,
+  caso_id    TEXT REFERENCES casos(id) ON DELETE SET NULL,
+  usuario_id TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
+  detalle    JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS bitacora_caso_idx ON bitacora (caso_id, id);
+
+-- Enganche de la actuación con la cuenta.
+--
+-- El secreto de apertura se devuelve UNA sola vez, en el alta, y es la única prueba que
+-- se acepta para reclamar una actuación anónima. El id no alcanza: se dicta por
+-- teléfono, se imprime en el expediente y viaja dentro del QR que escanea un testigo.
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS usuario_id     TEXT REFERENCES usuarios(id) ON DELETE SET NULL;
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS productor_id   TEXT REFERENCES usuarios(id) ON DELETE SET NULL;
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS secreto_sha256 TEXT;
+CREATE INDEX IF NOT EXISTS casos_usuario_idx   ON casos (usuario_id, creado_en DESC);
+CREATE INDEX IF NOT EXISTS casos_productor_idx ON casos (productor_id, creado_en DESC);
+
 -- Impide reescribir la historia: los eventos no se actualizan ni se borran.
 CREATE OR REPLACE FUNCTION eventos_solo_insercion() RETURNS trigger AS $fn$
 BEGIN
@@ -193,7 +271,7 @@ CREATE TRIGGER eventos_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {
