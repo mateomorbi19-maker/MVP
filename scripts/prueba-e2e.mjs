@@ -77,7 +77,11 @@ console.log('[0] Salud del sistema')
 {
   const { res, cuerpo } = await pedir('/api/salud')
   verificar('la base responde', res.status === 200 && cuerpo.ok === true, cuerpo?.base?.detalle ?? '')
-  verificar('las 4 tablas existen', cuerpo?.base?.tablas === 4, `tablas=${cuerpo?.base?.tablas}`)
+  verificar(
+    'no falta ninguna tabla del esquema',
+    Array.isArray(cuerpo?.base?.faltan) && cuerpo.base.faltan.length === 0,
+    `faltan=${JSON.stringify(cuerpo?.base?.faltan)}`,
+  )
 }
 
 /* ---------- 1. Apertura ---------- */
@@ -91,6 +95,14 @@ const { res: resAlta, cuerpo: alta } = await pedir('/api/casos', {
 verificar('se crea la actuación sin pedir datos', resAlta.status === 201 && typeof alta.id === 'string', alta.id ?? JSON.stringify(alta))
 const ID = alta.id
 verificar('el id tiene el formato esperado', /^ADS-[A-Z0-9]{6}$/.test(ID || ''), ID)
+{
+  const { cuerpo: recien } = await pedir(`/api/casos/${ID}`)
+  verificar(
+    'la actuación nace con el manifiesto que permite suprimir datos del testigo',
+    recien?.manifiesto_version === '1.1',
+    `manifiesto_version=${recien?.manifiesto_version}`,
+  )
+}
 {
   const { cuerpo: caso } = await pedir(`/api/casos/${ID}`)
   verificar('la carátula arranca vacía', caso.patente === null && caso.poliza === null, `patente=${caso.patente}`)
@@ -284,6 +296,56 @@ verificar('levanta las banderas de cobertura', cierre.consistencia?.banderas_cob
     body: JSON.stringify({ respuestas: { velocidad: 20 } }),
   })
   verificar('una actuación cerrada ya no admite cambios', res.status === 409, `status=${res.status}`)
+}
+
+/* ---------- 7b. Escritura concurrente con el cierre ---------- */
+console.log('\n[7b] Escritura concurrente con el cierre')
+{
+  /*
+   * El cierre construía el manifiesto, salía hasta 12 s a la red a buscar el sello de
+   * tiempo y recién después marcaba la actuación como cerrada, todo sin transacción.
+   * Cualquier eslabón que entrara en esa ventana quedaba FUERA del hash maestro sellado
+   * y el verificador público denunciaba como alterado un expediente intacto, para
+   * siempre. Acá se dispara una escritura a la vez que el cierre: gane quien gane, el
+   * expediente tiene que verificar como íntegro.
+   */
+  const { cuerpo: alta2 } = await pedir('/api/casos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+  const ID2 = alta2.id
+
+  const [cierre2, testigo2] = await Promise.all([
+    pedir(`/api/casos/${ID2}/cerrar`, { method: 'POST' }),
+    pedir(`/api/casos/${ID2}/testigos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: 'Testigo de carrera', consentimiento: true }),
+    }),
+  ])
+
+  verificar('el cierre concurrente igual cierra', cierre2.res.status === 200, `status=${cierre2.res.status}`)
+  verificar(
+    'la escritura simultánea o entra antes del sellado o se rechaza con 409',
+    testigo2.res.status === 201 || testigo2.res.status === 409,
+    `status=${testigo2.res.status}`,
+  )
+
+  const { cuerpo: ver2 } = await pedir('/api/verificar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: ID2 }),
+  })
+  verificar(
+    'el expediente sigue verificando como íntegro pese a la escritura concurrente',
+    ver2.valido === true,
+    JSON.stringify(ver2.problemas ?? []),
+  )
+
+  // Volver a cerrar es idempotente y no puede mover el hash ya sellado.
+  const { cuerpo: recierre } = await pedir(`/api/casos/${ID2}/cerrar`, { method: 'POST' })
+  verificar('volver a cerrar no cambia el hash maestro', recierre.hash_maestro === cierre2.cuerpo.hash_maestro)
 }
 
 /* ---------- 8. Expediente PDF ---------- */

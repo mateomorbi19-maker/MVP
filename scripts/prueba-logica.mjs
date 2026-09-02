@@ -10,7 +10,7 @@
  */
 
 import { writeFileSync, mkdirSync } from 'node:fs'
-import { canonico, sha256, hashEvento } from '../lib/hash.ts'
+import { canonico, sha256, hashEvento, registrarEvento, VERSION_MANIFIESTO } from '../lib/hash.ts'
 import { analizar } from '../lib/consistencia.ts'
 import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
@@ -157,6 +157,30 @@ verificar('alterar un eslabón rompe la validación', !validarCadena(alterada))
 
 const truncada = cadenaReal.slice(0, 2).concat(cadenaReal.slice(3))
 verificar('suprimir un eslabón rompe la validación', !validarCadena(truncada))
+
+/* ---------- 1b. Guardas de la cadena de custodia ---------- */
+console.log('\n[1b] Guardas de la cadena de custodia')
+
+verificar(
+  'las actuaciones nuevas nacen con el manifiesto que no lleva el nombre del testigo',
+  VERSION_MANIFIESTO === '1.1',
+  `=${VERSION_MANIFIESTO}`,
+)
+
+/*
+ * El cuarto parámetro de registrarEvento era un PoolClient suelto y pasó a ser un objeto
+ * de opciones. Pasar el viejo escribía el eslabón por FUERA de la transacción de quien
+ * llamaba: si esa transacción hacía ROLLBACK quedaba un eslabón encadenado y sellado
+ * apuntando a una fila que no existe. Tiene que fallar acá y no dentro de un expediente.
+ */
+let rechazoLaFirmaVieja = false
+try {
+  const clienteFalso = { query: async () => ({ rows: [] }) }
+  await registrarEvento('ADS-AAAAAA', 'prueba', {}, clienteFalso)
+} catch (err) {
+  rechazoLaFirmaVieja = String(err?.message ?? '').includes('cambió de firma')
+}
+verificar('registrarEvento rechaza la firma vieja con un mensaje que dice qué cambiar', rechazoLaFirmaVieja)
 
 /* ---------- 2. Motor de consistencia ---------- */
 console.log('\n[2] Motor de consistencia')
