@@ -438,6 +438,51 @@ console.log('\n[5] Lo que el expediente no perdona')
   )
 }
 
+{
+  /*
+   * Ningún dato personal en claro dentro del detalle de un eslabón.
+   *
+   * El detalle entra al preimagen del hash, así que un dato personal ahí no se puede
+   * borrar nunca sin romper la cadena — y eso vuelve incumplible la supresión que el
+   * art. 16 de la Ley 25.326 concede y que la propia aplicación promete en pantalla.
+   * Lo personal viaja por `reservado`, que se guarda aparte y deja sólo un compromiso.
+   *
+   * Se busca con texto plano y no con expresiones regulares a propósito: la primera
+   * versión de esta comprobación tenía una regex mal escapada que no matcheaba nunca y
+   * daba «ok» siempre. Una comprobación que no puede fallar es peor que ninguna.
+   */
+  const PROHIBIDAS = [
+    'nombre', 'telefono', 'asegurado', 'dni', 'patente', 'poliza',
+    'gps', 'direccion', 'domicilio', 'valores',
+  ]
+  const infractores = []
+  for (const ruta of archivos('app/api', (n) => n === 'route.ts')) {
+    const c = leer(ruta)
+    let desde = 0
+    for (;;) {
+      const i = c.indexOf('registrarEvento(', desde)
+      if (i < 0) break
+      desde = i + 16
+      // El objeto de opciones va después del detalle: se corta ahí para no mirar lo reservado.
+      const trozo = c.slice(i, i + 800).split('{ reservado')[0]
+      for (const clave of PROHIBIDAS) {
+        for (const forma of ['{ ' + clave + ':', ', ' + clave + ':', '  ' + clave + ':', '{ ' + clave + ',', ', ' + clave + ',']) {
+          if (trozo.includes(forma)) {
+            infractores.push(normalizar(ruta) + ': ' + clave)
+            break
+          }
+        }
+      }
+    }
+  }
+  verificar(
+    'ningún dato personal en claro dentro de un eslabón',
+    infractores.length === 0,
+    [...new Set(infractores)].join(', ') +
+      '  |  El detalle de un eslabón entra al hash y no se puede borrar nunca. Pasalo por { reservado: { ... } }, que lo guarda aparte y deja sólo un compromiso.',
+  )
+}
+
 /* ---------- 6. La documentación sigue el paso ---------- */
 console.log('\n[6] La documentación sigue el paso')
 

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { db } from './db'
 
@@ -15,6 +15,11 @@ import { db } from './db'
  * e integridad de los arts. 7 y 8— hay que firmar con un certificado emitido por un
  * certificador licenciado (Encode, Lakaut, Box Custodia o Digilogix). Ver README.
  */
+
+/** ¿Este evento trae datos reservados? Un objeto vacío no cuenta. */
+function reservadoDe(opciones: OpcionesEvento): boolean {
+  return Boolean(opciones.reservado && Object.keys(opciones.reservado).length > 0)
+}
 
 export function sha256(dato: string | Buffer | Uint8Array): string {
   return createHash('sha256').update(dato).digest('hex')
@@ -71,6 +76,18 @@ export interface OpcionesEvento {
    * manifiesto dentro de la misma transacción, sin que se cuele nada en el medio.
    */
   cliente?: PoolClient
+  /**
+   * Datos personales que NO deben quedar dentro del preimagen del hash.
+   *
+   * Van a `eventos_reservados`, una tabla sin disparador de inmutabilidad, y en el detalle
+   * del eslabón queda sólo el compromiso sha256(sal | canonico(reservado)). Así el dato se
+   * puede borrar a pedido de su titular —art. 16 de la Ley 25.326— sin mover un solo hash,
+   * y el compromiso sigue probando qué decía para quien todavía lo tenga.
+   *
+   * Regla práctica: nombre, teléfono, DNI, patente, póliza, domicilio, coordenadas exactas
+   * y el contenido de las respuestas van reservados. Todo lo demás va en claro.
+   */
+  reservado?: Record<string, unknown>
 }
 
 /**
@@ -118,12 +135,31 @@ export async function registrarEvento(
     )
     const hashPrevio = previo.rows[0]?.hash ?? null
     const ts = new Date().toISOString()
-    const hash = hashEvento({ caso_id: casoId, ts, tipo, detalle, hash_previo: hashPrevio })
+
+    /*
+     * El dato personal no entra al hash: entra su compromiso. La sal es por evento, así que
+     * conocer el conjunto de valores posibles no permite adivinar cuál era por fuerza bruta
+     * sobre el hash —que es exactamente el problema de comprometer un DNI o una patente,
+     * donde el espacio de valores es chico—.
+     */
+    const sal = reservadoDe(opciones) ? randomBytes(16).toString('base64') : null
+    const detalleFinal = sal
+      ? { ...detalle, reservado_sha256: sha256(sal + '|' + canonico(opciones.reservado)) }
+      : detalle
+
+    const hash = hashEvento({ caso_id: casoId, ts, tipo, detalle: detalleFinal, hash_previo: hashPrevio })
     const res = await cliente.query<{ id: string }>(
       `INSERT INTO eventos (caso_id, ts, tipo, detalle, hash_previo, hash)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [casoId, ts, tipo, JSON.stringify(detalle), hashPrevio, hash],
+      [casoId, ts, tipo, JSON.stringify(detalleFinal), hashPrevio, hash],
     )
+    if (sal) {
+      await cliente.query('INSERT INTO eventos_reservados (evento_id, sal, contenido) VALUES ($1, $2, $3)', [
+        res.rows[0].id,
+        sal,
+        JSON.stringify(opciones.reservado),
+      ])
+    }
     if (propio) await cliente.query('COMMIT')
     return { hash, id: Number(res.rows[0].id) }
   } catch (err) {

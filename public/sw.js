@@ -58,3 +58,25 @@ self.addEventListener('fetch', (evento) => {
     }),
   )
 })
+
+/*
+ * Cola de subida.
+ *
+ * Esto NO contradice la regla de arriba de no cachear nada. Esa regla es sobre SERVIR
+ * contenido viejo; esto es un buffer de ESCRITURA que va en un solo sentido, guarda sólo
+ * bytes producidos en este teléfono que todavía no llegaron al servidor, se borra al
+ * confirmarse, y jamás responde un fetch.
+ *
+ * Background Sync no existe en iOS. Ahí la cola avanza sólo con la aplicación abierta, y
+ * por eso la bomba también vive en el layout de la página.
+ */
+self.addEventListener('sync', (evento) => {
+  if (evento.tag !== 'acta-cola') return
+  evento.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientes) => {
+      // El drenado real lo hace la página: tiene el mismo IndexedDB y la lógica en un solo
+      // lugar. Si no hay ninguna abierta, se reintenta en el próximo disparo.
+      for (const c of clientes) c.postMessage({ tipo: 'drenar-cola' })
+    }),
+  )
+})

@@ -1354,3 +1354,21 @@ tr:last-child td {
   touch-action: none;
   cursor: crosshair;
 }
+
+/* Aviso de piezas sin subir. Fijo abajo: tiene que verse desde cualquier pantalla. */
+.chip-cola {
+  position: fixed;
+  left: 50%;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: calc(100% - 24px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--atencion-fondo);
+  color: var(--atencion);
+  border: 1px solid var(--atencion);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--sombra);
+}

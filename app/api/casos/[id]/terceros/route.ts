@@ -86,12 +86,12 @@ export async function POST(req: Request, { params }: Ctx) {
       ],
     )
 
-    await registrarEvento(id, 'tercero_identificado', {
-      tercero_id: terceroId,
-      dispositivo: registro.dispositivo,
-      consentimiento: true,
-      sha256: huella,
-    })
+    await registrarEvento(
+      id,
+      'tercero_identificado',
+      { tercero_id: terceroId, dispositivo: registro.dispositivo, consentimiento: true, sha256: huella },
+      { reservado: { nombre: registro.nombre, dni: registro.dni, patente: registro.patente, gps } },
+    )
 
     return NextResponse.json({ ok: true, id: terceroId, sha256: huella }, { status: 201 })
   } catch (err) {

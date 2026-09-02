@@ -82,11 +82,12 @@ export async function POST(req: Request) {
       throw new Error('No se pudo generar un número de actuación libre después de cinco intentos.')
     }
 
-    await registrarEvento(id, 'apertura_actuacion', {
-      poliza: conPrecarga.poliza,
-      patente: conPrecarga.patente,
-      user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null,
-    })
+    await registrarEvento(
+      id,
+      'apertura_actuacion',
+      { user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null },
+      { reservado: { poliza: conPrecarga.poliza, patente: conPrecarga.patente } },
+    )
 
     // Anota qué navegador tiene este id: es lo que le habilita las fotos y el expediente.
     await anotarPosesion(id)

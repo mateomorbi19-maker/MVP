@@ -456,11 +456,63 @@ UPDATE casos SET estado_gestion = 'sin_enviar'
  WHERE estado = 'cerrado' AND estado_gestion IS DISTINCT FROM 'sin_enviar' AND estado_gestion = '';
 
 -- Impide reescribir la historia: los eventos no se actualizan ni se borran.
+-- ===================== Datos personales fuera del hash =====================
+--
+-- El problema que resuelve: los datos personales viajaban DENTRO del detalle de cada
+-- evento, y ese detalle entra al preimagen del hash. Borrarlos a pedido de su titular
+-- —art. 16 de la Ley 25.326— rompía la cadena, así que el derecho de supresión que la
+-- aplicación promete era incumplible.
+--
+-- Ahora el dato personal va acá, en una tabla SIN disparador de inmutabilidad, y en
+-- eventos.detalle queda sólo un compromiso: sha256(sal | canonico(reservado)). Borrar la
+-- fila reservada no mueve ni un hash, y el compromiso sigue probando que ese dato existió
+-- y cuál era, para quien todavía lo tenga.
+CREATE TABLE IF NOT EXISTS eventos_reservados (
+  evento_id BIGINT PRIMARY KEY REFERENCES eventos(id) ON DELETE CASCADE,
+  sal       TEXT NOT NULL,
+  contenido JSONB NOT NULL,
+  borrado_en TIMESTAMPTZ
+);
+
+-- Constancia de las bajas. Sobrevive al expediente que dio de baja: es lo que permite
+-- contestarle a quien presente un PDF viejo que ese expediente existió y fue expurgado.
+CREATE TABLE IF NOT EXISTS expurgos (
+  caso_id      TEXT PRIMARY KEY,
+  hash_maestro TEXT,
+  abierta_en   TIMESTAMPTZ,
+  cerrada_en   TIMESTAMPTZ,
+  motivo       TEXT NOT NULL,
+  expurgado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE casos  ADD COLUMN IF NOT EXISTS retencion_hasta DATE;
+ALTER TABLE casos  ADD COLUMN IF NOT EXISTS bloqueo_legal   BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE casos  ADD COLUMN IF NOT EXISTS anonimizado_en  TIMESTAMPTZ;
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS purgada_en      TIMESTAMPTZ;
+ALTER TABLE testigos ADD COLUMN IF NOT EXISTS anonimizado_en TIMESTAMPTZ;
+
+-- Subida diferida y origen de la fotografía.
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS idempotencia     TEXT;
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS tomada_en        TIMESTAMPTZ;
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS desfase_reloj_ms BIGINT;
+ALTER TABLE medias ADD COLUMN IF NOT EXISTS origen           TEXT;
+-- Impide que un reintento duplique la misma toma. El uuid lo genera el navegador por
+-- CAPTURA y no por guía: si se generara por guía, «repetir la foto» devolvería la vieja.
+CREATE UNIQUE INDEX IF NOT EXISTS medias_idempotencia_uidx ON medias (idempotencia) WHERE idempotencia IS NOT NULL;
+
 -- UNA sola definición, que sirve a las dos tablas append-only. Con una función por tabla,
 -- cualquiera que la redefiniera después en este mismo string ganaría en silencio: SCHEMA
 -- se ejecuta como una sola consulta multi-sentencia y Postgres se queda con la última.
+--
+-- Y tiene UNA puerta: el expurgo declarado. Sin ella, el DELETE en cascada desde casos
+-- dispara este mismo control sobre las filas hijas y la baja total no funciona nunca, con
+-- un error que habla de append-only y no de expurgo. La puerta se abre con un
+-- set_config dentro de la transacción del expurgo y se cierra sola al terminarla.
 CREATE OR REPLACE FUNCTION eventos_solo_insercion() RETURNS trigger AS $fn$
 BEGIN
+  IF TG_OP = 'DELETE' AND current_setting('acta.expurgo_caso', true) = OLD.caso_id THEN
+    RETURN OLD;
+  END IF;
   RAISE EXCEPTION 'La tabla % es append-only: no admite UPDATE ni DELETE. Para corregir algo, registrá una entrada nueva.', TG_TABLE_NAME;
 END;
 $fn$ LANGUAGE plpgsql;
@@ -484,7 +536,7 @@ CREATE TRIGGER gestiones_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

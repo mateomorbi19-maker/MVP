@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { construirPasos, faltantes, pasoInicial, respondida, type Respuestas } from '@/lib/recorrido'
 import { olvidarActuacion, recordarActuacion } from '@/lib/local'
+import { drenar, encolar, huellaDe } from '@/lib/cola'
 
 import type { Croquis } from '@/lib/croquis'
 import type { Datos, FalloGps, Media, Subir, Testigo, Ubicacion } from './tipos'
@@ -359,21 +360,41 @@ export function Flujo(props: Props) {
 
   /* ---------- Subida de archivos ---------- */
 
+  /**
+   * Incorpora una pieza.
+   *
+   * Primero se guarda en el teléfono y recién después se intenta subir. Sin eso, sacar una
+   * foto sin señal la perdía: es la pieza más difícil de recuperar y la que más falta hace.
+   *
+   * El sha256 se calcula acá, sobre los bytes que salieron de la cámara, y el servidor lo
+   * revalida. El identificador de idempotencia se genera por CAPTURA y nunca se reutiliza:
+   * generado por guía, «repetir la foto» devolvería la anterior.
+   */
   const subir = useCallback<Subir>(
     async (archivo, tipo, guiaId) => {
-      const form = new FormData()
-      form.append('archivo', archivo)
-      form.append('tipo', tipo)
-      if (guiaId) form.append('guia_id', guiaId)
-      if (ubicacion) {
-        form.append('lat', String(ubicacion.lat))
-        form.append('lon', String(ubicacion.lon))
-      }
-      const res = await fetch(`/api/casos/${props.casoId}/media`, { method: 'POST', body: form })
-      const cuerpo = await res.json()
-      if (!res.ok) throw new Error(cuerpo?.error ?? 'No se pudo subir el archivo.')
-      setMedias((prev) => [...prev.filter((m) => !guiaId || m.guia_id !== guiaId), { id: cuerpo.id, tipo, guia_id: guiaId ?? null }])
-      return cuerpo.id as string
+      const id = crypto.randomUUID()
+      const sha256 = await huellaDe(archivo)
+      await encolar({
+        id,
+        casoId: props.casoId,
+        tipo,
+        guiaId: guiaId ?? null,
+        mime: archivo.type,
+        sha256,
+        tomadaEn: new Date().toISOString(),
+        lat: ubicacion?.lat ?? null,
+        lon: ubicacion?.lon ?? null,
+        bytes: archivo,
+      }).catch(() => {
+        /* sin almacenamiento local se sigue igual: se intenta la subida directa */
+      })
+
+      await drenar().catch(() => undefined)
+
+      // La pieza se muestra apenas se guarda: para la persona ya está incorporada, y lo
+      // está —lo que puede faltar es que haya llegado al servidor, y eso lo dice la cola.
+      setMedias((prev) => [...prev.filter((m) => !guiaId || m.guia_id !== guiaId), { id, tipo, guia_id: guiaId ?? null }])
+      return id
     },
     [props.casoId, ubicacion],
   )

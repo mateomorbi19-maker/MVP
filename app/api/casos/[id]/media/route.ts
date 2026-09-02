@@ -7,7 +7,7 @@ import { obtenerCaso } from '@/lib/casos'
 import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO } from '@/lib/almacenamiento'
 import { GUIA_FOTOS } from '@/lib/cuestionario'
 import { GUIA_A_DOCUMENTO, extraccionActiva, proveedorActivo } from '@/lib/extraccion'
-import { encolar } from '@/lib/cola-extraccion'
+import { encolarLectura } from '@/lib/cola-extraccion'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -53,15 +53,65 @@ export async function POST(req: Request, { params }: Ctx) {
     const lon = Number(form.get('lon'))
     const gps = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
 
+    const pg = await db()
+
+    /*
+     * Idempotencia.
+     *
+     * Con subida diferida, un reintento puede llegar después de que el primero haya
+     * entrado: sin esto, la misma toma quedaría dos veces en el expediente. El
+     * identificador lo genera el teléfono por CAPTURA, nunca por guía.
+     */
+    const idem = typeof form.get('idempotencia') === 'string' ? String(form.get('idempotencia')).slice(0, 64) : null
+    if (idem) {
+      const yaEsta = await pg.query('SELECT id, sha256 FROM medias WHERE idempotencia = $1', [idem])
+      if ((yaEsta.rowCount ?? 0) > 0) {
+        return NextResponse.json({ id: yaEsta.rows[0].id, sha256: yaEsta.rows[0].sha256, repetido: true }, { status: 200 })
+      }
+    }
+
     const mediaId = nuevoId(tipo === 'audio' ? 'AUD' : 'IMG')
     const datos = new Uint8Array(await archivo.arrayBuffer())
     const guardado = await guardarArchivo(id, mediaId, archivo.type, datos)
 
-    const pg = await db()
+    /*
+     * El hash que declaró el teléfono se REVALIDA acá. Si no coincide, el archivo cambió
+     * entre la captura y la subida: se guarda igual —la evidencia manda— pero se marca.
+     */
+    const shaCliente = typeof form.get('sha256_cliente') === 'string' ? String(form.get('sha256_cliente')) : null
+    const coincideHash = !shaCliente || shaCliente === guardado.sha256
+
+    /*
+     * Cuándo se sacó, contra cuándo llegó.
+     *
+     * `tomada_en` viene del reloj del teléfono y por eso es declarativo; `capturado_en` es
+     * la hora del servidor al recibirla. La diferencia entre las dos es lo que hay que
+     * imprimir: con subida diferida pueden separarse por horas, y decir que la hora la puso
+     * el sistema en el momento de la captura pasaría a ser falso.
+     *
+     * El origen se clasifica con lo que se puede saber de verdad. `capture` es una
+     * SUGERENCIA que el navegador puede ignorar y no hay forma cierta de distinguir una
+     * toma en vivo de una foto de la galería, así que el valor normal es
+     * «no_verificable» y NO genera ningún hallazgo: las fotos de iPhone llegan sin
+     * metadatos útiles y serían la mayoría. Sólo se marca «incoherente» ante una señal
+     * positiva: una hora anterior a la apertura de la actuación.
+     */
+    const tomadaCruda = typeof form.get('tomada_en') === 'string' ? String(form.get('tomada_en')) : null
+    const tomadaEn = tomadaCruda && !Number.isNaN(Date.parse(tomadaCruda)) ? new Date(tomadaCruda) : null
+    const ahora = new Date()
+    const desfase = tomadaEn ? ahora.getTime() - tomadaEn.getTime() : null
+    const anteriorALaApertura = tomadaEn ? tomadaEn < new Date(caso.creado_en) : false
+    const origen = !coincideHash ? 'incoherente' : anteriorALaApertura ? 'incoherente' : 'no_verificable'
+
     await pg.query(
-      `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [mediaId, id, tipo, guia, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256, gps ? JSON.stringify(gps) : null],
+      `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps,
+                           idempotencia, tomada_en, desfase_reloj_ms, origen)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [
+        mediaId, id, tipo, guia, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256,
+        gps ? JSON.stringify(gps) : null,
+        idem, tomadaEn ? tomadaEn.toISOString() : null, desfase, origen,
+      ],
     )
 
     await registrarEvento(id, tipo === 'audio' ? 'audio_incorporado' : 'fotografia_incorporada', {
@@ -70,8 +120,10 @@ export async function POST(req: Request, { params }: Ctx) {
       mime: guardado.mime,
       bytes: guardado.bytes,
       sha256: guardado.sha256,
-      gps,
-    })
+      origen,
+      desfase_reloj_ms: desfase,
+      coincide_hash_del_telefono: coincideHash,
+    }, { reservado: { gps } })
 
     /*
      * Lectura automática del documento del tercero.
@@ -105,7 +157,7 @@ export async function POST(req: Request, { params }: Ctx) {
             proveedor: proveedor?.nombre ?? null,
           })
           // Sin await: la respuesta sale sin haber contactado a ningún proveedor.
-          encolar(extraccionId)
+          encolarLectura(extraccionId)
         }
       } catch (err) {
         console.error('[media] no se pudo encolar la lectura automática', err)

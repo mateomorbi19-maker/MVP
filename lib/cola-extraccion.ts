@@ -82,8 +82,8 @@ async function drenar(): Promise<void> {
   }
 }
 
-/** Encola sin esperar. Quien llama sigue y responde. */
-export function encolar(extraccionId: string): void {
+/** Encola una lectura sin esperar. Quien llama sigue y responde. */
+export function encolarLectura(extraccionId: string): void {
   pendientes.push(extraccionId)
   void drenar()
 }
@@ -102,7 +102,7 @@ export async function reencolarPendientes(casoId: string): Promise<number> {
   )
   for (const f of res.rows) {
     await pg.query(`UPDATE extracciones SET estado = 'pendiente', error = NULL WHERE id = $1`, [f.id])
-    encolar(f.id)
+    encolarLectura(f.id)
   }
   return res.rows.length
 }

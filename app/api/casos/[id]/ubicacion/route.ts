@@ -59,9 +59,12 @@ export async function POST(req: Request, { params }: Ctx) {
       clima ? JSON.stringify(clima) : null,
     ])
 
+    /*
+     * Las coordenadas exactas y la dirección son dato personal: van reservadas. El resumen
+     * del clima queda en claro, porque es lo que el informe de consistencia contrasta y no
+     * identifica a nadie.
+     */
     await registrarEvento(id, 'ubicacion_registrada', {
-      gps,
-      direccion,
       clima_obtenido: clima !== null,
       clima_resumen: clima
         ? {
@@ -73,7 +76,7 @@ export async function POST(req: Request, { params }: Ctx) {
             hora_observada: clima.hora_observada,
           }
         : null,
-    })
+    }, { reservado: { gps, direccion } })
 
     return NextResponse.json({ ok: true, gps, direccion, clima })
   } catch (err) {

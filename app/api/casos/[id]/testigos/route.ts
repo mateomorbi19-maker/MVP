@@ -75,13 +75,17 @@ export async function POST(req: Request, { params }: Ctx) {
       ],
     )
 
-    await registrarEvento(id, 'testigo_registrado', {
-      testigo_id: testigoId,
-      nombre: registro.nombre,
-      sha256: huella,
-      consentimiento: true,
-      gps,
-    })
+    /*
+     * El nombre del testigo y sus coordenadas van reservados. Es lo que hace cumplible la
+     * supresión que la propia pantalla de carga le promete: con el nombre dentro del hash,
+     * borrarlo rompía la verificación del expediente entero.
+     */
+    await registrarEvento(
+      id,
+      'testigo_registrado',
+      { testigo_id: testigoId, sha256: huella, consentimiento: true },
+      { reservado: { nombre: registro.nombre, gps } },
+    )
 
     return NextResponse.json({ id: testigoId, sha256: huella }, { status: 201 })
   } catch (err) {

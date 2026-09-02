@@ -99,6 +99,8 @@ export interface Media {
   capturado_en: string
   firmante: string | null
   hash_firmado: string | null
+  tomada_en: string | null
+  origen: string | null
 }
 
 export async function listarMedias(casoId: string): Promise<Media[]> {
@@ -117,6 +119,8 @@ export async function listarMedias(casoId: string): Promise<Media[]> {
     capturado_en: iso(m.capturado_en),
     firmante: m.firmante ?? null,
     hash_firmado: m.hash_firmado ?? null,
+    tomada_en: m.tomada_en ? iso(m.tomada_en) : null,
+    origen: m.origen ?? null,
   }))
 }
 
@@ -175,7 +179,13 @@ export async function datosExpediente(casoId: string): Promise<DatosExpediente |
     listarTestigos(casoId),
     construirManifiesto(casoId),
   ])
-  const consistencia = caso.consistencia ?? (await calcularConsistencia(casoId))
+  /*
+   * En un expediente CERRADO no se recalcula el informe: se imprime el que quedó hasheado
+   * en su propio eslabón. Tras anonimizar, la columna queda vacía y recalcular produciría
+   * un informe distinto sobre respuestas ya borradas, que además cambiaría en cada
+   * descarga. Un documento que se contradice a sí mismo es lo primero que ataca un perito.
+   */
+  const consistencia = caso.consistencia ?? (caso.estado === 'cerrado' ? null : await calcularConsistencia(casoId))
 
   return {
     caso: {

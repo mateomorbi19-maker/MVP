@@ -74,10 +74,17 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (Object.keys(validas).length > 0) {
       const combinadas = { ...caso.respuestas, ...validas }
       await pg.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(combinadas)])
-      await registrarEvento(id, 'respuestas_registradas', {
-        preguntas: Object.keys(validas).sort(),
-        valores: validas,
-      })
+      /*
+       * Los nombres de las preguntas quedan en claro; sus valores, reservados. El detalle
+       * de un eslabón entra al preimagen del hash, y el contenido de una respuesta puede
+       * ser el nombre del otro conductor, su DNI o su patente.
+       */
+      await registrarEvento(
+        id,
+        'respuestas_registradas',
+        { preguntas: Object.keys(validas).sort() },
+        { reservado: { valores: validas } },
+      )
     }
 
     if (cambios.length > 0) {
@@ -87,7 +94,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
         `UPDATE casos SET ${asignaciones} WHERE id = $1`,
         [id, ...cambios.map(([, valor]) => valor)],
       )
-      await registrarEvento(id, 'datos_asegurado_registrados', Object.fromEntries(cambios))
+      await registrarEvento(
+        id,
+        'datos_asegurado_registrados',
+        { campos: cambios.map(([clave]) => clave).sort() },
+        { reservado: Object.fromEntries(cambios) },
+      )
     }
 
     const actualizado = await obtenerCaso(id)

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { BombaCola } from './components/BombaCola'
 
 export const metadata: Metadata = {
   title: 'Acta Digital de Siniestro',
@@ -44,7 +45,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-AR">
-      <body>{children}</body>
+      <body>
+        {children}
+        {/*
+          Va en el layout y no en el recorrido: en iPhone no hay Background Sync, así que la
+          cola sólo avanza con la aplicación abierta. Si la persona reabre en el inicio y no
+          en su actuación, esto igual la drena.
+        */}
+        <BombaCola />
+      </body>
     </html>
   )
 }
