@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { construirPasos, faltantes, pasoInicial, respondida, type Respuestas } from '@/lib/recorrido'
 import { olvidarActuacion, recordarActuacion } from '@/lib/local'
 
+import type { Croquis } from '@/lib/croquis'
 import type { Datos, FalloGps, Media, Subir, Testigo, Ubicacion } from './tipos'
 import { ChipUbicacion } from './pantallas/ChipUbicacion'
 import { PantallaPregunta } from './pantallas/PantallaPregunta'
@@ -11,6 +12,7 @@ import { PantallaEmergencia } from './pantallas/PantallaEmergencia'
 import { PantallaFoto } from './pantallas/PantallaFoto'
 import { PantallaTestigos } from './pantallas/PantallaTestigos'
 import { PantallaCorte } from './pantallas/PantallaCorte'
+import { PantallaCroquis } from './pantallas/PantallaCroquis'
 import { PantallaDatos } from './pantallas/PantallaDatos'
 import { PantallaRevision } from './pantallas/PantallaRevision'
 import { PantallaFinal } from './pantallas/PantallaFinal'
@@ -24,6 +26,7 @@ interface Props {
   mediasIniciales: Media[]
   testigosIniciales: Testigo[]
   ubicacionInicial: Ubicacion
+  croquisInicial: Croquis | null
 }
 
 /* ================= Componente principal ================= */
@@ -435,6 +438,15 @@ export function Flujo(props: Props) {
 
         {actual?.tipo === 'corte' ? (
           <PantallaCorte casoId={props.casoId} seguir={() => mover(1)} alCierre={() => irA('revision')} />
+        ) : null}
+
+        {actual?.tipo === 'croquis' ? (
+          <PantallaCroquis
+            casoId={props.casoId}
+            inicial={props.croquisInicial}
+            masDeDos={actual.masDeDosVehiculos}
+            seguir={() => mover(1)}
+          />
         ) : null}
 
         {actual?.tipo === 'datos' ? <PantallaDatos datos={datos} anotar={anotarDato} seguir={() => mover(1)} /> : null}

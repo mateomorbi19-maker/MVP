@@ -29,6 +29,7 @@ export type TipoPregunta =
   | 'audio'
   | 'zonaImpacto'
   | 'persona'
+  | 'parrafo'
 
 /**
  * Momento del recorrido al que pertenece la sección.
@@ -395,6 +396,14 @@ export const SECCIONES: Seccion[] = [
         requerida: true,
         omitir: 'Prefiero no grabar',
       },
+      {
+        id: 'relato_texto',
+        texto: 'Si preferís, contalo por escrito',
+        ayuda:
+          'Vale igual que el audio. Está acá para quien no puede grabar: por ruido, por vergüenza, o porque el teléfono no le dio permiso al micrófono. Hasta ahora, quien tocaba «Prefiero no grabar» perdía el relato entero.',
+        tipo: 'parrafo',
+        omitir: 'Ya lo conté por voz',
+      },
     ],
   },
   {
@@ -617,6 +626,40 @@ export const SECCIONES: Seccion[] = [
       },
     ],
   },
+  {
+    id: 'relato_casa',
+    titulo: 'El relato completo',
+    descripcion: 'Ahora sí, con calma y sin nadie esperando.',
+    bloque: 'despues',
+    preguntas: [
+      {
+        id: 'relato_ampliado',
+        texto: 'Contá lo que pasó, con todo el detalle que puedas',
+        ayuda:
+          'Esto es lo que va a leer quien resuelva el siniestro. Lo de abajo es una guía, no un formulario: contalo como te salga.',
+        tipo: 'parrafo',
+        omitir: 'Con lo que ya conté alcanza',
+      },
+    ],
+  },
+]
+
+/* ================= Guía del relato ================= */
+
+/**
+ * La estructura sugerida para el relato ampliado.
+ *
+ * Es una guía y no un formulario a propósito: partir el relato en campos obligatorios
+ * produce declaraciones que suenan a formulario y pierden justo lo que un relato aporta,
+ * que es el orden en que la persona recuerda las cosas.
+ */
+export const GUIA_RELATO = [
+  'La hora y el lugar aproximados.',
+  'Por dónde venías y hacia dónde ibas.',
+  'Qué estabas haciendo justo antes.',
+  'Cómo fue el contacto entre los vehículos.',
+  'Qué pasó inmediatamente después.',
+  'Cualquier cosa que te parezca importante y no te haya preguntado nadie.',
 ]
 
 /* ================= Fotografías ================= */
@@ -719,6 +762,7 @@ export type Etapa =
   | { tipo: 'fotos' }
   | { tipo: 'testigos' }
   | { tipo: 'corte' }
+  | { tipo: 'croquis' }
   | { tipo: 'datos' }
   | { tipo: 'revision' }
   | { tipo: 'final' }
@@ -736,6 +780,8 @@ export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'intervenciones' },
   { tipo: 'corte' },
   { tipo: 'seccion', id: 'cobertura' },
+  { tipo: 'seccion', id: 'relato_casa' },
+  { tipo: 'croquis' },
   { tipo: 'datos' },
   { tipo: 'revision' },
   { tipo: 'final' },

@@ -28,7 +28,13 @@ export interface InformeConsistencia {
   generado_en: string
   hallazgos: Hallazgo[]
   resumen: { alertas: number; atenciones: number; banderas_cobertura: number; controles_ok: number }
-  completitud: { fotos_obligatorias: number; fotos_presentes: number; tiene_audio: boolean; testigos: number }
+  completitud: {
+    fotos_obligatorias: number
+    fotos_presentes: number
+    tiene_audio: boolean
+    tiene_relato_escrito: boolean
+    testigos: number
+  }
 }
 
 interface Entrada {
@@ -364,13 +370,31 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Las tomas faltantes debilitan la reconstrucción posterior del hecho.',
     })
   }
-  if (!e.tieneAudio) {
+  /*
+   * El relato puede venir por voz o por escrito.
+   *
+   * Quien no puede grabar —por ruido, por vergüenza, o porque el teléfono le negó el
+   * micrófono— antes perdía el relato entero. Un relato escrito de cierta extensión es una
+   * declaración espontánea igual, y marcarlo como faltante sería reprocharle a la persona
+   * haber usado una salida que el propio producto le ofrece.
+   */
+  const escrito = s(r.relato_texto) ?? ''
+  const tieneRelatoEscrito = escrito.trim().length >= 80
+  if (!e.tieneAudio && !tieneRelatoEscrito) {
     h.push({
       nivel: 'atencion',
-      titulo: 'Sin relato en audio',
-      declarado: 'No se grabó el relato',
+      titulo: 'Sin relato del conductor',
+      declarado: 'No se grabó ni se escribió el relato',
       objetivo: 'Falta la declaración espontánea del conductor',
       detalle: 'El relato tomado en el momento es la pieza de mayor valor probatorio del expediente.',
+    })
+  } else if (!e.tieneAudio && tieneRelatoEscrito) {
+    h.push({
+      nivel: 'ok',
+      titulo: 'Relato tomado por escrito',
+      declarado: `${escrito.trim().length} caracteres`,
+      objetivo: 'Declaración espontánea registrada en el lugar',
+      detalle: 'La persona optó por escribirlo en vez de grabarlo. Vale igual.',
     })
   }
   if (e.testigos === 0) {
@@ -398,6 +422,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       fotos_obligatorias: e.fotosObligatorias.length,
       fotos_presentes: guiasPresentes.size,
       tiene_audio: e.tieneAudio,
+      tiene_relato_escrito: tieneRelatoEscrito,
       testigos: e.testigos,
     },
   }

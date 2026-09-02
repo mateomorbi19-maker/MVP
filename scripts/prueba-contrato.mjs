@@ -89,11 +89,11 @@ const VALORES_CONGELADOS = {
 const IDS_CONGELADOS = [
   'heridos', 'heridos_gravedad', 'heridos_cantidad', 'riesgo', 'momento_declarado', 'tipo_siniestro',
   'cantidad_vehiculos', 'tercero_actitud', 'tercero_patente', 'tercero_datos', 'tercero_aseguradora', 'tercero_poliza',
-  'relato', 'calle', 'sentido', 'maniobra', 'velocidad', 'freno',
+  'relato', 'relato_texto', 'calle', 'sentido', 'maniobra', 'velocidad', 'freno',
   'zona_propia', 'zona_tercero', 'semaforo', 'senalizacion', 'pavimento', 'clima',
   'luz', 'circula', 'policia', 'policia_acta', 'policia_dependencia', 'otras_intervenciones',
   'quien_llamo', 'quien_conducia', 'conductor_datos', 'acompanantes', 'licencia_vigente', 'vtv',
-  'alcoholemia', 'uso_vehiculo',
+  'alcoholemia', 'uso_vehiculo', 'relato_ampliado',
 ]
 
 const GUIAS_CONGELADAS = [

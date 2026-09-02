@@ -14,6 +14,7 @@ import { canonico, sha256, hashEvento, registrarEvento, VERSION_MANIFIESTO } fro
 import { analizar } from '../lib/consistencia.ts'
 import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
+import { PLANTILLAS, figurasDelCroquis, limpiarCroquis } from '../lib/croquis.ts'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
@@ -474,6 +475,7 @@ const pdf = await generarExpediente({
     gps: { lat: -34.6187, lon: -58.4419, precision_m: 12, capturado_en: new Date().toISOString() },
     direccion: 'Avenida Rivadavia 5000, Caballito, Buenos Aires, Argentina',
   },
+  croquis: PLANTILLAS[0].croquis,
   clima: climaLluvioso,
   consistencia: mentiroso,
   manifiesto,
@@ -561,6 +563,38 @@ verificar('una clave razonable se acepta', validarClave('una clave larga 123', '
   verificar('el hash del token es determinista', hashToken(a) === hashToken(a))
   verificar('dos tokens distintos dan hashes distintos', hashToken(a) !== hashToken(b))
 }
+
+/* ---------- 7. Croquis y relato ---------- */
+console.log('\n[7] Croquis y relato')
+
+verificar('hay ocho situaciones típicas', PLANTILLAS.length === 8, String(PLANTILLAS.length))
+verificar('cada plantilla es un croquis completo', PLANTILLAS.every((p) => limpiarCroquis(p.croquis) !== null))
+verificar(
+  'todas las posiciones caen dentro del lienzo',
+  PLANTILLAS.every((p) => p.croquis.vehiculos.every((v) => v.x >= 0 && v.x <= 100 && v.y >= 0 && v.y <= 100)),
+)
+
+{
+  const figuras = figurasDelCroquis(PLANTILLAS[0].croquis)
+  verificar('el croquis produce trazos dibujables', figuras.length > 0 && figuras.every((f) => f.d.startsWith('M ')))
+  verificar('incluye el punto de impacto', figuras.some((f) => f.tipo === 'impacto'))
+  verificar('incluye los dos vehículos', figuras.filter((f) => f.tipo === 'vehiculo').length === 2)
+  verificar(
+    'el mismo croquis produce siempre los mismos trazos',
+    JSON.stringify(figuras) === JSON.stringify(figurasDelCroquis(PLANTILLAS[0].croquis)),
+  )
+}
+
+verificar('un croquis sin cruce válido se rechaza entero', limpiarCroquis({ vehiculos: [] }) === null)
+verificar(
+  'un vehículo fuera del plano invalida el croquis, no se recorta',
+  limpiarCroquis({ ...PLANTILLAS[0].croquis, vehiculos: [{ rol: 'propio', x: 500, y: 10, rumbo: 0 }] }) === null,
+)
+verificar(
+  'el rumbo se normaliza a un giro',
+  limpiarCroquis({ ...PLANTILLAS[0].croquis, vehiculos: [{ rol: 'propio', x: 10, y: 10, rumbo: 450 }] })
+    ?.vehiculos[0].rumbo === 90,
+)
 
 /* ---------- Resultado ---------- */
 console.log(`\n${pruebas - fallos}/${pruebas} verificaciones pasaron`)

@@ -6,6 +6,7 @@ import type { Clima } from './clima'
 import type { Sello } from './sello'
 import type { DatosExpediente } from './pdf'
 import type { AlcanceCasos } from './sesion'
+import type { Croquis } from './croquis'
 
 export interface Caso {
   id: string
@@ -27,6 +28,7 @@ export interface Caso {
   manifiesto_version: string
   usuario_id: string | null
   productor_id: string | null
+  croquis: Croquis | null
 }
 
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : String(v))
@@ -51,6 +53,7 @@ function mapear(fila: Record<string, unknown>): Caso {
     manifiesto_version: (fila.manifiesto_version as string) ?? '1.0',
     usuario_id: (fila.usuario_id as string) ?? null,
     productor_id: (fila.productor_id as string) ?? null,
+    croquis: (fila.croquis as Croquis) ?? null,
   }
 }
 
@@ -181,6 +184,7 @@ export async function datosExpediente(casoId: string): Promise<DatosExpediente |
       gps: caso.gps,
       direccion: caso.direccion,
     },
+    croquis: caso.croquis,
     clima: caso.clima,
     consistencia,
     manifiesto,

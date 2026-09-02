@@ -1,6 +1,6 @@
 'use client'
 
-import { ZONAS_IMPACTO } from '@/lib/cuestionario'
+import { GUIA_RELATO, ZONAS_IMPACTO } from '@/lib/cuestionario'
 import type { Paso } from '@/lib/recorrido'
 import type { Media, Subir } from '../tipos'
 import { GrabadorAudio } from './GrabadorAudio'
@@ -92,6 +92,25 @@ export function PantallaPregunta({
             value={typeof valor === 'string' ? valor : ''}
             onChange={(e) => responder(pregunta.id, e.target.value)}
           />
+        ) : null}
+
+        {pregunta.tipo === 'parrafo' ? (
+          <>
+            {pregunta.id === 'relato_ampliado' ? (
+              <ul className="ayuda">
+                {GUIA_RELATO.map((linea) => (
+                  <li key={linea}>{linea}</li>
+                ))}
+              </ul>
+            ) : null}
+            <textarea
+              id={pregunta.id}
+              className="campo-grande"
+              rows={8}
+              value={typeof valor === 'string' ? valor : ''}
+              onChange={(e) => responder(pregunta.id, e.target.value)}
+            />
+          </>
         ) : null}
 
         {pregunta.tipo === 'numero' ? (

@@ -26,6 +26,7 @@ export default async function PaginaSiniestro({ params }: { params: Promise<{ id
       mediasIniciales={medias.map((m) => ({ id: m.id, tipo: m.tipo, guia_id: m.guia_id }))}
       testigosIniciales={testigos.map((t) => ({ id: t.id, nombre: t.nombre }))}
       ubicacionInicial={caso.gps ? { lat: caso.gps.lat, lon: caso.gps.lon, direccion: caso.direccion } : null}
+      croquisInicial={caso.croquis}
     />
   )
 }

@@ -1247,3 +1247,80 @@ tr:last-child td {
 .entrada-oculta {
   display: none;
 }
+
+/* ---------- Croquis ---------- */
+
+/*
+ * El SVG tiene que quedar CUADRADO.
+ *
+ * Su viewBox es 0 0 100 100. Con una caja de otra proporción el dibujo se apaisa adentro y
+ * aparece letterboxing, y aunque el toque se convierte con getScreenCTM —que lo tolera—,
+ * el croquis deja de coincidir con el que se imprime en el expediente. Por eso el
+ * aspect-ratio va acá y no se le da width y height por separado.
+ */
+.croquis {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--superficie-2);
+  border-radius: var(--radio-s);
+  touch-action: none;
+}
+
+.croquis[data-editable='true'] {
+  cursor: crosshair;
+}
+
+.croquis-lienzo {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 10px;
+  background: var(--superficie);
+  margin-top: 14px;
+}
+
+.croquis-calzada {
+  fill: var(--borde);
+  stroke: none;
+}
+
+.croquis-linea {
+  fill: none;
+  stroke: var(--tinta-3);
+  stroke-width: 0.6;
+  stroke-dasharray: 3 3;
+}
+
+.croquis-vehiculo {
+  fill: var(--acento);
+  stroke: var(--acento-fuerte);
+  stroke-width: 0.6;
+}
+
+.croquis-vehiculo[data-rol='otro'] {
+  fill: var(--atencion);
+  stroke: var(--atencion);
+}
+
+.croquis-flecha {
+  fill: none;
+  stroke: var(--sobre-color);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+.croquis-impacto {
+  fill: none;
+  stroke: var(--alerta);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* La guía del relato ampliado: sugerencia, no formulario. */
+.ayuda {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  color: var(--tinta-2);
+  font-size: 14px;
+  line-height: 1.6;
+}

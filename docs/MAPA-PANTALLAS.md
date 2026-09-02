@@ -93,9 +93,23 @@ componente de pregunta de la etapa 4.
 | Pantalla | Archivo | Clases |
 | --- | --- | --- |
 | Corte | `pantallas/PantallaCorte.tsx` | `.hito`, `.hito-simbolo`, `.numero-actuacion` |
+| Relato ampliado | `pantallas/PantallaPregunta.tsx` (tipo `parrafo`) | `.ayuda`, `.campo-grande` |
+| Croquis | `pantallas/PantallaCroquis.tsx` + `components/CroquisVisor.tsx` | `.croquis`, `.croquis-lienzo`, `.croquis-calzada`, `.croquis-linea`, `.croquis-vehiculo`, `.croquis-flecha`, `.croquis-impacto` |
 | Carátula | `pantallas/PantallaDatos.tsx` | `.campo`, `.campo-grande` |
 
-El croquis y el relato ampliado llegan con su módulo.
+**Intocable en el croquis:** `.croquis` declara `aspect-ratio: 1` y no recibe `width` y
+`height` por separado, ni `padding` ni `border` sobre el propio `<svg>` —el borde va en
+`.croquis-lienzo`, el div de afuera—. El `viewBox` es `0 0 100 100` y no se toca. Con una
+caja de otra proporción el dibujo se apaisa dentro y aparece letterboxing, y el croquis de
+la pantalla deja de coincidir con el que se imprime en el expediente.
+
+El arrastrar y soltar del mockup queda para una segunda etapa: la especificación funcional
+dice expresamente que no es prioritario. El modelo de datos ya es el definitivo, así que el
+paso 2 reemplaza sólo el editor.
+
+El pie que dice que el croquis es declarativo y no un peritaje es obligatorio en las dos
+vistas y en el PDF. No es una nota al pie decorativa: es lo que evita que un dibujo armado
+eligiendo de una lista se lea como una reconstrucción.
 
 ## 7 · Generando el acta
 

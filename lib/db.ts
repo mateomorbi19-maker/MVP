@@ -327,6 +327,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS contactos_confianza_usuario_uidx ON contactos_
 
 ALTER TABLE casos ADD COLUMN IF NOT EXISTS poliza_id TEXT REFERENCES polizas(id) ON DELETE SET NULL;
 
+-- El croquis del hecho. Columna propia y no una respuesta más del cuestionario: respuestas
+-- es un mapa plano de id a escalar que el PDF, el panel y el motor de consistencia
+-- imprimen como texto, y un objeto anidado ahí sale como [object Object] en el expediente.
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS croquis JSONB;
+
 -- Impide reescribir la historia: los eventos no se actualizan ni se borran.
 CREATE OR REPLACE FUNCTION eventos_solo_insercion() RETURNS trigger AS $fn$
 BEGIN

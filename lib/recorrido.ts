@@ -52,6 +52,12 @@ export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
   | { clave: string; bloque: Bloque; tipo: 'testigos' }
   | { clave: string; bloque: Bloque; tipo: 'corte' }
+  /**
+   * `masDeDosVehiculos` viaja resuelto: la pantalla no puede comparar contra el texto de
+   * una opción del cuestionario, porque ese texto es el dato y mejorar su redacción
+   * cambiaría en silencio lo que la pantalla hace.
+   */
+  | { clave: string; bloque: Bloque; tipo: 'croquis'; masDeDosVehiculos: boolean }
   | { clave: string; bloque: Bloque; tipo: 'datos' }
   | { clave: string; bloque: Bloque; tipo: 'revision' }
   | { clave: string; bloque: Bloque; tipo: 'final' }
@@ -110,6 +116,17 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
     }
 
     const bloque: Bloque = etapa.tipo === 'testigos' || etapa.tipo === 'corte' ? 'lugar' : 'despues'
+    if (etapa.tipo === 'croquis') {
+      const cuantos = respuestas.cantidad_vehiculos
+      pasos.push({
+        clave: 'croquis',
+        bloque,
+        tipo: 'croquis',
+        masDeDosVehiculos:
+          cuantos === VALOR.cantidad_vehiculos.N3 || cuantos === VALOR.cantidad_vehiculos.N4_O_MAS,
+      })
+      continue
+    }
     pasos.push({ clave: etapa.tipo, bloque, tipo: etapa.tipo } as Paso)
   }
 
