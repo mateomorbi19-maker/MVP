@@ -1,5 +1,6 @@
 type NombreIcono =
   | 'archivo'
+  | 'personas'
   | 'camara'
   | 'compartir'
   | 'descargar'
@@ -23,6 +24,15 @@ export function Icono({ nombre, clase = 'icono' }: { nombre: NombreIcono; clase?
       aria-hidden="true"
       focusable="false"
     >
+      {nombre === 'personas' ? (
+        <>
+          <path d="M15.5 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20" />
+          <circle cx="9.25" cy="7.6" r="3.1" />
+          <path d="M21 20v-1.6a3.4 3.4 0 0 0-2.6-3.3" />
+          <path d="M15.8 4.7a3.4 3.4 0 0 1 0 6.4" />
+        </>
+      ) : null}
+
       {nombre === 'escudo' ? (
         <>
           <path d="M12 3 19 6v5c0 4.6-2.8 7.8-7 10-4.2-2.2-7-5.4-7-10V6l7-3Z" />

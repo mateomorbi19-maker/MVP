@@ -879,39 +879,27 @@ tr:last-child td {
   background: var(--fondo);
 }
 
-.inicio-centro {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 16px;
-  padding: 18px 0 24px;
-}
-
-.boton-gigante {
-  width: 100%;
-  min-height: 238px;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
+/*
+ * La tarjeta de la denuncia.
+ *
+ * Es la superficie de color pleno del inicio, y dentro va el botón. El texto sobre ella es
+ * siempre --sobre-color: sobre un azul saturado el contraste lo da el color, no el tema del
+ * teléfono, así que este bloque no cambia en modo oscuro.
+ */
+.denuncia {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  margin-top: 18px;
+  padding: 26px 22px 22px;
+  border-radius: 26px;
   background: linear-gradient(145deg, var(--accion), var(--accion-fuerte));
   color: var(--sobre-color);
-  border-radius: 26px;
-  border-color: rgb(var(--sobre-color-rgb) / 0.12);
-  font-size: clamp(31px, 8.5vw, 42px);
-  font-weight: 820;
-  letter-spacing: -0.035em;
-  line-height: 1.04;
-  text-align: left;
-  padding: 34px 30px;
   box-shadow: var(--sombra-alta);
 }
 
-.boton-gigante::before,
-.boton-gigante::after {
+.denuncia::before,
+.denuncia::after {
   content: '';
   position: absolute;
   z-index: -1;
@@ -919,33 +907,208 @@ tr:last-child td {
   pointer-events: none;
 }
 
-.boton-gigante::before {
+.denuncia::before {
   width: 190px;
   height: 190px;
-  right: -54px;
-  top: -72px;
+  right: -58px;
+  top: -78px;
   background: rgb(var(--sobre-color-rgb) / 0.1);
 }
 
-.boton-gigante::after {
+.denuncia::after {
   width: 120px;
   height: 120px;
-  right: 46px;
-  bottom: -72px;
+  right: 40px;
+  bottom: -80px;
   border: 22px solid rgb(var(--sobre-color-rgb) / 0.08);
+}
+
+.denuncia-titulo {
+  margin: 0;
+  font-size: clamp(28px, 7.6vw, 36px);
+  font-weight: 820;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: var(--sobre-color);
+}
+
+.denuncia-bajada {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: rgb(var(--sobre-color-rgb) / 0.9);
+}
+
+/* Cuatro cosas, en dos columnas: entra en un teléfono angosto sin achicar la tipografía. */
+.denuncia-pasos {
+  list-style: none;
+  margin: 20px 0;
+  padding: 18px 0 0;
+  border-top: 1px solid rgb(var(--sobre-color-rgb) / 0.22);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 14px;
+}
+
+.denuncia-paso {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+}
+
+.denuncia-paso-icono {
+  grid-row: span 2;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: rgb(var(--sobre-color-rgb) / 0.16);
+}
+
+.denuncia-paso-icono .icono {
+  width: 17px;
+  height: 17px;
+}
+
+.denuncia-paso-titulo {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.denuncia-paso-detalle {
+  font-size: 12px;
+  line-height: 1.3;
+  color: rgb(var(--sobre-color-rgb) / 0.82);
+}
+
+/* El botón, dentro de la tarjeta: blanco sobre el azul, como en la maqueta. */
+.boton-gigante {
+  width: 100%;
+  min-height: 66px;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--sobre-color);
+  color: var(--accion-fuerte);
+  border: none;
+  border-radius: 16px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  padding: 12px 22px;
+  box-shadow: 0 8px 20px rgb(var(--sombra-rgb) / 0.18);
 }
 
 @media (hover: hover) {
   .boton-gigante:hover:not(:disabled) {
-    filter: brightness(1.06);
+    filter: brightness(0.97);
   }
 }
 
 .boton-gigante span {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
-  opacity: 0.92;
+  opacity: 0.72;
   letter-spacing: 0;
+}
+
+.denuncia-resguardo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--sobre-color-rgb) / 0.85);
+}
+
+.denuncia-resguardo .icono {
+  width: 15px;
+  height: 15px;
+}
+
+/* Bloques del inicio */
+.bloque-inicio {
+  margin-top: 22px;
+}
+
+.bloque-titulo {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--tinta);
+}
+
+.bloque-bajada {
+  margin: 4px 0 14px;
+  font-size: 14px;
+  color: var(--tinta-2);
+}
+
+/* Acceso a una sección, con su flecha. */
+.acceso {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+  text-decoration: none;
+  color: inherit;
+}
+
+.acceso-icono {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--acento-suave);
+  color: var(--acento);
+}
+
+.acceso-texto {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.acceso-titulo {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+.acceso-detalle {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tinta-2);
+}
+
+.acceso-flecha {
+  flex: none;
+  font-size: 20px;
+  color: var(--tinta-3);
+}
+
+/* El aviso sólo trae margen abajo: en el inicio va suelto y necesita el de arriba. */
+.inicio > .aviso {
+  margin-top: 22px;
+}
+
+.inicio > .aviso:first-of-type {
+  margin-top: 0;
 }
 
 .inicio-pie {
@@ -2155,10 +2318,18 @@ tr:last-child td {
     padding-right: 14px;
   }
 
+  .denuncia {
+    padding: 22px 17px 18px;
+  }
+
+  .denuncia-pasos {
+    gap: 14px 10px;
+  }
+
   .boton-gigante {
-    min-height: 214px;
-    padding: 28px 23px;
-    font-size: 31px;
+    min-height: 62px;
+    padding: 11px 16px;
+    font-size: 17.5px;
   }
 
   .pregunta {

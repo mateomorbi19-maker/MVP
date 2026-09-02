@@ -7,17 +7,34 @@ import { Marca } from './components/Marca'
 import { InstalarApp } from './components/InstalarApp'
 import { BarraCuenta } from './components/BarraCuenta'
 import { BotonesEmergencia } from './components/BotonesEmergencia'
+import { Icono } from './components/Iconos'
 import { actuacionAbierta, recordarActuacion } from '@/lib/local'
 
 /**
  * Inicio.
  *
- * Un solo botón. No se pide nada antes de empezar —ni la póliza, ni la patente—:
- * parado al lado del auto nadie tiene eso a mano, y un formulario en la primera
- * pantalla es exactamente lo que hace que la persona abandone. Los datos del
- * asegurado se piden al final del recorrido, cuando ya está registrado lo que
- * sólo existe en el lugar.
+ * No se pide nada antes de empezar —ni la póliza, ni la patente—: parado al lado del auto
+ * nadie tiene eso a mano, y un formulario en la primera pantalla es exactamente lo que hace
+ * que la persona abandone. Los datos del asegurado se piden al final del recorrido, cuando
+ * ya está registrado lo que sólo existe en el lugar.
+ *
+ * Es un Client Component a propósito y el botón no depende de ninguna consulta: si el
+ * inicio se resolviera en el servidor, con la base lenta o caída la persona con adrenalina
+ * vería un error en vez del botón. El aviso de sistema no operativo aparece encima, pero
+ * nunca lo tapa.
+ *
+ * Las emergencias van desplegadas y no dentro de un desplegable: en el momento en que hacen
+ * falta, un acordeón es un toque de más.
  */
+
+/** Lo que el recorrido va a pedir, dicho antes de empezar. */
+const QUE_SE_REGISTRA = [
+  { icono: 'camara', titulo: 'Fotografías', detalle: 'del lugar y los vehículos' },
+  { icono: 'personas', titulo: 'Datos', detalle: 'del tercero y los testigos' },
+  { icono: 'ubicacion', titulo: 'Ubicación', detalle: 'hora y condiciones reales' },
+  { icono: 'microfono', titulo: 'Tu relato', detalle: 'con tus palabras' },
+] as const
+
 export default function Inicio() {
   const router = useRouter()
   const [enviando, setEnviando] = useState(false)
@@ -63,37 +80,84 @@ export default function Inicio() {
       {salud && !salud.ok ? (
         <div className="aviso" data-nivel="alerta">
           <strong>El sistema no está operativo.</strong>
-          <div style={{ marginTop: 6 }}>{salud.detalle}</div>
+          <div className="aviso-detalle">{salud.detalle}</div>
         </div>
       ) : null}
 
       {/* Si el fallo al abrir es el mismo que ya avisa el estado del sistema, no se repite. */}
-      {error && error !== salud?.detalle ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
+      {error && error !== salud?.detalle ? (
+        <div className="aviso" data-nivel="alerta">
+          {error}
+        </div>
+      ) : null}
 
-      <div className="inicio-centro">
+      <section className="denuncia">
+        <h2 className="denuncia-titulo">¿Tuviste un siniestro?</h2>
+        <p className="denuncia-bajada">
+          Registralo ahora. Reunir la información y las fotos en el momento del hecho es lo que más pesa después.
+        </p>
+
+        <ul className="denuncia-pasos">
+          {QUE_SE_REGISTRA.map((p) => (
+            <li className="denuncia-paso" key={p.titulo}>
+              <span className="denuncia-paso-icono">
+                <Icono nombre={p.icono} />
+              </span>
+              <span className="denuncia-paso-titulo">{p.titulo}</span>
+              <span className="denuncia-paso-detalle">{p.detalle}</span>
+            </li>
+          ))}
+        </ul>
+
         <button className="boton-gigante" onClick={iniciar} disabled={enviando}>
           {enviando ? 'Abriendo...' : 'Tuve un accidente'}
           {!enviando ? <span>Tocá acá para empezar</span> : null}
         </button>
 
-        {abierta ? (
-          <Link href={`/s/${abierta}`} className="boton boton-secundario" style={{ width: '100%' }}>
-            Continuar la actuación que dejaste abierta
-          </Link>
-        ) : null}
+        <p className="denuncia-resguardo">
+          <Icono nombre="escudo" />
+          Tu información está protegida.
+        </p>
+      </section>
+
+      {abierta ? (
+        <Link href={`/s/${abierta}`} className="boton boton-secundario boton-ancho">
+          Continuar la actuación que dejaste abierta
+        </Link>
+      ) : null}
+
+      <section className="bloque-inicio">
+        <h2 className="bloque-titulo">¿Necesitás ayuda urgente?</h2>
+        <p className="bloque-bajada">Llamá a los servicios de emergencia.</p>
+        <BotonesEmergencia />
+      </section>
+
+      <Link href="/poliza" className="acceso">
+        <span className="acceso-icono">
+          <Icono nombre="archivo" />
+        </span>
+        <span className="acceso-texto">
+          <span className="acceso-titulo">Mi póliza y documentación</span>
+          <span className="acceso-detalle">Tu cobertura, la documentación del vehículo y el productor asignado.</span>
+        </span>
+        <span className="acceso-flecha" aria-hidden="true">
+          →
+        </span>
+      </Link>
+
+      <div className="aviso" data-nivel="info">
+        <strong>Un consejo</strong>
+        <div className="aviso-detalle">
+          Reuní toda la información posible en el lugar: fotos, datos del tercero, testigos y documentación. Es lo que
+          después hace la diferencia.
+        </div>
       </div>
 
       <div className="inicio-pie">
-        {/* Marcado estático: es lo último que tiene que seguir andando si falla todo lo demás. */}
-        <details className="tarjeta-plana">
-          <summary>¿Necesitás ayuda urgente?</summary>
-          <BotonesEmergencia />
-        </details>
-
         <InstalarApp />
-        <p className="mini centrado" style={{ margin: 0 }}>
-          Vamos a pedirte permiso de ubicación, cámara y micrófono para registrar dónde, cuándo y cómo ocurrió.
-          Los datos se usan sólo para documentar este siniestro ante tu aseguradora (Ley 25.326).
+        <p className="mini centrado">
+          Vamos a pedirte permiso de ubicación, cámara y micrófono para registrar dónde, cuándo y cómo ocurrió. Los
+          datos se usan sólo para documentar este siniestro ante tu aseguradora (Ley 25.326).
         </p>
         <BarraCuenta />
       </div>
