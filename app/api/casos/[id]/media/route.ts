@@ -6,6 +6,8 @@ import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
 import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO } from '@/lib/almacenamiento'
 import { GUIA_FOTOS } from '@/lib/cuestionario'
+import { GUIA_A_DOCUMENTO, extraccionActiva, proveedorActivo } from '@/lib/extraccion'
+import { encolar } from '@/lib/cola-extraccion'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -70,6 +72,45 @@ export async function POST(req: Request, { params }: Ctx) {
       sha256: guardado.sha256,
       gps,
     })
+
+    /*
+     * Lectura automática del documento del tercero.
+     *
+     * Se dispara SÓLO si el tercero ya prestó su consentimiento: el titular del dato es él,
+     * y el asegurado no puede consentir por él (arts. 5 y 11, Ley 25.326). Sin
+     * consentimiento la foto se guarda igual —la evidencia manda— pero no se lee.
+     *
+     * Va en su propio try/catch: si esto falla, la fotografía queda incorporada lo mismo.
+     * Es el endpoint que se usa parado al lado del auto.
+     */
+    const tipoDocumento = guia ? GUIA_A_DOCUMENTO[guia] : undefined
+    if (tipoDocumento && extraccionActiva()) {
+      try {
+        const consintio = await pg.query(
+          'SELECT 1 FROM terceros WHERE caso_id = $1 AND consentimiento = true LIMIT 1',
+          [id],
+        )
+        if ((consintio.rowCount ?? 0) > 0) {
+          const proveedor = proveedorActivo()
+          const extraccionId = nuevoId('EXT')
+          await pg.query(
+            `INSERT INTO extracciones (id, caso_id, media_id, guia_id, tipo_documento, proveedor)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [extraccionId, id, mediaId, guia, tipoDocumento, proveedor?.nombre ?? 'desconocido'],
+          )
+          await registrarEvento(id, 'extraccion_solicitada', {
+            extraccion_id: extraccionId,
+            media_id: mediaId,
+            guia_id: guia,
+            proveedor: proveedor?.nombre ?? null,
+          })
+          // Sin await: la respuesta sale sin haber contactado a ningún proveedor.
+          encolar(extraccionId)
+        }
+      } catch (err) {
+        console.error('[media] no se pudo encolar la lectura automática', err)
+      }
+    }
 
     return NextResponse.json({ id: mediaId, sha256: guardado.sha256, bytes: guardado.bytes }, { status: 201 })
   } catch (err) {

@@ -14,7 +14,21 @@ export async function GET(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
     await exigirAccesoCaso(id)
-    const destino = `${urlPublica(req)}/t/${id}`
+
+    /*
+     * Lista blanca de destinos. El valor por omisión es 'testigo' porque es el que usa la
+     * pantalla de testigos, que llama sin parámetros.
+     */
+    const DESTINOS: Record<string, string> = { testigo: 't', tercero: 'c', verificacion: 'v' }
+    const pedido = new URL(req.url).searchParams.get('destino') ?? 'testigo'
+    const prefijo = DESTINOS[pedido]
+    if (!prefijo) {
+      return NextResponse.json(
+        { error: `Destino desconocido. Los válidos son: ${Object.keys(DESTINOS).join(', ')}.` },
+        { status: 400 },
+      )
+    }
+    const destino = `${urlPublica(req)}/${prefijo}/${id}`
 
     const svg = await QRCode.toString(destino, {
       type: 'svg',

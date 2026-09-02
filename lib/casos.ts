@@ -263,3 +263,10 @@ export function limpiarDatosAsegurado(cuerpo: unknown): DatosAsegurado {
     telefono: limpiar('telefono'),
   }
 }
+
+/** Cuántos terceros se identificaron. Lo usa la pantalla de consentimiento. */
+export async function contarTerceros(casoId: string): Promise<number> {
+  const pg = await db()
+  const res = await pg.query<{ n: string }>('SELECT count(*)::text AS n FROM terceros WHERE caso_id = $1', [casoId])
+  return Number(res.rows[0]?.n ?? 0)
+}

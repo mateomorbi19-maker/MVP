@@ -68,6 +68,7 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
 | Una foto | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-tomada`, `.entrada-oculta`, `.miniatura` | `POST /api/casos/[id]/media` |
 | Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
+| Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
 | Ubicación | `pantallas/ChipUbicacion.tsx` | `.chip[data-estado]`, `.punto[data-estado]`, `.chip-flecha` | `POST /api/casos/[id]/ubicacion` |
 | Conmutador | `Flujo.tsx` | `.envoltura-flujo`, `.pantalla[data-paso][data-bloque]`, `.progreso-fino`, `.progreso-fino-relleno`, `.volver` | — |
 
@@ -77,13 +78,30 @@ porque ya parece un botón— deja de abrir la cámara. Sacar `capture` abre la 
 evidencia deja de ser una toma del lugar. El `<small>` que dice «La hora y el lugar los
 pone el sistema, no el archivo» sostiene el valor probatorio: no se borra.
 
-## 5 · Modo casa · revisión de lo que detectó la IA
+## 5 · Revisión de lo que leyó la máquina
 
-**Estado: no construida.** Llega con el módulo de lectura automática.
+| | |
+| --- | --- |
+| Archivo | `pantallas/PantallaValidacion.tsx` |
+| Clases | `.tarjeta`, `.campo`, `.insignia[data-nivel]`, `.aviso[data-nivel]`, `.omitir` |
+| Endpoints | `GET /api/casos/[id]/extracciones` · `POST …/[extraccionId]/confirmar` |
 
-Cambio obligatorio respecto del mockup: **no se muestra el porcentaje de confianza.** La
-propia especificación funcional lo pide. Cada campo se marca «Verificado» o «Revisar
-dato»; el número queda como dato interno de soporte, en el panel de la aseguradora.
+Ocurre en el lugar del hecho y no en casa, a diferencia del mockup: se lee lo que se
+fotografió recién, y va después del relato en audio para no romper su orden.
+
+**Tres cosas que no se tocan:**
+
+1. **No se muestra el porcentaje de confianza.** La propia especificación funcional lo
+   pide: un número que la persona no sabe interpretar genera dudas legales sin aportar
+   nada de uso. Cada campo dice «Verificado» o «Revisar dato». El número queda en el
+   expediente y en el panel de la aseguradora, que es donde sirve.
+2. **Un campo «Revisar dato» llega vacío**, con la lectura como pista en el placeholder.
+   Para confirmarlo hay que escribirlo.
+3. **«Lo reviso después» siempre avanza.** Lo que se fuerza es confirmar, no avanzar.
+
+El aviso rojo de «lectura de demostración» aparece cuando el proveedor es el simulado, que
+inventa nombres y DNI con formato argentino correcto que **no salen de la foto**. No se
+borra ni se suaviza.
 
 ## 6 · Modo casa · contexto y cierre
 

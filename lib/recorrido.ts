@@ -51,6 +51,8 @@ export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'emergencia'; variante: 'confirmado' | 'dudoso' }
   | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
   | { clave: string; bloque: Bloque; tipo: 'testigos' }
+  | { clave: string; bloque: Bloque; tipo: 'consentimiento' }
+  | { clave: string; bloque: Bloque; tipo: 'validacion' }
   | { clave: string; bloque: Bloque; tipo: 'corte' }
   /**
    * `masDeDosVehiculos` viaja resuelto: la pantalla no puede comparar contra el texto de
@@ -96,6 +98,24 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
             variante: heridos === VALOR.heridos.NO_LO_SE ? 'dudoso' : 'confirmado',
           })
         }
+      }
+      continue
+    }
+
+    if (etapa.tipo === 'consentimiento') {
+      /*
+       * Sólo si hay un tercero y sigue en el lugar. A quien chocó contra un árbol no se le
+       * pide el consentimiento de nadie, y a quien declaró que el otro se dio a la fuga
+       * pedírselo sería pedirle algo imposible.
+       */
+      const tipo = respuestas.tipo_siniestro
+      const actitud = respuestas.tercero_actitud
+      const hayTercero =
+        tipo === VALOR.tipo_siniestro.COLISION_CON_OTRO_VEHICULO ||
+        tipo === VALOR.tipo_siniestro.ATROPELLO_A_PEATON_O_CICLISTA
+      const seFue = actitud === VALOR.tercero_actitud.SE_DIO_A_LA_FUGA
+      if (hayTercero && !seFue) {
+        pasos.push({ clave: 'consentimiento', bloque: 'lugar', tipo: 'consentimiento' })
       }
       continue
     }

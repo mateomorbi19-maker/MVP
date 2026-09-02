@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { obtenerCaso, listarMedias, listarTestigos } from '@/lib/casos'
+import { obtenerCaso, listarMedias, listarTestigos, contarTerceros } from '@/lib/casos'
 import { Flujo } from './Flujo'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +9,7 @@ export default async function PaginaSiniestro({ params }: { params: Promise<{ id
   const caso = await obtenerCaso(id)
   if (!caso) notFound()
 
-  const [medias, testigos] = await Promise.all([listarMedias(id), listarTestigos(id)])
+  const [medias, testigos, terceros] = await Promise.all([listarMedias(id), listarTestigos(id), contarTerceros(id)])
 
   return (
     <Flujo
@@ -27,6 +27,7 @@ export default async function PaginaSiniestro({ params }: { params: Promise<{ id
       testigosIniciales={testigos.map((t) => ({ id: t.id, nombre: t.nombre }))}
       ubicacionInicial={caso.gps ? { lat: caso.gps.lat, lon: caso.gps.lon, direccion: caso.direccion } : null}
       croquisInicial={caso.croquis}
+      tercerosIniciales={terceros}
     />
   )
 }

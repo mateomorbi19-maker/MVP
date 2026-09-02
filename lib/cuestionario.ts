@@ -763,6 +763,8 @@ export type Etapa =
   | { tipo: 'testigos' }
   | { tipo: 'corte' }
   | { tipo: 'croquis' }
+  | { tipo: 'consentimiento' }
+  | { tipo: 'validacion' }
   | { tipo: 'datos' }
   | { tipo: 'revision' }
   | { tipo: 'final' }
@@ -771,9 +773,27 @@ export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'triage' },
   { tipo: 'seccion', id: 'identificacion' },
   { tipo: 'seccion', id: 'terceros' },
+  /*
+   * El consentimiento del tercero va ANTES de las fotos, y no es un detalle de orden.
+   * Dos de las tomas son la licencia y la cédula del otro conductor, y la lectura
+   * automática se dispara al subirlas. Procesar el documento de identidad de una persona
+   * que todavía no consintió nada es tratar el dato de un titular que no es el asegurado,
+   * y por quien el asegurado no puede consentir (arts. 5 y 11, Ley 25.326).
+   *
+   * No agrega fricción real: el tercero está parado al lado, y es justo el momento en que
+   * se le pide el documento.
+   */
+  { tipo: 'consentimiento' },
   { tipo: 'fotos' },
   { tipo: 'seccion', id: 'relato' },
   { tipo: 'testigos' },
+  /*
+   * La revisión de lo que leyó la máquina va DESPUÉS del relato en audio y de los
+   * testigos, no antes. El orden del relato es deliberado —primero la persona cuenta lo
+   * que vio, sin que ninguna pregunta le sugiera la respuesta— y meter en el medio una
+   * pantalla con los datos del tercero lo rompería.
+   */
+  { tipo: 'validacion' },
   { tipo: 'seccion', id: 'mecanica' },
   { tipo: 'seccion', id: 'contexto' },
   { tipo: 'seccion', id: 'estado' },

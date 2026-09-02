@@ -15,6 +15,7 @@ import { analizar } from '../lib/consistencia.ts'
 import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
 import { PLANTILLAS, figurasDelCroquis, limpiarCroquis } from '../lib/croquis.ts'
+import { MAPEO, PROVEEDOR_SIMULADO, extraccionActiva, vistaParaAsegurado } from '../lib/extraccion.ts'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
@@ -563,6 +564,59 @@ verificar('una clave razonable se acepta', validarClave('una clave larga 123', '
   verificar('el hash del token es determinista', hashToken(a) === hashToken(a))
   verificar('dos tokens distintos dan hashes distintos', hashToken(a) !== hashToken(b))
 }
+
+/* ---------- 6. Lectura automática ---------- */
+console.log('\n[6] Lectura automática')
+
+/*
+ * Arranca APAGADA. El proveedor de demostración devuelve nombres y DNI con formato
+ * argentino correcto que NO salen de la foto: encendido por omisión, un despliegue que
+ * simplemente no define la variable fabricaría prueba de identidad sobre una persona que
+ * ni siquiera es usuaria del sistema.
+ */
+verificar('la lectura automática está apagada por defecto', extraccionActiva() === false)
+
+{
+  const antes = process.env.EXTRACCION_SIMULADA
+  process.env.EXTRACCION_SIMULADA = 'true'
+  verificar('se enciende sólo pidiéndola por su nombre', extraccionActiva() === true)
+  process.env.EXTRACCION_DESACTIVADA = 'true'
+  verificar('y el interruptor de apagado gana siempre', extraccionActiva() === false)
+  delete process.env.EXTRACCION_DESACTIVADA
+  if (antes === undefined) delete process.env.EXTRACCION_SIMULADA
+  else process.env.EXTRACCION_SIMULADA = antes
+}
+
+{
+  const bytes = new TextEncoder().encode('una foto cualquiera')
+  const a = await PROVEEDOR_SIMULADO.leer(bytes, 'image/jpeg', 'licencia')
+  const b = await PROVEEDOR_SIMULADO.leer(bytes, 'image/jpeg', 'licencia')
+  verificar('el proveedor simulado es reproducible', JSON.stringify(a) === JSON.stringify(b))
+  verificar('se declara simulado', a.simulado === true)
+
+  const otros = await PROVEEDOR_SIMULADO.leer(new TextEncoder().encode('otra foto'), 'image/jpeg', 'licencia')
+  verificar('dos fotos distintas dan lecturas distintas', JSON.stringify(a) !== JSON.stringify(otros))
+
+  /*
+   * Con el proveedor simulado TODOS los campos llegan a revisar, sin mirar la confianza:
+   * la confianza también es inventada, y un campo verificado llega precargado. Un toque
+   * en confirmar lo sellaría como declaración del asegurado sobre la identidad de otro.
+   */
+  const vista = vistaParaAsegurado(a)
+  verificar('con el simulado ningún campo llega verificado', vista.every((c) => c.estado === 'revisar'))
+  verificar('la vista no lleva la confianza', vista.every((c) => !('confianza' in c)))
+
+  const real = vistaParaAsegurado({ ...a, simulado: false, campos: a.campos.map((c) => ({ ...c, confianza: 0.99 })) })
+  verificar('con un proveedor real y confianza alta, sí llega verificado', real.every((c) => c.estado === 'verificado'))
+
+  const dudoso = vistaParaAsegurado({ ...a, simulado: false, campos: a.campos.map((c) => ({ ...c, confianza: 0.2 })) })
+  verificar('y con confianza baja, a revisar', dudoso.every((c) => c.estado === 'revisar'))
+}
+
+verificar(
+  'cada campo mapea a una pregunta que existe',
+  Object.values(MAPEO).every((m) => SECCIONES.some((s) => s.preguntas.some((p) => p.id === m.pregunta))),
+)
 
 /* ---------- 7. Croquis y relato ---------- */
 console.log('\n[7] Croquis y relato')

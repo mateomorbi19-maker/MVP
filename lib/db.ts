@@ -332,6 +332,67 @@ ALTER TABLE casos ADD COLUMN IF NOT EXISTS poliza_id TEXT REFERENCES polizas(id)
 -- imprimen como texto, y un objeto anidado ahí sale como [object Object] en el expediente.
 ALTER TABLE casos ADD COLUMN IF NOT EXISTS croquis JSONB;
 
+-- ===================== El tercero =====================
+--
+-- El tercero NO es un testigo y no comparte tabla con él: es la contraparte del hecho.
+-- Contarlo entre los testigos apagaría el hallazgo «Sin testigos registrados» —justamente
+-- con la persona con la que se chocó— y lo imprimiría bajo «Testigos registrados» en el
+-- expediente, que es materialmente falso.
+--
+-- Estos datos los carga el TERCERO desde su propio teléfono y son distintos de
+-- tercero_datos, tercero_patente y tercero_aseguradora, que los declara el asegurado.
+CREATE TABLE IF NOT EXISTS terceros (
+  id             TEXT PRIMARY KEY,
+  caso_id        TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
+  nombre         TEXT NOT NULL,
+  dni            TEXT,
+  telefono       TEXT,
+  domicilio      TEXT,
+  patente        TEXT,
+  marca_modelo   TEXT,
+  aseguradora    TEXT,
+  poliza         TEXT,
+  licencia       TEXT,
+  -- Consentimiento expreso y separado, art. 5 de la Ley 25.326. Sin esto no se le lee
+  -- ningún documento con la lectura automática: el titular del dato es él, y el asegurado
+  -- no puede consentir por él.
+  consentimiento BOOLEAN NOT NULL DEFAULT false,
+  -- 'del_tercero' cuando lo cargó él; 'del_asegurado' cuando se usó el teléfono del otro.
+  dispositivo    TEXT NOT NULL DEFAULT 'del_tercero',
+  gps            JSONB,
+  creado_en      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  sha256         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS terceros_caso_idx ON terceros (caso_id, creado_en);
+
+-- ===================== Lectura automática =====================
+--
+-- campos es la afirmación de la MÁQUINA y no se reescribe nunca. confirmacion es lo
+-- que resolvió la persona, campo por campo. Sólo lo segundo se copia a casos.respuestas.
+-- La distinción no es prolijidad: una lectura automática no es una declaración del
+-- asegurado, y el expediente tiene que poder mostrar las dos cosas por separado.
+CREATE TABLE IF NOT EXISTS extracciones (
+  id               TEXT PRIMARY KEY,
+  caso_id          TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
+  media_id         TEXT NOT NULL REFERENCES medias(id) ON DELETE CASCADE,
+  guia_id          TEXT,
+  tipo_documento   TEXT NOT NULL,
+  estado           TEXT NOT NULL DEFAULT 'pendiente',
+  proveedor        TEXT NOT NULL,
+  simulado         BOOLEAN NOT NULL DEFAULT false,
+  campos           JSONB NOT NULL DEFAULT '[]'::jsonb,
+  confianza_global REAL,
+  error            TEXT,
+  confirmacion     JSONB,
+  creado_en        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  procesado_en     TIMESTAMPTZ,
+  confirmado_en    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS extracciones_caso_idx ON extracciones (caso_id, creado_en);
+-- Una foto se lee una sola vez. Repetir la toma crea otra media y otra lectura, y en
+-- pantalla gana la última: el mismo criterio que ya usa la pantalla de fotos.
+CREATE UNIQUE INDEX IF NOT EXISTS extracciones_media_idx ON extracciones (media_id);
+
 -- Impide reescribir la historia: los eventos no se actualizan ni se borran.
 CREATE OR REPLACE FUNCTION eventos_solo_insercion() RETURNS trigger AS $fn$
 BEGIN
@@ -353,7 +414,7 @@ CREATE TRIGGER eventos_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

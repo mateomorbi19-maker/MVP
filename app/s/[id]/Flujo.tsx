@@ -13,6 +13,8 @@ import { PantallaFoto } from './pantallas/PantallaFoto'
 import { PantallaTestigos } from './pantallas/PantallaTestigos'
 import { PantallaCorte } from './pantallas/PantallaCorte'
 import { PantallaCroquis } from './pantallas/PantallaCroquis'
+import { PantallaConsentimiento } from './pantallas/PantallaConsentimiento'
+import { PantallaValidacion } from './pantallas/PantallaValidacion'
 import { PantallaDatos } from './pantallas/PantallaDatos'
 import { PantallaRevision } from './pantallas/PantallaRevision'
 import { PantallaFinal } from './pantallas/PantallaFinal'
@@ -27,6 +29,7 @@ interface Props {
   testigosIniciales: Testigo[]
   ubicacionInicial: Ubicacion
   croquisInicial: Croquis | null
+  tercerosIniciales: number
 }
 
 /* ================= Componente principal ================= */
@@ -439,6 +442,12 @@ export function Flujo(props: Props) {
         {actual?.tipo === 'corte' ? (
           <PantallaCorte casoId={props.casoId} seguir={() => mover(1)} alCierre={() => irA('revision')} />
         ) : null}
+
+        {actual?.tipo === 'consentimiento' ? (
+          <PantallaConsentimiento casoId={props.casoId} yaCargado={props.tercerosIniciales > 0} seguir={() => mover(1)} />
+        ) : null}
+
+        {actual?.tipo === 'validacion' ? <PantallaValidacion casoId={props.casoId} seguir={() => mover(1)} /> : null}
 
         {actual?.tipo === 'croquis' ? (
           <PantallaCroquis
