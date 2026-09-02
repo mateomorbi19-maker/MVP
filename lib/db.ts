@@ -126,6 +126,12 @@ CREATE TABLE IF NOT EXISTS casos (
   sello           JSONB
 );
 
+-- Con qué formato de manifiesto se selló esta actuación. Ver VERSION_MANIFIESTO en
+-- lib/hash.ts: sólo desde '1.1' el nombre del testigo queda fuera del hash maestro y
+-- por lo tanto se puede suprimir sin romper la verificación. El DEFAULT '1.0' es para
+-- las filas que ya existían; las nuevas lo escriben explícitamente en el alta.
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS manifiesto_version TEXT NOT NULL DEFAULT '1.0';
+
 -- Log append-only. Cada fila encadena con el hash de la anterior del mismo caso.
 CREATE TABLE IF NOT EXISTS eventos (
   id          BIGSERIAL PRIMARY KEY,
@@ -179,6 +185,16 @@ CREATE TRIGGER eventos_inmutables
   FOR EACH ROW EXECUTE FUNCTION eventos_solo_insercion();
 `
 
+/**
+ * Las tablas que el esquema tiene que haber creado.
+ *
+ * Es una lista y no un número a propósito: con un total, agregar una tabla obliga a
+ * acordarse de subir el contador en dos archivos, y si alguien no lo hace /api/salud
+ * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
+ * escenario que ese endpoint existe para detectar—.
+ */
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos'] as const
+
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {
   if (!globalForDb._schemaLista) {
@@ -211,19 +227,30 @@ export async function estadoBase(): Promise<{
   causa?: string
   version?: string
   tablas?: number
+  faltan?: string[]
 }> {
   try {
     const pg = await db()
     const version = await pg.query<{ v: string }>('SELECT version() AS v')
-    const tablas = await pg.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM information_schema.tables
-       WHERE table_schema = 'public' AND table_name IN ('casos','eventos','medias','testigos')`,
+    const presentes = await pg.query<{ table_name: string }>(
+      // table_name es un dominio sobre `name`, no text: el casteo explícito evita
+      // depender de una coerción implícita que varía entre versiones de Postgres.
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name::text = ANY($1::text[])`,
+      [[...TABLAS]],
     )
+    const hay = new Set(presentes.rows.map((r) => r.table_name))
+    const faltan = TABLAS.filter((t) => !hay.has(t))
     return {
-      ok: true,
-      detalle: 'Base conectada y esquema creado.',
+      ok: faltan.length === 0,
+      detalle:
+        faltan.length === 0
+          ? 'Base conectada y esquema creado.'
+          : `La base responde pero le faltan tablas: ${faltan.join(', ')}. Reiniciá el servicio para que el esquema se vuelva a aplicar y mirá el log del arranque.`,
+      causa: faltan.length === 0 ? undefined : 'sin_configurar',
       version: version.rows[0]?.v?.split(',')[0] ?? 'desconocida',
-      tablas: Number(tablas.rows[0]?.n ?? 0),
+      tablas: hay.size,
+      faltan,
     }
   } catch (err) {
     const traducido = traducirErrorBase(err)
