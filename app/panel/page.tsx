@@ -61,7 +61,7 @@ export default async function Panel() {
                       </Link>
                     </td>
                     <td>
-                      <span className={`insignia ${c.estado === 'cerrado' ? 'insignia-ok' : 'insignia-neutra'}`}>
+                      <span className="insignia" data-nivel={c.estado === 'cerrado' ? 'ok' : 'neutra'}>
                         {c.estado === 'cerrado' ? 'Sellada' : 'En curso'}
                       </span>
                     </td>
@@ -74,15 +74,15 @@ export default async function Panel() {
                     <td>
                       {r ? (
                         <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                          {r.alertas > 0 ? <span className="insignia insignia-alerta">{r.alertas} contra.</span> : null}
+                          {r.alertas > 0 ? <span className="insignia" data-nivel="alerta">{r.alertas} contra.</span> : null}
                           {r.banderas_cobertura > 0 ? (
-                            <span className="insignia insignia-cobertura">{r.banderas_cobertura} cob.</span>
+                            <span className="insignia" data-nivel="cobertura">{r.banderas_cobertura} cob.</span>
                           ) : null}
                           {r.atenciones > 0 ? (
-                            <span className="insignia insignia-atencion">{r.atenciones} rev.</span>
+                            <span className="insignia" data-nivel="atencion">{r.atenciones} rev.</span>
                           ) : null}
                           {r.alertas === 0 && r.banderas_cobertura === 0 && r.atenciones === 0 ? (
-                            <span className="insignia insignia-ok">Sin observaciones</span>
+                            <span className="insignia" data-nivel="ok">Sin observaciones</span>
                           ) : null}
                         </span>
                       ) : (
@@ -97,7 +97,7 @@ export default async function Panel() {
         </div>
       )}
 
-      <div className="aviso aviso-atencion" style={{ marginTop: 22 }}>
+      <div className="aviso" data-nivel="atencion" style={{ marginTop: 22 }}>
         <strong>Sin control de acceso.</strong> Este panel es abierto porque es un MVP de uso interno. Antes de
         mostrárselo a una aseguradora con datos reales hay que ponerle autenticación.
       </div>

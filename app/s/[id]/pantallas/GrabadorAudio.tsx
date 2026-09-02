@@ -65,8 +65,8 @@ export function GrabadorAudio({ subir, yaGrabado, casoId }: { subir: Subir; yaGr
 
   return (
     <div>
-      {listo ? <div className="aviso aviso-ok" style={{ marginBottom: 12 }}>Relato incorporado al expediente.</div> : null}
-      {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
+      {listo ? <div className="aviso" data-nivel="ok" style={{ marginBottom: 12 }}>Relato incorporado al expediente.</div> : null}
+      {fallo ? <div className="aviso" data-nivel="alerta">{fallo}</div> : null}
 
       {!grabando ? (
         <button

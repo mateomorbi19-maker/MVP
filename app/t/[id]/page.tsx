@@ -65,7 +65,7 @@ export default function PaginaTestigo({ params }: { params: Promise<{ id: string
     return (
       <main className="envoltura">
         <Marca enlace={false} />
-        <div className="aviso aviso-ok">Datos registrados. Gracias.</div>
+        <div className="aviso" data-nivel="ok">Datos registrados. Gracias.</div>
         <h1>Listo</h1>
         <p className="apagado">
           Tu declaración quedó incorporada al expediente del siniestro, con la fecha y la hora exactas. Puede que la
@@ -112,7 +112,7 @@ export default function PaginaTestigo({ params }: { params: Promise<{ id: string
           style={{ marginBottom: 14, alignItems: 'flex-start' }}
         >
           <span className="marca-opcion" data-cuadrada="true" style={{ marginTop: 2 }}>
-            <span />
+            <span className="marca-opcion-punto" />
           </span>
           <span style={{ fontSize: 13.5, fontWeight: 500, lineHeight: 1.45 }}>
             Presto mi consentimiento libre e informado para que mis datos se incorporen al expediente de este siniestro
@@ -120,7 +120,7 @@ export default function PaginaTestigo({ params }: { params: Promise<{ id: string
           </span>
         </button>
 
-        {error ? <div className="aviso aviso-alerta">{error}</div> : null}
+        {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
 
         <button className="boton-primario" onClick={enviar} disabled={enviando}>
           {enviando ? 'Registrando...' : 'Registrar mis datos'}

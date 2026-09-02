@@ -60,7 +60,7 @@ export function PantallaTestigos({
         </p>
 
         <div className="tarjeta centrado">
-          {svg ? <div className="qr" dangerouslySetInnerHTML={{ __html: svg }} /> : <p className="apagado">Generando el código...</p>}
+          {svg ? <div className="qr qr-imagen" dangerouslySetInnerHTML={{ __html: svg }} /> : <p className="apagado">Generando el código...</p>}
           <button className="boton-secundario" onClick={compartir} style={{ width: '100%', marginTop: 10 }}>
             Compartir el enlace
           </button>
@@ -72,7 +72,7 @@ export function PantallaTestigos({
             <div className="pila">
               {testigos.map((t) => (
                 <div key={t.id} className="faltante" style={{ pointerEvents: 'none' }}>
-                  <span className="punto punto-ok" />
+                  <span className="punto" data-estado="ok" />
                   {t.nombre}
                 </div>
               ))}

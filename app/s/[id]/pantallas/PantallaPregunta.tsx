@@ -50,7 +50,7 @@ export function PantallaPregunta({
                 onClick={() => responderYAvanzar(pregunta.id, o)}
               >
                 <span className="marca-opcion">
-                  <span />
+                  <span className="marca-opcion-punto" />
                 </span>
                 {o}
               </button>
@@ -72,7 +72,7 @@ export function PantallaPregunta({
                   onClick={() => responder(pregunta.id, elegida ? actuales.filter((x) => x !== o) : [...actuales, o])}
                 >
                   <span className="marca-opcion" data-cuadrada="true">
-                    <span />
+                    <span className="marca-opcion-punto" />
                   </span>
                   {o}
                 </button>

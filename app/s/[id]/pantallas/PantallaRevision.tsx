@@ -92,7 +92,7 @@ export function PantallaRevision({
         </div>
 
         {ubicacion === null ? (
-          <div className="aviso aviso-atencion">
+          <div className="aviso" data-nivel="atencion">
             <strong>El expediente va a quedar sin ubicación.</strong>
             <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
               Sin ella no hay clima ni hora solar con qué contrastar la declaración. Si todavía estás en el lugar,
@@ -114,7 +114,7 @@ export function PantallaRevision({
             <div className="pila">
               {faltantes.map((f) => (
                 <button key={f.clave} className="faltante" onClick={() => irA(f.clave)}>
-                  <span className="punto punto-espera" />
+                  <span className="punto" data-estado="espera" />
                   {f.texto}
                   <span className="faltante-ir">Completar →</span>
                 </button>
@@ -123,7 +123,7 @@ export function PantallaRevision({
           </div>
         ) : null}
 
-        {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
+        {fallo ? <div className="aviso" data-nivel="alerta">{fallo}</div> : null}
       </div>
 
       <div className="barra-accion">
@@ -139,7 +139,7 @@ export function Linea({ etiqueta, ok, texto }: { etiqueta: string; ok: boolean; 
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-        <span className={`punto ${ok ? 'punto-ok' : 'punto-espera'}`} />
+        <span className="punto" data-estado={ok ? 'ok' : 'espera'} />
         {etiqueta}
       </span>
       <span className="mini" style={{ textAlign: 'right' }}>

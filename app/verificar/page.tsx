@@ -93,7 +93,7 @@ function Verificador() {
           <p className="ayuda">Opcional. Figura al pie del PDF; si lo pegás acá, se compara además contra el registro.</p>
           <input id="hash" type="text" placeholder="Opcional" value={hash} onChange={(e) => setHash(e.target.value.trim())} />
         </div>
-        {error ? <div className="aviso aviso-alerta">{error}</div> : null}
+        {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
         <button className="boton-primario" onClick={() => verificar(id, hash)} disabled={cargando || id.length < 5}>
           {cargando ? 'Verificando...' : 'Verificar'}
         </button>
@@ -101,7 +101,7 @@ function Verificador() {
 
       {resultado ? (
         <>
-          <div className={`aviso ${resultado.valido ? 'aviso-ok' : 'aviso-alerta'}`}>
+          <div className="aviso" data-nivel={resultado.valido ? 'ok' : 'alerta'}>
             <strong>
               {resultado.valido
                 ? 'Expediente íntegro. La cadena de custodia es consistente.'
@@ -164,7 +164,7 @@ function Verificador() {
                 <Fila etiqueta="Hash del token TSA" valor={<span className="mono">{resultado.sello.tsa_token_sha256}</span>} />
               ) : null}
               {resultado.sello.advertencia ? (
-                <div className="aviso aviso-atencion" style={{ marginTop: 12, marginBottom: 0 }}>
+                <div className="aviso" data-nivel="atencion" style={{ marginTop: 12, marginBottom: 0 }}>
                   {resultado.sello.advertencia}
                 </div>
               ) : null}

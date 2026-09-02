@@ -57,14 +57,14 @@ export default function Inicio() {
       <Marca enlace={false} sub="Registro probatorio de siniestros viales" />
 
       {salud && !salud.ok ? (
-        <div className="aviso aviso-alerta">
+        <div className="aviso" data-nivel="alerta">
           <strong>El sistema no está operativo.</strong>
           <div style={{ marginTop: 6 }}>{salud.detalle}</div>
         </div>
       ) : null}
 
       {/* Si el fallo al abrir es el mismo que ya avisa el estado del sistema, no se repite. */}
-      {error && error !== salud?.detalle ? <div className="aviso aviso-alerta">{error}</div> : null}
+      {error && error !== salud?.detalle ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
 
       <div className="inicio-centro">
         <button className="boton-gigante" onClick={iniciar} disabled={enviando}>

@@ -34,6 +34,23 @@
   --ok: #1c7040;
   --ok-fondo: #e8f5ee;
 
+  /*
+   * Blanco sobre una superficie de color pleno: texto de botones, el punto de la opción
+   * elegida, la tarjeta blanca sobre el rojo de emergencia. NO cambia con el tema, igual
+   * que --emergencia: sobre un fondo de color pleno el contraste lo da el color, no el
+   * tema del teléfono. Se declara además en canales para poder usarlo con transparencia.
+   */
+  --sobre-color: #ffffff;
+  --sobre-color-rgb: 255 255 255;
+
+  /* El QR necesita fondo claro para que una cámara lo lea, aunque el teléfono esté en
+     modo oscuro. Por eso es un token propio y no --superficie. */
+  --fondo-qr: #ffffff;
+
+  /* El rojo de emergencia en canales, para la sombra del botón de inicio, que hasta
+     ahora repetía a mano un rojo distinto (184,28,28) del token (#bf1b1b). */
+  --emergencia-rgb: 191 27 27;
+
   --radio: 12px;
   --radio-s: 8px;
   --sombra: 0 1px 2px rgba(16, 22, 31, 0.06), 0 4px 16px rgba(16, 22, 31, 0.05);
@@ -111,7 +128,7 @@ body {
   height: 30px;
   border-radius: 9px;
   background: var(--acento);
-  color: #fff;
+  color: var(--sobre-color);
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -193,6 +210,20 @@ p {
   margin-bottom: 12px;
 }
 
+/*
+ * Toda regla :hover vive dentro de @media (hover: hover), sin excepción.
+ *
+ * En una pantalla táctil el navegador deja el :hover pegado en lo último que se tocó, y
+ * sobre una opción del cuestionario eso se ve igual que haberla elegido. Antes se
+ * neutralizaba caso por caso con @media (hover: none), así que cada hover nuevo nacía
+ * desprotegido: hoy, en un teléfono, el botón de llamar al 107 quedaba apagado después
+ * de tocarlo, como si estuviera deshabilitado, justo en la pantalla donde el estado
+ * visual tiene que significar algo.
+ *
+ * Con la polaridad invertida el defecto es "sin hover" y agregar uno es seguro por
+ * construcción. `npm run contrato` falla si aparece un :hover fuera de este envoltorio.
+ */
+
 /* ---------- Botones ---------- */
 
 button,
@@ -221,12 +252,14 @@ button:disabled,
 
 .boton-primario {
   background: var(--acento);
-  color: #fff;
+  color: var(--sobre-color);
   width: 100%;
 }
 
-.boton-primario:hover:not(:disabled) {
-  background: var(--acento-fuerte);
+@media (hover: hover) {
+  .boton-primario:hover:not(:disabled) {
+    background: var(--acento-fuerte);
+  }
 }
 
 .boton-secundario {
@@ -235,8 +268,10 @@ button:disabled,
   border-color: var(--borde);
 }
 
-.boton-secundario:hover:not(:disabled) {
-  background: var(--superficie-2);
+@media (hover: hover) {
+  .boton-secundario:hover:not(:disabled) {
+    background: var(--superficie-2);
+  }
 }
 
 .boton-fantasma {
@@ -249,7 +284,7 @@ button:disabled,
 
 .boton-emergencia {
   background: var(--emergencia);
-  color: #fff;
+  color: var(--sobre-color);
   width: 100%;
   font-size: 17px;
   min-height: 56px;
@@ -336,8 +371,10 @@ textarea {
   font-weight: 500;
 }
 
-.opcion:hover {
-  border-color: var(--acento);
+@media (hover: hover) {
+  .opcion:hover {
+    border-color: var(--acento);
+  }
 }
 
 .opcion[data-elegida='true'] {
@@ -365,15 +402,15 @@ textarea {
   background: var(--acento);
 }
 
-.marca-opcion span {
+.marca-opcion-punto {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--sobre-color);
   display: none;
 }
 
-.opcion[data-elegida='true'] .marca-opcion span {
+.opcion[data-elegida='true'] .marca-opcion-punto {
   display: block;
 }
 
@@ -403,7 +440,7 @@ textarea {
 .zona[data-elegida='true'] {
   background: var(--emergencia);
   border-color: var(--emergencia);
-  color: #fff;
+  color: var(--sobre-color);
   font-weight: 650;
 }
 
@@ -451,26 +488,26 @@ textarea {
   border-left: 3px solid;
 }
 
-.aviso-info {
+.aviso[data-nivel='info'] {
   background: var(--acento-suave);
   border-color: var(--acento);
 }
-.aviso-ok {
+.aviso[data-nivel='ok'] {
   background: var(--ok-fondo);
   border-color: var(--ok);
   color: var(--ok);
 }
-.aviso-alerta {
+.aviso[data-nivel='alerta'] {
   background: var(--alerta-fondo);
   border-color: var(--alerta);
   color: var(--alerta);
 }
-.aviso-atencion {
+.aviso[data-nivel='atencion'] {
   background: var(--atencion-fondo);
   border-color: var(--atencion);
   color: var(--atencion);
 }
-.aviso-cobertura {
+.aviso[data-nivel='cobertura'] {
   background: var(--cobertura-fondo);
   border-color: var(--cobertura);
   color: var(--cobertura);
@@ -490,23 +527,23 @@ textarea {
   border-radius: 99px;
 }
 
-.insignia-alerta {
+.insignia[data-nivel='alerta'] {
   background: var(--alerta-fondo);
   color: var(--alerta);
 }
-.insignia-atencion {
+.insignia[data-nivel='atencion'] {
   background: var(--atencion-fondo);
   color: var(--atencion);
 }
-.insignia-cobertura {
+.insignia[data-nivel='cobertura'] {
   background: var(--cobertura-fondo);
   color: var(--cobertura);
 }
-.insignia-ok {
+.insignia[data-nivel='ok'] {
   background: var(--ok-fondo);
   color: var(--ok);
 }
-.insignia-neutra {
+.insignia[data-nivel='neutra'] {
   background: var(--superficie-2);
   color: var(--tinta-2);
 }
@@ -531,14 +568,14 @@ textarea {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.punto-ok {
+.punto[data-estado='ok'] {
   background: var(--ok);
 }
-.punto-espera {
+.punto[data-estado='espera'] {
   background: var(--atencion);
   animation: latido 1.4s ease-in-out infinite;
 }
-.punto-error {
+.punto[data-estado='error'] {
   background: var(--alerta);
 }
 
@@ -589,7 +626,7 @@ textarea {
   height: 19px;
   border-radius: 50%;
   background: var(--ok);
-  color: #fff;
+  color: var(--sobre-color);
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -634,8 +671,10 @@ tr:last-child td {
   border-bottom: none;
 }
 
-tbody tr:hover {
-  background: var(--superficie-2);
+@media (hover: hover) {
+  tbody tr:hover {
+    background: var(--superficie-2);
+  }
 }
 
 /* ---------- Utilidades ---------- */
@@ -646,8 +685,10 @@ tbody tr:hover {
   font-weight: 600;
 }
 
-.enlace:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .enlace:hover {
+    text-decoration: underline;
+  }
 }
 
 .pila {
@@ -667,14 +708,14 @@ tbody tr:hover {
 }
 
 .qr {
-  background: #fff;
+  background: var(--fondo-qr);
   padding: 14px;
   border-radius: var(--radio);
   display: inline-block;
   border: 1px solid var(--borde);
 }
 
-.qr svg {
+.qr-imagen svg {
   display: block;
   width: 100%;
   height: auto;
@@ -731,18 +772,20 @@ tbody tr:hover {
   flex-direction: column;
   gap: 10px;
   background: var(--emergencia);
-  color: #fff;
+  color: var(--sobre-color);
   border-radius: 24px;
   font-size: clamp(27px, 8.5vw, 38px);
   font-weight: 750;
   letter-spacing: -0.02em;
   line-height: 1.1;
   padding: 28px 22px;
-  box-shadow: 0 10px 30px rgba(184, 28, 28, 0.28);
+  box-shadow: 0 10px 30px rgb(var(--emergencia-rgb) / 0.28);
 }
 
-.boton-gigante:hover:not(:disabled) {
-  filter: brightness(1.06);
+@media (hover: hover) {
+  .boton-gigante:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
 }
 
 .boton-gigante span {
@@ -771,9 +814,11 @@ tbody tr:hover {
   text-decoration: none;
 }
 
-.enlaces-pie a:hover {
-  color: var(--tinta);
-  text-decoration: underline;
+@media (hover: hover) {
+  .enlaces-pie a:hover {
+    color: var(--tinta);
+    text-decoration: underline;
+  }
 }
 
 /* ---------- Estructura de una pantalla ---------- */
@@ -852,7 +897,9 @@ tbody tr:hover {
   overflow: hidden;
 }
 
-.progreso-fino > div {
+.progreso-fino-relleno {
+  /* El avance llega como --avance desde el marcado: es un dato, no un estilo. */
+  width: var(--avance, 0%);
   height: 100%;
   background: var(--acento);
   border-radius: 3px;
@@ -910,7 +957,7 @@ tbody tr:hover {
   height: 24px;
 }
 
-.opciones-grandes .marca-opcion span {
+.opciones-grandes .marca-opcion-punto {
   width: 10px;
   height: 10px;
 }
@@ -971,33 +1018,35 @@ tbody tr:hover {
   text-underline-offset: 3px;
 }
 
-.omitir:hover {
-  color: var(--tinta-2);
+@media (hover: hover) {
+  .omitir:hover {
+    color: var(--tinta-2);
+  }
 }
 
 /* ---------- Emergencia ---------- */
 
 .emergencia {
   background: var(--emergencia);
-  color: #fff;
+  color: var(--sobre-color);
   border-radius: var(--radio);
   padding: 24px 20px;
   margin-top: 8px;
 }
 
 .emergencia h1 {
-  color: #fff;
+  color: var(--sobre-color);
   font-size: clamp(26px, 7.5vw, 34px);
   margin: 0 0 8px;
 }
 
 .emergencia p {
-  color: rgba(255, 255, 255, 0.92);
+  color: rgb(var(--sobre-color-rgb) / 0.92);
   font-size: 15.5px;
 }
 
 .boton-llamada {
-  background: #fff;
+  background: var(--sobre-color);
   color: var(--emergencia);
   width: 100%;
   min-height: 82px;
@@ -1014,21 +1063,25 @@ tbody tr:hover {
   opacity: 0.75;
 }
 
-.boton-llamada:hover:not(:disabled) {
-  filter: brightness(0.95);
+@media (hover: hover) {
+  .boton-llamada:hover:not(:disabled) {
+    filter: brightness(0.95);
+  }
 }
 
 .boton-claro {
   background: transparent;
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.55);
+  color: var(--sobre-color);
+  border: 2px solid rgb(var(--sobre-color-rgb) / 0.55);
   width: 100%;
   min-height: 54px;
   font-size: 16px;
 }
 
-.boton-claro:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+@media (hover: hover) {
+  .boton-claro:hover:not(:disabled) {
+    background: rgb(var(--sobre-color-rgb) / 0.12);
+  }
 }
 
 /* ---------- Chip de estado (ubicación) ---------- */
@@ -1083,9 +1136,11 @@ tbody tr:hover {
   width: 100%;
 }
 
-.foto-guiada:hover {
-  border-color: var(--acento);
-  background: var(--acento-suave);
+@media (hover: hover) {
+  .foto-guiada:hover {
+    border-color: var(--acento);
+    background: var(--acento-suave);
+  }
 }
 
 .foto-guiada small {
@@ -1153,8 +1208,10 @@ tbody tr:hover {
   font-weight: 500;
 }
 
-.faltante:hover {
-  border-color: var(--acento);
+@media (hover: hover) {
+  .faltante:hover {
+    border-color: var(--acento);
+  }
 }
 
 .faltante-ir {
@@ -1178,19 +1235,15 @@ tbody tr:hover {
   border: 0;
 }
 
-/*
-  En pantallas táctiles el navegador deja el estado :hover pegado en lo último que
-  se tocó. Sobre una opción eso se ve igual que una elección, así que se apaga: en
-  el celular la única marca de selección tiene que ser la de la respuesta real.
-*/
-@media (hover: none) {
-  .opcion:hover:not([data-elegida='true']),
-  .faltante:hover {
-    border-color: var(--borde);
-  }
 
-  .foto-guiada:hover {
-    border-color: var(--borde);
-    background: var(--superficie);
-  }
+
+/*
+ * Entrada de archivo oculta.
+ *
+ * El disparador de la cámara es un <label> que envuelve un <input type="file">. El input
+ * tiene que existir en el árbol y estar oculto: reemplazar el label por un <button> o
+ * sacar el input de adentro deja la pantalla igual y desactiva la cámara.
+ */
+.entrada-oculta {
+  display: none;
 }

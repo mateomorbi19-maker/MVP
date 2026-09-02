@@ -36,7 +36,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
             {caso.patente ? `${caso.patente} · ` : ''}
             {caso.asegurado || 'Sin asegurado declarado'}
             {' · '}
-            <span className={`insignia ${caso.estado === 'cerrado' ? 'insignia-ok' : 'insignia-neutra'}`}>
+            <span className="insignia" data-nivel={caso.estado === 'cerrado' ? 'ok' : 'neutra'}>
               {caso.estado === 'cerrado' ? 'Sellada' : 'En curso'}
             </span>
           </p>
@@ -63,19 +63,19 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
           </p>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            <span className="insignia insignia-alerta">{consistencia.resumen.alertas} contradicciones</span>
-            <span className="insignia insignia-cobertura">{consistencia.resumen.banderas_cobertura} cobertura</span>
-            <span className="insignia insignia-atencion">{consistencia.resumen.atenciones} a revisar</span>
-            <span className="insignia insignia-ok">{consistencia.resumen.controles_ok} consistentes</span>
+            <span className="insignia" data-nivel="alerta">{consistencia.resumen.alertas} contradicciones</span>
+            <span className="insignia" data-nivel="cobertura">{consistencia.resumen.banderas_cobertura} cobertura</span>
+            <span className="insignia" data-nivel="atencion">{consistencia.resumen.atenciones} a revisar</span>
+            <span className="insignia" data-nivel="ok">{consistencia.resumen.controles_ok} consistentes</span>
           </div>
 
           {(['alerta', 'cobertura', 'atencion', 'ok'] as const).map((nivel) =>
             consistencia.hallazgos
               .filter((h) => h.nivel === nivel)
               .map((h, i) => (
-                <div className={`aviso aviso-${nivel}`} key={`${nivel}-${i}`}>
+                <div className="aviso" data-nivel={nivel} key={`${nivel}-${i}`}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
-                    <span className={`insignia insignia-${nivel}`}>{ETIQUETA_NIVEL[nivel]}</span>
+                    <span className="insignia" data-nivel={nivel}>{ETIQUETA_NIVEL[nivel]}</span>
                     <strong>{h.titulo}</strong>
                   </div>
                   <div className="mini" style={{ color: 'inherit', opacity: 0.85 }}>
@@ -295,7 +295,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
               }
             />
             {caso.sello.firma.advertencia ? (
-              <div className="aviso aviso-atencion" style={{ marginTop: 12, marginBottom: 0 }}>
+              <div className="aviso" data-nivel="atencion" style={{ marginTop: 12, marginBottom: 0 }}>
                 {caso.sello.firma.advertencia}
               </div>
             ) : null}

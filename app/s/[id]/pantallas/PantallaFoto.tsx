@@ -48,7 +48,7 @@ export function PantallaFoto({
         <h1 className="pregunta">{paso.guia.titulo}</h1>
         <p className="pregunta-ayuda">{paso.guia.instruccion}</p>
 
-        {fallo ? <div className="aviso aviso-alerta">{fallo}</div> : null}
+        {fallo ? <div className="aviso" data-nivel="alerta">{fallo}</div> : null}
 
         {tomada ? (
           <div className="foto-tomada">
@@ -59,7 +59,7 @@ export function PantallaFoto({
           <label className="foto-guiada">
             {subiendo ? 'Subiendo...' : 'Sacar la foto'}
             <small>La hora y el lugar los pone el sistema, no el archivo</small>
-            <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={elegir} disabled={subiendo} />
+            <input type="file" accept="image/*" capture="environment" className="entrada-oculta" onChange={elegir} disabled={subiendo} />
           </label>
         )}
       </div>
@@ -72,7 +72,7 @@ export function PantallaFoto({
             </button>
             <label className="boton boton-secundario" style={{ cursor: 'pointer' }}>
               Repetir la foto
-              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={elegir} />
+              <input type="file" accept="image/*" capture="environment" className="entrada-oculta" onChange={elegir} />
             </label>
           </>
         ) : (

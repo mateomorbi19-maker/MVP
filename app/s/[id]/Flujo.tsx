@@ -382,18 +382,18 @@ export function Flujo(props: Props) {
             </button>
           ) : null}
           <div className="progreso-fino" role="progressbar" aria-valuenow={porcentaje} aria-valuemin={0} aria-valuemax={100}>
-            <div style={{ width: `${porcentaje}%` }} />
+            <div className="progreso-fino-relleno" style={{ ['--avance']: `${porcentaje}%` } as React.CSSProperties} />
           </div>
           {guardando ? <span className="contador">Guardando</span> : null}
         </div>
       ) : null}
 
-      <div className="pantalla" key={actual?.clave ?? 'vacio'}>
+      <div className="pantalla" data-paso={actual?.tipo ?? 'vacio'} data-bloque={actual?.bloque ?? 'vacio'} key={actual?.clave ?? 'vacio'}>
         {conUbicacion ? (
           <ChipUbicacion estado={estadoGps} ubicacion={ubicacion} fallo={falloGps} alReintentar={pedirUbicacion} />
         ) : null}
 
-        {error ? <div className="aviso aviso-alerta">{error}</div> : null}
+        {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
 
         {actual?.tipo === 'pregunta' ? (
           <PantallaPregunta

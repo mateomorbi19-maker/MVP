@@ -58,8 +58,8 @@ export function ChipUbicacion({
 
   if (estado !== 'error') {
     return (
-      <div className="chip">
-        <span className={`punto ${estado === 'ok' ? 'punto-ok' : 'punto-espera'}`} />
+      <div className="chip" data-estado={estado}>
+        <span className="punto" data-estado={estado === 'ok' ? 'ok' : 'espera'} />
         <span>
           {estado === 'ok'
             ? `Ubicación registrada${ubicacion?.direccion ? ` · ${ubicacion.direccion.split(',').slice(0, 2).join(', ')}` : ''}`
@@ -74,13 +74,13 @@ export function ChipUbicacion({
   return (
     <>
       <button className="chip" data-estado="error" onClick={() => setAbierto((a) => !a)}>
-        <span className="punto punto-error" />
+        <span className="punto" data-estado="error" />
         <span>Sin ubicación · tocá para resolverlo</span>
         <span className="chip-flecha">{abierto ? '▲' : '▼'}</span>
       </button>
 
       {abierto ? (
-        <div className="aviso aviso-atencion">
+        <div className="aviso" data-nivel="atencion">
           <strong>{guia.titulo}</strong>
           <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
             Sin ubicación, el expediente pierde el registro objetivo del lugar, la hora solar y el clima. Son
