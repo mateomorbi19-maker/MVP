@@ -51,21 +51,67 @@ export function hashEvento(entrada: {
 }
 
 /**
- * Registra un eslabón nuevo. Usa SELECT ... FOR UPDATE sobre el caso para que dos
- * requests simultáneas no encadenen sobre el mismo eslabón previo.
+ * La actuación ya fue sellada y no admite eslabones nuevos.
+ *
+ * Se distingue de un fallo cualquiera porque los route handlers la traducen a un 409,
+ * que es lo que el cliente necesita para dejar de reintentar.
+ */
+export class ErrorActuacionCerrada extends Error {
+  constructor(readonly casoId: string) {
+    super('La actuación ya fue cerrada y sellada: no admite cambios.')
+    this.name = 'ErrorActuacionCerrada'
+  }
+}
+
+export interface OpcionesEvento {
+  /**
+   * Cliente de una transacción ya abierta por quien llama.
+   *
+   * Es lo que permite que el cierre registre sus dos eslabones y construya el
+   * manifiesto dentro de la misma transacción, sin que se cuele nada en el medio.
+   */
+  cliente?: PoolClient
+}
+
+/**
+ * Registra un eslabón nuevo.
+ *
+ * Toma SELECT ... FOR UPDATE sobre el caso por dos motivos: para que dos requests
+ * simultáneas no encadenen sobre el mismo eslabón previo, y para leer el estado dentro
+ * del mismo lock. Lo segundo importa más de lo que parece: si la comprobación de
+ * "¿está cerrada?" la hace el route handler antes de llamar acá, entre esa lectura y
+ * esta escritura entra el cierre, y el eslabón queda fuera del manifiesto sellado. Desde
+ * ahí el verificador público denuncia como alterado un expediente intacto, para siempre.
  */
 export async function registrarEvento(
   casoId: string,
   tipo: string,
   detalle: Record<string, unknown> = {},
-  clienteExistente?: PoolClient,
+  opciones: OpcionesEvento = {},
 ): Promise<{ hash: string; id: number }> {
+  /*
+   * El cuarto parámetro era un PoolClient suelto. Si alguien pasa el viejo, `cliente`
+   * queda undefined, se abre una conexión aparte y el eslabón se escribe FUERA de la
+   * transacción de quien llama: si esa transacción hace ROLLBACK, queda un eslabón
+   * encadenado que referencia algo que no existe. Falla ruidoso y en desarrollo.
+   */
+  if (opciones && typeof (opciones as { query?: unknown }).query === 'function') {
+    throw new Error(
+      'registrarEvento cambió de firma: pasá { cliente } como cuarto argumento en vez del PoolClient suelto.',
+    )
+  }
+
   const pg = await db()
-  const cliente = clienteExistente ?? (await pg.connect())
-  const propio = !clienteExistente
+  const cliente = opciones.cliente ?? (await pg.connect())
+  const propio = !opciones.cliente
   try {
     if (propio) await cliente.query('BEGIN')
-    await cliente.query('SELECT id FROM casos WHERE id = $1 FOR UPDATE', [casoId])
+    const caso = await cliente.query<{ estado: string }>(
+      'SELECT estado FROM casos WHERE id = $1 FOR UPDATE',
+      [casoId],
+    )
+    if (caso.rowCount === 0) throw new Error(`No existe la actuación ${casoId}.`)
+    if (caso.rows[0].estado === 'cerrado') throw new ErrorActuacionCerrada(casoId)
     const previo = await cliente.query<{ hash: string }>(
       'SELECT hash FROM eventos WHERE caso_id = $1 ORDER BY id DESC LIMIT 1',
       [casoId],
@@ -106,20 +152,51 @@ export interface Manifiesto {
   hash_maestro: string
 }
 
+/**
+ * Versión del manifiesto que se le asigna a toda actuación nueva.
+ *
+ * '1.0' describía la pieza del testigo como `Declaración de <nombre>`, y esa cadena entra
+ * al preimagen del hash maestro. Con el nombre adentro, suprimir los datos del testigo
+ * —que es un derecho suyo, art. 16 de la Ley 25.326, y que la pantalla de carga le
+ * promete— hace que el verificador público declare alterado el expediente. Desde '1.1' la
+ * descripción es genérica y el nombre vive sólo en la tabla, donde se puede borrar.
+ *
+ * Las actuaciones viejas conservan su versión y su descripción: cambiarlas les movería el
+ * hash maestro que ya está sellado.
+ */
+export const VERSION_MANIFIESTO = '1.1'
+
 /** Reconstruye el manifiesto completo del expediente y calcula el hash maestro. */
-export async function construirManifiesto(casoId: string): Promise<Manifiesto> {
-  const pg = await db()
+export async function construirManifiesto(
+  casoId: string,
+  opciones: OpcionesEvento = {},
+): Promise<Manifiesto> {
+  const pg = opciones.cliente ?? (await db())
+  const caso = await pg.query<{ manifiesto_version: string }>(
+    'SELECT manifiesto_version FROM casos WHERE id = $1',
+    [casoId],
+  )
+  const version = caso.rows[0]?.manifiesto_version ?? '1.0'
+
   const eventos = await pg.query(
     'SELECT ts, tipo, detalle, hash_previo, hash FROM eventos WHERE caso_id = $1 ORDER BY id ASC',
     [casoId],
   )
+  /*
+   * El desempate por id no es decorativo. `piezas` es un array y entra al canonico() del
+   * que sale el hash maestro: si dos piezas comparten timestamp, Postgres puede devolver
+   * dos órdenes distintos y el mismo expediente intacto produce dos hashes distintos.
+   * Los timestamps se escriben desde JS con resolución de milisegundo, así que el empate
+   * no es hipotético.
+   */
   const medias = await pg.query(
-    'SELECT id, tipo, guia_id, sha256, bytes FROM medias WHERE caso_id = $1 ORDER BY capturado_en ASC',
+    'SELECT id, tipo, guia_id, sha256, bytes FROM medias WHERE caso_id = $1 ORDER BY capturado_en ASC, id ASC',
     [casoId],
   )
-  const testigos = await pg.query('SELECT id, nombre, sha256 FROM testigos WHERE caso_id = $1 ORDER BY creado_en ASC', [
-    casoId,
-  ])
+  const testigos = await pg.query(
+    'SELECT id, nombre, sha256 FROM testigos WHERE caso_id = $1 ORDER BY creado_en ASC, id ASC',
+    [casoId],
+  )
 
   const cadena: EslabonManifiesto[] = eventos.rows.map((e, i) => ({
     n: i + 1,
@@ -141,13 +218,14 @@ export async function construirManifiesto(casoId: string): Promise<Manifiesto> {
     ...testigos.rows.map((t) => ({
       tipo: 'testigo',
       id: t.id as string,
-      descripcion: `Declaración de ${t.nombre}`,
+      // Ver VERSION_MANIFIESTO: desde '1.1' el nombre no entra al hash maestro.
+      descripcion: version === '1.0' ? `Declaración de ${t.nombre}` : 'Declaración de testigo',
       sha256: t.sha256 as string,
     })),
   ]
 
   const generado_en = new Date().toISOString()
-  const cuerpo = { version: '1.0', caso_id: casoId, cadena, piezas }
+  const cuerpo = { version, caso_id: casoId, cadena, piezas }
   const hash_maestro = sha256(canonico(cuerpo))
 
   return { ...cuerpo, generado_en, hash_maestro }

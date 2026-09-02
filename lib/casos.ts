@@ -22,6 +22,8 @@ export interface Caso {
   consistencia: InformeConsistencia | null
   hash_maestro: string | null
   sello: Sello | null
+  /** Ver VERSION_MANIFIESTO en lib/hash.ts. Las actuaciones viejas conservan la suya. */
+  manifiesto_version: string
 }
 
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : String(v))
@@ -43,6 +45,7 @@ function mapear(fila: Record<string, unknown>): Caso {
     consistencia: (fila.consistencia as InformeConsistencia) ?? null,
     hash_maestro: (fila.hash_maestro as string) ?? null,
     sello: (fila.sello as Sello) ?? null,
+    manifiesto_version: (fila.manifiesto_version as string) ?? '1.0',
   }
 }
 
