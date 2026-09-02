@@ -12,6 +12,7 @@
 
 import type { Clima } from './clima'
 import { calleCoincide } from './geo'
+import { VALOR } from './cuestionario'
 
 export type Nivel = 'alerta' | 'atencion' | 'cobertura' | 'ok'
 
@@ -57,7 +58,7 @@ export function analizar(e: Entrada): InformeConsistencia {
   if (pavimento && clima?.precipitacion_3h_mm !== null && clima?.precipitacion_3h_mm !== undefined) {
     const llovio = clima.precipitacion_3h_mm > 0.2
     let pavimentoObservado = false
-    if (pavimento === 'Seco' && llovio) {
+    if (pavimento === VALOR.pavimento.SECO && llovio) {
       h.push({
         nivel: 'alerta',
         titulo: 'Pavimento declarado seco con lluvia registrada',
@@ -67,7 +68,7 @@ export function analizar(e: Entrada): InformeConsistencia {
           'La condición del pavimento incide directamente en la distancia de frenado y en la atribución de responsabilidad. Conviene repreguntar.',
       })
       pavimentoObservado = true
-    } else if (pavimento === 'Mojado' && !llovio) {
+    } else if (pavimento === VALOR.pavimento.MOJADO && !llovio) {
       h.push({
         nivel: 'atencion',
         titulo: 'Pavimento declarado mojado sin lluvia registrada',
@@ -77,7 +78,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       })
       pavimentoObservado = true
     }
-    if (pavimento === 'Con hielo o escarcha' && clima.temperatura_c !== null && clima.temperatura_c > 5) {
+    if (pavimento === VALOR.pavimento.CON_HIELO_O_ESCARCHA && clima.temperatura_c !== null && clima.temperatura_c > 5) {
       h.push({
         nivel: 'alerta',
         titulo: 'Hielo declarado con temperatura incompatible',
@@ -102,18 +103,18 @@ export function analizar(e: Entrada): InformeConsistencia {
   const climaDecl = s(r.clima)
   if (climaDecl && clima) {
     const precip = clima.precipitacion_mm ?? 0
-    const secoDeclarado = climaDecl === 'Despejado' || climaDecl === 'Nublado'
-    const lluviaDeclarada = climaDecl === 'Lloviznando' || climaDecl === 'Lluvia fuerte'
+    const secoDeclarado = climaDecl === VALOR.clima.DESPEJADO || climaDecl === VALOR.clima.NUBLADO
+    const lluviaDeclarada = climaDecl === VALOR.clima.LLOVIZNANDO || climaDecl === VALOR.clima.LLUVIA_FUERTE
 
     /** Categoría real según el código WMO, para comparar contra lo declarado. */
     const categoriaReal = ((codigo: number | null): string | null => {
       if (codigo === null) return null
-      if (codigo <= 1) return 'Despejado'
-      if (codigo <= 3) return 'Nublado'
-      if (codigo === 45 || codigo === 48) return 'Niebla'
-      if (codigo >= 51 && codigo <= 57) return 'Lloviznando'
-      if (codigo === 61) return 'Lloviznando'
-      return 'Lluvia fuerte'
+      if (codigo <= 1) return VALOR.clima.DESPEJADO
+      if (codigo <= 3) return VALOR.clima.NUBLADO
+      if (codigo === 45 || codigo === 48) return VALOR.clima.NIEBLA
+      if (codigo >= 51 && codigo <= 57) return VALOR.clima.LLOVIZNANDO
+      if (codigo === 61) return VALOR.clima.LLOVIZNANDO
+      return VALOR.clima.LLUVIA_FUERTE
     })(clima.codigo_wmo)
 
     if (secoDeclarado && precip > 0.5) {
@@ -132,19 +133,19 @@ export function analizar(e: Entrada): InformeConsistencia {
         objetivo: `${clima.descripcion} — sin precipitación en la hora del hecho`,
         detalle: 'Las lluvias muy localizadas pueden no aparecer en el modelo. No es concluyente por sí solo.',
       })
-    } else if (climaDecl === 'Niebla' && (clima.visibilidad_m ?? 99999) > 5000) {
+    } else if (climaDecl === VALOR.clima.NIEBLA && (clima.visibilidad_m ?? 99999) > 5000) {
       h.push({
         nivel: 'atencion',
         titulo: 'Niebla declarada con buena visibilidad registrada',
-        declarado: 'Niebla',
+        declarado: VALOR.clima.NIEBLA,
         objetivo: `Visibilidad estimada: ${Math.round((clima.visibilidad_m ?? 0) / 1000)} km`,
         detalle: 'La niebla de banco es muy local y puede no estar reflejada en el modelo.',
       })
-    } else if (climaDecl === 'Viento fuerte' && (clima.rafaga_kmh ?? 0) < 30) {
+    } else if (climaDecl === VALOR.clima.VIENTO_FUERTE && (clima.rafaga_kmh ?? 0) < 30) {
       h.push({
         nivel: 'atencion',
         titulo: 'Viento fuerte declarado sin registro de ráfagas',
-        declarado: 'Viento fuerte',
+        declarado: VALOR.clima.VIENTO_FUERTE,
         objetivo: `Ráfagas registradas: ${clima.rafaga_kmh ?? 0} km/h`,
         detalle: 'Las ráfagas registradas no alcanzan valores que afecten la conducción.',
       })
@@ -174,8 +175,8 @@ export function analizar(e: Entrada): InformeConsistencia {
   /* --- 3. Luz declarada vs hora solar real --- */
   const luz = s(r.luz)
   if (luz && clima?.es_de_dia !== null && clima?.es_de_dia !== undefined) {
-    const dijoDia = luz === 'De día, buena luz' || luz === 'Sol de frente'
-    const dijoNoche = luz === 'De noche con iluminación' || luz === 'De noche sin iluminación'
+    const dijoDia = luz === VALOR.luz.DE_DIA_BUENA_LUZ || luz === VALOR.luz.SOL_DE_FRENTE
+    const dijoNoche = luz === VALOR.luz.DE_NOCHE_CON_ILUMINACION || luz === VALOR.luz.DE_NOCHE_SIN_ILUMINACION
     const horaSolar = `amanecer ${(clima.amanecer ?? '').slice(11, 16)} / atardecer ${(clima.atardecer ?? '').slice(11, 16)}`
 
     if (dijoDia && !clima.es_de_dia) {
@@ -208,7 +209,7 @@ export function analizar(e: Entrada): InformeConsistencia {
   /* --- 4. Antigüedad declarada del hecho --- */
   const momento = s(r.momento_declarado)
   if (momento) {
-    if (momento === 'Ayer o antes' || momento === 'Hace más de 2 horas') {
+    if (momento === VALOR.momento_declarado.AYER_O_ANTES || momento === VALOR.momento_declarado.HACE_MAS_DE_2_HORAS) {
       h.push({
         nivel: 'alerta',
         titulo: 'La evidencia objetiva no corresponde al momento del hecho',
@@ -217,7 +218,7 @@ export function analizar(e: Entrada): InformeConsistencia {
         detalle:
           'La ubicación y las condiciones meteorológicas registradas son las del momento de la carga, no las del siniestro. El valor probatorio del expediente cae sensiblemente y el motor de consistencia no puede contrastar el resto de las respuestas.',
       })
-    } else if (momento === 'Recién, hace menos de 10 minutos') {
+    } else if (momento === VALOR.momento_declarado.RECIEN_HACE_MENOS_DE_10_MINUTOS) {
       h.push({
         nivel: 'ok',
         titulo: 'Captura inmediata al hecho',
@@ -256,7 +257,7 @@ export function analizar(e: Entrada): InformeConsistencia {
   const maniobra = s(r.maniobra)
   const freno = s(r.freno)
 
-  if (maniobra === 'Detenido por completo' && velocidad !== null && velocidad > 5) {
+  if (maniobra === VALOR.maniobra.DETENIDO_POR_COMPLETO && velocidad !== null && velocidad > 5) {
     h.push({
       nivel: 'alerta',
       titulo: 'Contradicción interna: detenido pero con velocidad declarada',
@@ -265,7 +266,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Contradicción dentro de la propia declaración, sin necesidad de contrastar con datos externos.',
     })
   }
-  if (freno === 'Sí, frené a fondo' && velocidad !== null && velocidad === 0) {
+  if (freno === VALOR.freno.SI_FRENE_A_FONDO && velocidad !== null && velocidad === 0) {
     h.push({
       nivel: 'atencion',
       titulo: 'Frenada declarada con velocidad cero',
@@ -286,7 +287,7 @@ export function analizar(e: Entrada): InformeConsistencia {
 
   /* --- 7. Banderas de cobertura --- */
   const licencia = s(r.licencia_vigente)
-  if (licencia === 'No, estaba vencida' || licencia === 'No tengo licencia') {
+  if (licencia === VALOR.licencia_vigente.NO_ESTABA_VENCIDA || licencia === VALOR.licencia_vigente.NO_TENGO_LICENCIA) {
     h.push({
       nivel: 'cobertura',
       titulo: 'Licencia de conducir no vigente',
@@ -295,7 +296,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Verificar contra el registro de licencias y las condiciones particulares de la póliza.',
     })
   }
-  if (s(r.alcoholemia) === 'Sí, dio positivo') {
+  if (s(r.alcoholemia) === VALOR.alcoholemia.SI_DIO_POSITIVO) {
     h.push({
       nivel: 'cobertura',
       titulo: 'Test de alcoholemia positivo',
@@ -304,7 +305,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Solicitar el acta de la autoridad interviniente con el valor registrado.',
     })
   }
-  if (s(r.alcoholemia) === 'Se ofreció y no se realizó') {
+  if (s(r.alcoholemia) === VALOR.alcoholemia.SE_OFRECIO_Y_NO_SE_REALIZO) {
     h.push({
       nivel: 'atencion',
       titulo: 'Test de alcoholemia ofrecido y no realizado',
@@ -313,7 +314,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'En varias jurisdicciones la negativa tiene el mismo efecto que el resultado positivo.',
     })
   }
-  if (s(r.quien_conducia) === 'Otra persona') {
+  if (s(r.quien_conducia) === VALOR.quien_conducia.OTRA_PERSONA) {
     h.push({
       nivel: 'cobertura',
       titulo: 'Conducía una persona distinta del titular',
@@ -322,7 +323,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Contrastar los datos cargados contra los conductores declarados en la póliza.',
     })
   }
-  if (s(r.uso_vehiculo) === 'Trabajo con el vehículo (reparto, aplicación, taxi)') {
+  if (s(r.uso_vehiculo) === VALOR.uso_vehiculo.TRABAJO_CON_EL_VEHICULO_REPARTO_APLICACION_TAXI) {
     h.push({
       nivel: 'cobertura',
       titulo: 'Uso comercial del vehículo',
@@ -331,7 +332,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Si la póliza es de uso particular, el uso comercial suele ser causal de exclusión.',
     })
   }
-  if (s(r.vtv) === 'No') {
+  if (s(r.vtv) === VALOR.vtv.NO) {
     h.push({
       nivel: 'cobertura',
       titulo: 'Revisión técnica no vigente',
@@ -340,7 +341,7 @@ export function analizar(e: Entrada): InformeConsistencia {
       detalle: 'Su incidencia sobre la cobertura varía según la jurisdicción y el texto de la póliza.',
     })
   }
-  if (s(r.tercero_actitud) === 'Se dio a la fuga') {
+  if (s(r.tercero_actitud) === VALOR.tercero_actitud.SE_DIO_A_LA_FUGA) {
     h.push({
       nivel: 'atencion',
       titulo: 'El tercero se dio a la fuga',

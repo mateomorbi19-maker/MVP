@@ -204,6 +204,16 @@ const climaLluvioso = {
   zona_horaria: 'America/Argentina/Buenos_Aires',
 }
 
+/*
+ * Los textos de las respuestas van escritos a mano y NO importados de VALOR, a propósito.
+ *
+ * Si alguien cambia la redacción de una opción, el motor de consistencia pasa a comparar
+ * contra el texto nuevo y estas aserciones —que siguen diciendo el viejo— fallan. Eso es
+ * lo que queremos: el motor dejó de reconocer los expedientes ya sellados, que guardan el
+ * texto anterior en su JSONB, y hay que enterarse acá y no en el informe del liquidador.
+ * Importar VALOR haría que los fixtures acompañen el cambio y la prueba pase en verde
+ * mientras la aplicación real deja de detectar la contradicción.
+ */
 const entradaBase = {
   respuestas: {},
   clima: climaLluvioso,
