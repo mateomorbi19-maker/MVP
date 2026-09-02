@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
+import { SinSesion } from '@/app/components/SinSesion'
 
 type Documento = { id: string; tipo: string; titulo: string | null; sha256: string; creado_en: string }
 type Poliza = {
@@ -25,12 +27,18 @@ const TIPOS = ['Cédula verde', 'Licencia de conducir', 'VTV', 'Póliza', 'Otro'
 export default function MiPoliza() {
   const [polizas, setPolizas] = useState<Poliza[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sinSesion, setSinSesion] = useState(false)
   const [alta, setAlta] = useState(false)
   const [nueva, setNueva] = useState({ numero: '', aseguradora: '', patente: '', marca_modelo: '', anio: '' })
 
   const cargar = () =>
     fetch('/api/polizas')
       .then(async (r) => {
+        // Que falte la sesión no es una falla del sistema: es un estado con su propia salida.
+        if (r.status === 401) {
+          setSinSesion(true)
+          return
+        }
         const c = await r.json()
         if (!r.ok) throw new Error(c?.error ?? 'No se pudieron leer las pólizas.')
         setPolizas(c)
@@ -79,9 +87,19 @@ export default function MiPoliza() {
 
   return (
     <main className="envoltura">
-      <Marca sub="Mi póliza y documentación" />
+      <Marca />
+
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Mi póliza y documentación</h1>
+        <p className="bajada-pagina">
+          Lo que tenés que tener a mano el día del choque y nunca aparece: el número de póliza, la cédula, la licencia
+          y la VTV. Cargalo una vez y queda acá.
+        </p>
+      </header>
 
       {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
+
+      {sinSesion ? <SinSesion volver="/poliza" que="tu póliza" /> : null}
 
       {(polizas ?? []).map((p) => (
         <div className="tarjeta" key={p.id}>
@@ -122,7 +140,20 @@ export default function MiPoliza() {
         </div>
       ))}
 
-      {alta ? (
+      {polizas !== null && polizas.length === 0 && !alta ? (
+        <div className="vacio">
+          <span className="vacio-icono">
+            <Icono nombre="archivo" />
+          </span>
+          <h2 className="vacio-titulo">Todavía no cargaste ninguna póliza</h2>
+          <p className="vacio-texto">
+            Con la póliza cargada, el recorrido de un siniestro arranca con tus datos ya puestos y no tenés que
+            buscarlos parado al lado del auto.
+          </p>
+        </div>
+      ) : null}
+
+      {alta && !sinSesion ? (
         <form className="tarjeta" onSubmit={guardar}>
           <h3>Agregar una póliza</h3>
           <div className="campo">
@@ -149,8 +180,11 @@ export default function MiPoliza() {
             Guardar
           </button>
         </form>
-      ) : (
-        <button className="boton boton-secundario" onClick={() => setAlta(true)}>
+      ) : sinSesion ? null : (
+        <button
+          className={`boton boton-ancho ${polizas?.length ? 'boton-secundario' : 'boton-primario'}`}
+          onClick={() => setAlta(true)}
+        >
           Agregar una póliza
         </button>
       )}

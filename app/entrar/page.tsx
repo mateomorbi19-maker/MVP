@@ -43,7 +43,15 @@ function Formulario() {
 
   return (
     <main className="envoltura">
-      <Marca sub="Iniciar sesión" />
+      <Marca />
+
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Entrá a tu cuenta</h1>
+        <p className="bajada-pagina">
+          Para ver tu póliza, tu historial de actuaciones y mandarle el acta a tu productor. Registrar un siniestro no
+          necesita cuenta.
+        </p>
+      </header>
 
       <form className="tarjeta" onSubmit={entrar}>
         <div className="campo">

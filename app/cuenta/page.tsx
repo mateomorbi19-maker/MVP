@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
 import { leerSesion } from '@/lib/sesion'
 import { CerrarSesion, CambiarClave } from './Acciones'
 
@@ -12,36 +13,75 @@ export const dynamic = 'force-dynamic'
  * El historial de actuaciones NO está acá: vive en /historial, con el estado del trámite
  * de cada una. Acá quedan los datos y la contraseña.
  */
+/**
+ * Los accesos de la cuenta.
+ *
+ * Van como tarjetas con detalle y no como botones apilados: «Mis datos y contacto de
+ * confianza» dentro de un botón no dice qué es un contacto de confianza, y esa es
+ * justamente la sección que nadie completa por no saber para qué sirve.
+ */
+const SECCIONES = [
+  {
+    href: '/historial',
+    icono: 'archivo',
+    titulo: 'Mis actuaciones',
+    detalle: 'Los siniestros que registraste y en qué estado está cada trámite.',
+    soloEquipo: false,
+  },
+  {
+    href: '/poliza',
+    icono: 'escudo',
+    titulo: 'Mi póliza y documentación',
+    detalle: 'Tu cobertura, la cédula, la licencia y el productor asignado.',
+    soloEquipo: false,
+  },
+  {
+    href: '/perfil',
+    icono: 'personas',
+    titulo: 'Mis datos y contacto de confianza',
+    detalle: 'A quién avisar si el teléfono detecta un impacto y no respondés.',
+    soloEquipo: false,
+  },
+  {
+    href: '/panel',
+    icono: 'verificar',
+    titulo: 'Panel de siniestros',
+    detalle: 'Las actuaciones que te llegaron para gestionar.',
+    soloEquipo: true,
+  },
+] as const
+
 export default async function Cuenta() {
   const sesion = await leerSesion()
   if (!sesion) redirect('/entrar?volver=/cuenta')
 
   return (
     <main className="envoltura">
-      <Marca sub="Mi cuenta" />
+      <Marca />
 
-      <div className="tarjeta">
-        <h1>{sesion.nombre ?? `DNI ${sesion.dni}`}</h1>
-        <p className="apagado">
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">{sesion.nombre ?? `DNI ${sesion.dni}`}</h1>
+        <p className="bajada-pagina">
           DNI {sesion.dni} · {sesion.rol}
         </p>
-        <div className="pila">
-          <Link className="boton boton-secundario" href="/historial">
-            Mis actuaciones
-          </Link>
-          <Link className="boton boton-secundario" href="/poliza">
-            Mi póliza y documentación
-          </Link>
-          <Link className="boton boton-secundario" href="/perfil">
-            Mis datos y contacto de confianza
-          </Link>
-          {sesion.rol !== 'asegurado' ? (
-            <Link className="boton boton-secundario" href="/panel">
-              Panel de siniestros
-            </Link>
-          ) : null}
-        </div>
-      </div>
+      </header>
+
+      {SECCIONES.filter((s) => !s.soloEquipo || sesion.rol !== 'asegurado').map((s) => (
+        <Link className="acceso" href={s.href} key={s.href}>
+          <span className="acceso-icono">
+            <Icono nombre={s.icono} />
+          </span>
+          <span className="acceso-texto">
+            <span className="acceso-titulo">{s.titulo}</span>
+            <span className="acceso-detalle">{s.detalle}</span>
+          </span>
+          <span className="acceso-flecha" aria-hidden="true">
+            →
+          </span>
+        </Link>
+      ))}
+
+      <div className="separacion-bloque" />
 
       <CambiarClave />
       <CerrarSesion />

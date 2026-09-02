@@ -35,7 +35,14 @@ export default async function VerificacionPublica({ params }: { params: Promise<
 
   return (
     <main className="envoltura">
-      <Marca sub="Verificación de un expediente" />
+      <Marca />
+
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Verificación de un expediente</h1>
+        <p className="bajada-pagina">
+          Esta página no muestra el contenido del expediente: sólo si sigue siendo el mismo que se selló.
+        </p>
+      </header>
 
       <div className="aviso" data-nivel={valido ? 'ok' : 'alerta'}>
         <strong>

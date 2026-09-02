@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
+import { SinSesion } from '@/app/components/SinSesion'
 
 type Fila = {
   id: string
@@ -21,10 +23,16 @@ const fecha = (iso: string | null) =>
 export default function Historial() {
   const [filas, setFilas] = useState<Fila[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [sinSesion, setSinSesion] = useState(false)
 
   useEffect(() => {
     fetch('/api/historial')
       .then(async (r) => {
+        // Que falte la sesión no es una falla del sistema: es un estado con su propia salida.
+        if (r.status === 401) {
+          setSinSesion(true)
+          return
+        }
         const c = await r.json()
         if (!r.ok) throw new Error(c?.error ?? 'No se pudo leer el historial.')
         setFilas(c)
@@ -34,14 +42,27 @@ export default function Historial() {
 
   return (
     <main className="envoltura">
-      <Marca sub="Mis actuaciones" />
+      <Marca />
+
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Mis actuaciones</h1>
+        <p className="bajada-pagina">
+          Los siniestros que registraste. Una vez sellada, la actuación se puede descargar y verificar, pero ya no se
+          modifica.
+        </p>
+      </header>
 
       {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
 
+      {sinSesion ? <SinSesion volver="/historial" que="tus actuaciones" /> : null}
+
       {filas && filas.length === 0 ? (
-        <div className="tarjeta centrado">
-          <h3>Todavía no registraste ningún siniestro</h3>
-          <p className="apagado">Ojalá siga así.</p>
+        <div className="vacio">
+          <span className="vacio-icono">
+            <Icono nombre="tilde" />
+          </span>
+          <h2 className="vacio-titulo">Todavía no registraste ningún siniestro</h2>
+          <p className="vacio-texto">Ojalá siga así.</p>
           <Link href="/" className="boton boton-secundario">
             Volver al inicio
           </Link>

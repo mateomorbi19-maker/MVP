@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { listarCasos } from '@/lib/casos'
 import { alcanceDe, exigirRol } from '@/lib/sesion'
 import { Marca } from '@/app/components/Marca'
+import { Icono } from '@/app/components/Iconos'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,27 +15,28 @@ export default async function Panel() {
 
   return (
     <main className="envoltura-ancha">
-      <Marca sub="Panel de siniestros" />
+      <Marca />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, marginBottom: 18 }}>
+      <header className="encabezado-pagina encabezado-con-accion">
         <div>
-          <h1>Siniestros</h1>
-          <p className="apagado" style={{ marginBottom: 0 }}>
+          <h1 className="titulo-pagina">Panel de siniestros</h1>
+          <p className="bajada-pagina">
             {casos.length} actuación{casos.length === 1 ? '' : 'es'} registrada{casos.length === 1 ? '' : 's'}.
           </p>
         </div>
         <Link href="/" className="boton boton-secundario">
           Nueva actuación
         </Link>
-      </div>
+      </header>
 
       {casos.length === 0 ? (
-        <div className="tarjeta centrado">
-          <h3>Todavía no hay siniestros cargados</h3>
-          <p className="apagado" style={{ marginBottom: 16 }}>
-            Cuando alguien complete el flujo de captura, la actuación aparece acá.
-          </p>
-          <Link href="/" className="boton boton-primario" style={{ maxWidth: 280, margin: '0 auto' }}>
+        <div className="vacio">
+          <span className="vacio-icono">
+            <Icono nombre="archivo" />
+          </span>
+          <h2 className="vacio-titulo">Todavía no hay siniestros cargados</h2>
+          <p className="vacio-texto">Cuando alguien complete el recorrido de captura, la actuación aparece acá.</p>
+          <Link href="/" className="boton boton-primario">
             Crear una de prueba
           </Link>
         </div>
@@ -69,13 +71,13 @@ export default async function Panel() {
                     </td>
                     <td>{c.patente || '-'}</td>
                     <td>{c.asegurado || '-'}</td>
-                    <td style={{ maxWidth: 260, fontSize: 13 }}>
+                    <td className="celda-lugar">
                       {c.direccion ? c.direccion.split(',').slice(0, 3).join(', ') : '-'}
                     </td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{fecha(c.creado_en)}</td>
+                    <td className="celda-fecha">{fecha(c.creado_en)}</td>
                     <td>
                       {r ? (
-                        <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                        <span className="insignias">
                           {r.alertas > 0 ? <span className="insignia" data-nivel="alerta">{r.alertas} contra.</span> : null}
                           {r.banderas_cobertura > 0 ? (
                             <span className="insignia" data-nivel="cobertura">{r.banderas_cobertura} cob.</span>
@@ -99,7 +101,7 @@ export default async function Panel() {
         </div>
       )}
 
-      <p className="mini" style={{ marginTop: 22 }}>
+      <p className="mini pie-sesion">
         Sesión de {sesion.nombre ?? sesion.dni} ({sesion.rol}).{' '}
         {sesion.rol === 'productor' ? 'Ves las actuaciones que te fueron asignadas.' : 'Ves todas las actuaciones.'}
       </p>

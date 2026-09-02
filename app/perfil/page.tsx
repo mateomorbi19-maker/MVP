@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Marca } from '@/app/components/Marca'
 import { DetectorImpacto } from '@/app/components/DetectorImpacto'
+import { SinSesion } from '@/app/components/SinSesion'
 
 type Contacto = { nombre: string; telefono: string; relacion: string | null }
 
@@ -18,11 +19,22 @@ export default function Perfil() {
   const [titular, setTitular] = useState({ nombre: '', telefono: '', email: '' })
   const [contacto, setContacto] = useState<Contacto>({ nombre: '', telefono: '', relacion: '' })
   const [aviso, setAviso] = useState<{ nivel: 'ok' | 'alerta'; texto: string } | null>(null)
+  const [sinSesion, setSinSesion] = useState(false)
 
   useEffect(() => {
     fetch('/api/perfil')
-      .then((r) => r.json())
-      .then((c) => {
+      .then(async (r) => {
+        /*
+         * Antes esto era `.then((r) => r.json())` sin mirar el estado, y con eso un 401
+         * dibujaba el formulario vacío como si funcionara: la persona escribía sus datos y
+         * el fallo recién aparecía al guardar.
+         */
+        if (r.status === 401) {
+          setSinSesion(true)
+          return
+        }
+        const c = await r.json()
+        if (!r.ok) throw new Error(c?.error ?? 'No se pudo leer el perfil.')
         setTitular({
           nombre: c?.usuario?.nombre ?? '',
           telefono: c?.usuario?.telefono ?? '',
@@ -30,7 +42,7 @@ export default function Perfil() {
         })
         if (c?.contacto) setContacto({ ...c.contacto, relacion: c.contacto.relacion ?? '' })
       })
-      .catch(() => setAviso({ nivel: 'alerta', texto: 'No se pudo leer el perfil.' }))
+      .catch((e) => setAviso({ nivel: 'alerta', texto: e instanceof Error ? e.message : 'No se pudo leer el perfil.' }))
   }, [])
 
   async function guardar(e: React.FormEvent) {
@@ -48,19 +60,43 @@ export default function Perfil() {
     )
   }
 
+  /*
+   * Al primer toque de una tecla se borra el «Guardado.».
+   *
+   * Si se queda puesto, dice que está guardado mientras la persona edita algo que todavía
+   * no mandó, que es exactamente al revés.
+   */
+  const alEditar = () => setAviso((a) => (a?.nivel === 'ok' ? null : a))
+
   const campoTitular = (clave: keyof typeof titular) => ({
     value: titular[clave],
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTitular({ ...titular, [clave]: e.target.value }),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      alEditar()
+      setTitular({ ...titular, [clave]: e.target.value })
+    },
   })
   const campoContacto = (clave: keyof Contacto) => ({
     value: contacto[clave] ?? '',
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setContacto({ ...contacto, [clave]: e.target.value }),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+      alEditar()
+      setContacto({ ...contacto, [clave]: e.target.value })
+    },
   })
 
   return (
     <main className="envoltura">
-      <Marca sub="Mis datos" />
+      <Marca />
 
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Mis datos</h1>
+        <p className="bajada-pagina">
+          Se usan para completar la carátula de una actuación nueva sin que tengas que escribirlos en el lugar.
+        </p>
+      </header>
+
+      {sinSesion ? <SinSesion volver="/perfil" que="tus datos" /> : null}
+
+      {sinSesion ? null : (
       <form onSubmit={guardar}>
         <div className="tarjeta">
           <h3>Titular</h3>
@@ -104,10 +140,11 @@ export default function Perfil() {
 
         {aviso ? <div className="aviso" data-nivel={aviso.nivel}>{aviso.texto}</div> : null}
 
-        <button className="boton-primario" type="submit">
+        <button className="boton-primario boton-ancho" type="submit">
           Guardar
         </button>
       </form>
+      )}
 
       <DetectorImpacto />
 

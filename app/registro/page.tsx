@@ -38,12 +38,15 @@ export default function Registro() {
 
   return (
     <main className="envoltura">
-      <Marca sub="Crear una cuenta" />
+      <Marca />
 
-      <p className="apagado">
-        La cuenta sirve para ver tu póliza, el historial de tus actuaciones y mandarle el acta a tu productor. Para
-        registrar un siniestro no hace falta: ese botón nunca te va a pedir nada.
-      </p>
+      <header className="encabezado-pagina">
+        <h1 className="titulo-pagina">Crear una cuenta</h1>
+        <p className="bajada-pagina">
+          La cuenta sirve para ver tu póliza, el historial de tus actuaciones y mandarle el acta a tu productor. Para
+          registrar un siniestro no hace falta: ese botón nunca te va a pedir nada.
+        </p>
+      </header>
 
       <form className="tarjeta" onSubmit={registrar}>
         <div className="campo">

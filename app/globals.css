@@ -390,9 +390,17 @@ label {
   margin-bottom: 6px;
 }
 
-input[type='text'],
-input[type='number'],
-input[type='tel'],
+/*
+ * Se estilan los campos por exclusion y no por lista blanca.
+ *
+ * Antes esto enumeraba text, number y tel, y por eso los cuatro `type="password"` y los
+ * dos `type="email"` del sistema salian con el control crudo del navegador: angostos,
+ * grises y sin el area de toque de 54px. No fallaba nada; simplemente se veia mal en el
+ * ingreso y en el registro. Con la polaridad al reves, el tipo que alguien agregue manana
+ * ya queda estilado, y lo unico que hay que acordarse es de excluir lo que no es un campo
+ * de texto.
+ */
+input:not([type='file']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='submit']):not([type='button']),
 textarea,
 select {
   width: 100%;
@@ -1055,7 +1063,7 @@ tr:last-child td {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 22px;
+  margin-top: 12px;
   padding: 16px;
   border: 1px solid var(--borde);
   border-radius: var(--radio);
@@ -1100,6 +1108,132 @@ tr:last-child td {
   flex: none;
   font-size: 20px;
   color: var(--tinta-3);
+}
+
+/*
+ * En el inicio los accesos van sueltos entre bloques y necesitan aire; en /cuenta van
+ * apilados uno debajo del otro y 22px los desarma como lista.
+ */
+.inicio > .acceso {
+  margin-top: 22px;
+}
+
+/* ---------- Encabezado de página ---------- */
+
+/*
+ * Toda pantalla que no sea el recorrido abre igual: marca, titulo y bajada.
+ *
+ * Sin esto cada pagina resolvia el encabezado por su cuenta —/verificar tenia h1 y bajada,
+ * /poliza no tenia nada— y al abrirlas una detras de otra no parecian del mismo sistema.
+ * La marca sola no alcanza: dice de quien es la aplicacion, no en que pantalla estas.
+ */
+.encabezado-pagina {
+  margin-bottom: 20px;
+}
+
+.titulo-pagina {
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.bajada-pagina {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+  margin: 0;
+}
+
+/* Aire entre dos grupos de contenido que no comparten encabezado. */
+.separacion-bloque {
+  height: 22px;
+}
+
+/*
+ * El encabezado con acción al costado. En pantalla angosta la acción baja: en 375px un
+ * botón al lado del título deja el título en dos palabras por renglón.
+ */
+.encabezado-con-accion {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .encabezado-con-accion {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+}
+
+/* ---------- Tabla del panel ---------- */
+
+.celda-lugar {
+  max-width: 260px;
+  font-size: 13px;
+}
+
+.celda-fecha {
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.insignias {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.pie-sesion {
+  margin-top: 22px;
+}
+
+/* ---------- Estado vacío ---------- */
+
+/*
+ * No es decoración. Una pantalla que sólo tiene un botón «Agregar una póliza» no dice
+ * para qué sirve agregarla, y la persona no la agrega: la ve el día del choque, que es
+ * tarde. El estado vacío es donde se explica la utilidad.
+ */
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 32px 20px;
+  border: 1px dashed var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  margin-bottom: 16px;
+}
+
+.vacio-icono {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--acento-suave);
+  color: var(--acento);
+  margin-bottom: 2px;
+}
+
+.vacio-titulo {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.vacio-texto {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+  margin: 0;
+  max-width: 34ch;
 }
 
 /* El aviso sólo trae margen abajo: en el inicio va suelto y necesita el de arriba. */
