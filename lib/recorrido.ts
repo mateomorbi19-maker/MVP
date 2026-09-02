@@ -132,3 +132,32 @@ export function pasoInicial(pasos: Paso[], respuestas: Respuestas, medias: Media
   }
   return 'revision'
 }
+
+/** Lo que falta, con la pantalla exacta a la que hay que volver para completarlo. */
+export interface Faltante {
+  clave: string
+  texto: string
+}
+
+/**
+ * Qué quedó sin completar.
+ *
+ * Vive acá y no en la pantalla de revisión porque decide qué se le muestra al liquidador
+ * como ausencia, y porque compara contra `requerida` y `obligatoria`, que son datos del
+ * cuestionario. Nada de esto es aspecto.
+ *
+ * Ojo con lo que NO hace: no bloquea nada. Cada faltante es un botón que lleva a su
+ * pregunta, y el expediente se cierra igual. Un expediente incompleto vale más que uno
+ * abandonado en la tercera pantalla.
+ */
+export function faltantes(pasos: Paso[], respuestas: Respuestas, medias: MediaMinima[]): Faltante[] {
+  return pasos.flatMap((paso) => {
+    if (paso.tipo === 'pregunta' && paso.pregunta.requerida && !respondida(paso.pregunta, respuestas, medias)) {
+      return [{ clave: paso.clave, texto: paso.pregunta.texto }]
+    }
+    if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {
+      return [{ clave: paso.clave, texto: `Foto: ${paso.guia.titulo}` }]
+    }
+    return []
+  })
+}

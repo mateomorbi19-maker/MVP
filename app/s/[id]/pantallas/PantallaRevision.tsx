@@ -1,15 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { respondida, type Paso, type Respuestas } from '@/lib/recorrido'
+import { useState } from 'react'
+import type { Faltante } from '@/lib/recorrido'
 import type { Media, Testigo, Ubicacion } from '../tipos'
 
 /* ================= Revisión y cierre ================= */
 
 export function PantallaRevision({
   casoId,
-  pasos,
-  respuestas,
+  faltantes,
   medias,
   testigos,
   ubicacion,
@@ -19,8 +18,8 @@ export function PantallaRevision({
   alCerrar,
 }: {
   casoId: string
-  pasos: Paso[]
-  respuestas: Respuestas
+  /** Lo que falta, ya calculado por lib/recorrido.ts. */
+  faltantes: Faltante[]
   medias: Media[]
   testigos: Testigo[]
   ubicacion: Ubicacion
@@ -31,21 +30,6 @@ export function PantallaRevision({
 }) {
   const [cerrando, setCerrando] = useState(false)
   const [fallo, setFallo] = useState<string | null>(null)
-
-  /** Lo que falta, con la pantalla exacta a la que hay que volver para completarlo. */
-  const faltantes = useMemo(
-    () =>
-      pasos.flatMap((paso) => {
-        if (paso.tipo === 'pregunta' && paso.pregunta.requerida && !respondida(paso.pregunta, respuestas, medias)) {
-          return [{ clave: paso.clave, texto: paso.pregunta.texto }]
-        }
-        if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {
-          return [{ clave: paso.clave, texto: `Foto: ${paso.guia.titulo}` }]
-        }
-        return []
-      }),
-    [pasos, respuestas, medias],
-  )
 
   const fotos = medias.filter((m) => m.tipo === 'foto').length
   const audios = medias.filter((m) => m.tipo === 'audio').length

@@ -1,7 +1,7 @@
 'use client'
 
 import { ZONAS_IMPACTO } from '@/lib/cuestionario'
-import { respondida, type Paso, type Respuestas } from '@/lib/recorrido'
+import type { Paso } from '@/lib/recorrido'
 import type { Media, Subir } from '../tipos'
 import { GrabadorAudio } from './GrabadorAudio'
 
@@ -9,7 +9,8 @@ import { GrabadorAudio } from './GrabadorAudio'
 
 export function PantallaPregunta({
   paso,
-  respuestas,
+  valor,
+  yaEsta,
   medias,
   casoId,
   responder,
@@ -18,7 +19,9 @@ export function PantallaPregunta({
   subir,
 }: {
   paso: Extract<Paso, { tipo: 'pregunta' }>
-  respuestas: Respuestas
+  /** El valor ya contestado para ESTA pregunta. La pantalla no ve las demás. */
+  valor: unknown
+  yaEsta: boolean
   medias: Media[]
   casoId: string
   responder: (id: string, valor: unknown) => void
@@ -27,8 +30,6 @@ export function PantallaPregunta({
   subir: Subir
 }) {
   const { pregunta, seccion } = paso
-  const valor = respuestas[pregunta.id]
-  const yaEsta = respondida(pregunta, respuestas, medias)
   // Con un toque alcanza: elegir ya es avanzar. El resto necesita confirmación.
   const autoAvanza = pregunta.tipo === 'opcion' || pregunta.tipo === 'zonaImpacto'
 

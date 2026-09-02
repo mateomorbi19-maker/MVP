@@ -15,7 +15,7 @@ import { analizar } from '../lib/consistencia.ts'
 import { calleCoincide } from '../lib/geo.ts'
 import { generarExpediente } from '../lib/pdf.ts'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
-import { construirPasos, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
+import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 
 let fallos = 0
 let pruebas = 0
@@ -203,6 +203,21 @@ verificar(
 verificar(
   'el relato cuenta como respondido cuando existe el audio',
   respondida(preguntaRelato, {}, [{ id: 'AUD-1', tipo: 'audio', guia_id: null }]),
+)
+
+/* Lo que falta, que es lo que la revisión final le ofrece completar a la persona. */
+verificar(
+  'sin nada contestado, faltan las preguntas requeridas y las fotos obligatorias',
+  faltantes(sinContestar, {}, []).length > 0,
+)
+verificar(
+  'con todo completo no falta nada',
+  faltantes(pasosCompletos, respuestasCompletas, mediasCompletas).length === 0,
+  JSON.stringify(faltantes(pasosCompletos, respuestasCompletas, mediasCompletas)),
+)
+verificar(
+  'cada faltante lleva la clave de la pantalla a la que hay que volver',
+  faltantes(sinContestar, {}, []).every((f) => typeof f.clave === 'string' && typeof f.texto === 'string'),
 )
 
 /* ---------- 1. Serialización canónica y cadena ---------- */

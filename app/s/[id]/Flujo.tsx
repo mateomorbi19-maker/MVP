@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { construirPasos, pasoInicial, type Respuestas } from '@/lib/recorrido'
+import { construirPasos, faltantes, pasoInicial, respondida, type Respuestas } from '@/lib/recorrido'
 import { olvidarActuacion, recordarActuacion } from '@/lib/local'
 
 import type { Datos, FalloGps, Media, Subir, Testigo, Ubicacion } from './tipos'
@@ -399,7 +399,8 @@ export function Flujo(props: Props) {
           <PantallaPregunta
             key={actual.clave}
             paso={actual}
-            respuestas={respuestas}
+            valor={respuestas[actual.pregunta.id]}
+            yaEsta={respondida(actual.pregunta, respuestas, medias)}
             medias={medias}
             casoId={props.casoId}
             responder={responder}
@@ -433,8 +434,7 @@ export function Flujo(props: Props) {
         {actual?.tipo === 'revision' ? (
           <PantallaRevision
             casoId={props.casoId}
-            pasos={pasos}
-            respuestas={respuestas}
+            faltantes={faltantes(pasos, respuestas, medias)}
             medias={medias}
             testigos={testigos}
             ubicacion={ubicacion}
