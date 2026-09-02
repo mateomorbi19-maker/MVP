@@ -42,20 +42,35 @@ export async function POST(req: Request, { params }: Ctx) {
     const mediaId = nuevoId('SEN')
     const guardado = await guardarSerie(id, mediaId, canonico({ serie, veredicto }))
 
+    // La fila y su eslabón en la misma transacción: la serie entra al manifiesto como pieza.
     const pg = await db()
-    await pg.query(
-      `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256)
-       VALUES ($1,$2,'sensores',NULL,$3,$4,$5,$6)`,
-      [mediaId, id, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256],
-    )
-
-    await registrarEvento(id, 'sensores_incorporados', {
-      media_id: mediaId,
-      sha256: guardado.sha256,
-      muestras: serie.length,
-      pico_g: veredicto.picoG,
-      nivel: veredicto.nivel,
-    })
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await cliente.query(
+        `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256)
+         VALUES ($1,$2,'sensores',NULL,$3,$4,$5,$6)`,
+        [mediaId, id, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256],
+      )
+      await registrarEvento(
+        id,
+        'sensores_incorporados',
+        {
+          media_id: mediaId,
+          sha256: guardado.sha256,
+          muestras: serie.length,
+          pico_g: veredicto.picoG,
+          nivel: veredicto.nivel,
+        },
+        { cliente },
+      )
+      await cliente.query('COMMIT')
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
+    }
 
     return NextResponse.json({ ok: true, id: mediaId, veredicto }, { status: 201 })
   } catch (err) {

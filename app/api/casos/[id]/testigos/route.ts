@@ -57,35 +57,54 @@ export async function POST(req: Request, { params }: Ctx) {
     }
     const huella = sha256(canonico(registro))
 
-    const pg = await db()
-    await pg.query(
-      `INSERT INTO testigos (id, caso_id, nombre, dni, telefono, relato, consentimiento, gps, creado_en, sha256)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        testigoId,
-        id,
-        registro.nombre,
-        registro.dni,
-        registro.telefono,
-        registro.relato,
-        true,
-        gps ? JSON.stringify(gps) : null,
-        creado_en,
-        huella,
-      ],
-    )
-
     /*
-     * El nombre del testigo y sus coordenadas van reservados. Es lo que hace cumplible la
-     * supresión que la propia pantalla de carga le promete: con el nombre dentro del hash,
-     * borrarlo rompía la verificación del expediente entero.
+     * La fila y su eslabón van en LA MISMA transacción, y no es prolijidad.
+     *
+     * La fila del testigo entra al manifiesto como una pieza. Insertándola aparte, una
+     * carga que llega justo mientras se cierra la actuación deja la fila escrita y el
+     * eslabón rechazado: la pieza aparece en el manifiesto recalculado pero no estaba
+     * cuando se selló, y el verificador público informa como ALTERADO un expediente que
+     * nadie tocó. Con la transacción, si el eslabón no entra, la fila tampoco.
      */
-    await registrarEvento(
-      id,
-      'testigo_registrado',
-      { testigo_id: testigoId, sha256: huella, consentimiento: true },
-      { reservado: { nombre: registro.nombre, gps } },
-    )
+    const pg = await db()
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await cliente.query(
+        `INSERT INTO testigos (id, caso_id, nombre, dni, telefono, relato, consentimiento, gps, creado_en, sha256)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          testigoId,
+          id,
+          registro.nombre,
+          registro.dni,
+          registro.telefono,
+          registro.relato,
+          true,
+          gps ? JSON.stringify(gps) : null,
+          creado_en,
+          huella,
+        ],
+      )
+
+      /*
+       * El nombre del testigo y sus coordenadas van reservados. Es lo que hace cumplible la
+       * supresión que la propia pantalla de carga le promete: con el nombre dentro del hash,
+       * borrarlo rompía la verificación del expediente entero.
+       */
+      await registrarEvento(
+        id,
+        'testigo_registrado',
+        { testigo_id: testigoId, sha256: huella, consentimiento: true },
+        { reservado: { nombre: registro.nombre, gps }, cliente },
+      )
+      await cliente.query('COMMIT')
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
+    }
 
     return NextResponse.json({ id: testigoId, sha256: huella }, { status: 201 })
   } catch (err) {

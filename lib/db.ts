@@ -4,7 +4,12 @@ import { Pool } from 'pg'
  * Pool de Postgres. En desarrollo Next.js recarga los módulos en caliente, así que
  * lo cacheamos en globalThis para no abrir una conexión nueva en cada recarga.
  */
-const globalForDb = globalThis as unknown as { _pool?: Pool; _schemaLista?: Promise<void> }
+const globalForDb = globalThis as unknown as {
+  _pool?: Pool
+  _schemaLista?: Promise<void>
+  /** Si alguna vez se conectó, un 28P01 posterior NO es la contraseña. Ver traducirErrorBase. */
+  _conectoAlgunaVez?: boolean
+}
 
 /**
  * Error de configuración o de conexión a la base.
@@ -47,9 +52,31 @@ export function traducirErrorBase(err: unknown): ErrorBaseDeDatos | null {
       )
     case '28P01':
     case '28000':
+      /*
+       * Si la aplicación ya se conectó con esta misma cadena, la contraseña no puede estar
+       * mal: lo que pasó es que el pooler rechazó una conexión NUEVA, casi siempre porque
+       * se llegó al límite de conexiones simultáneas del proyecto. Acusar a la contraseña
+       * acá manda a resetearla, que no arregla nada y encima invalida la que funcionaba.
+       */
+      if (globalForDb._conectoAlgunaVez) {
+        return new ErrorBaseDeDatos(
+          'La base rechazó una conexión nueva, pero la aplicación ya venía conectada con esta misma cadena: no es la contraseña. Casi siempre es el límite de conexiones simultáneas del pooler. Esperá unos segundos y reintentá; si se repite, bajá el máximo de conexiones o subí el límite del proyecto.',
+          'inalcanzable',
+        )
+      }
       return new ErrorBaseDeDatos(
         'Usuario o contraseña incorrectos en DATABASE_URL. Las dos causas más frecuentes son una contraseña con caracteres que la URL se come si no van codificados (#, ?, / y @), y —en Supabase con el pooler— haber puesto el usuario "postgres" en lugar de "postgres.<referencia-del-proyecto>". El log del servidor dice a qué usuario y host se está intentando conectar.',
         'autenticacion',
+      )
+    case '55P03':
+      /*
+       * No se pudo tomar el lock del caso a tiempo: otro escritor lo tiene, casi siempre el
+       * cierre. Va como 503 y no como 500 a propósito: es temporal y hay que REINTENTAR, y
+       * la cola de subida del teléfono reintenta ante 5xx y descarta ante 4xx.
+       */
+      return new ErrorBaseDeDatos(
+        'La actuación está siendo cerrada en este momento y no admite escrituras hasta que termine. Reintentá en unos segundos.',
+        'inalcanzable',
       )
     case '3D000':
       return new ErrorBaseDeDatos('La base indicada en DATABASE_URL no existe.', 'sin_configurar')
@@ -616,6 +643,7 @@ export async function estadoBase(): Promise<{
   try {
     const pg = await db()
     const version = await pg.query<{ v: string }>('SELECT version() AS v')
+    globalForDb._conectoAlgunaVez = true
     const presentes = await pg.query<{ table_name: string }>(
       // table_name es un dominio sobre `name`, no text: el casteo explícito evita
       // depender de una coerción implícita que varía entre versiones de Postgres.

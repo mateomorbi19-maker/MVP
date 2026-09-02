@@ -60,20 +60,35 @@ export async function POST(req: Request, { params }: Ctx) {
     const mediaId = nuevoId('FIR')
     const guardado = await guardarArchivo(id, mediaId, archivo.type, new Uint8Array(await archivo.arrayBuffer()))
 
+    // La fila y su eslabón en la misma transacción: la firma entra al manifiesto como pieza.
     const pg = await db()
-    await pg.query(
-      `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps, firmante, hash_firmado)
-       VALUES ($1,$2,'firma',NULL,$3,$4,$5,$6,NULL,$7,$8)`,
-      [mediaId, id, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256, firmante, acta.hash],
-    )
-
-    await registrarEvento(id, 'acta_firmada_asegurado', {
-      media_id: mediaId,
-      firmante,
-      hash_acta: acta.hash,
-      version_declaracion: DECLARACION.version,
-      sha256: guardado.sha256,
-    })
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await cliente.query(
+        `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps, firmante, hash_firmado)
+         VALUES ($1,$2,'firma',NULL,$3,$4,$5,$6,NULL,$7,$8)`,
+        [mediaId, id, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256, firmante, acta.hash],
+      )
+      await registrarEvento(
+        id,
+        'acta_firmada_asegurado',
+        {
+          media_id: mediaId,
+          firmante,
+          hash_acta: acta.hash,
+          version_declaracion: DECLARACION.version,
+          sha256: guardado.sha256,
+        },
+        { cliente },
+      )
+      await cliente.query('COMMIT')
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
+    }
 
     return NextResponse.json({ ok: true, id: mediaId, hash_acta: acta.hash }, { status: 201 })
   } catch (err) {

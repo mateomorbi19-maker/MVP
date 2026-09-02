@@ -103,27 +103,43 @@ export async function POST(req: Request, { params }: Ctx) {
     const anteriorALaApertura = tomadaEn ? tomadaEn < new Date(caso.creado_en) : false
     const origen = !coincideHash ? 'incoherente' : anteriorALaApertura ? 'incoherente' : 'no_verificable'
 
-    await pg.query(
-      `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps,
-                           idempotencia, tomada_en, desfase_reloj_ms, origen)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        mediaId, id, tipo, guia, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256,
-        gps ? JSON.stringify(gps) : null,
-        idem, tomadaEn ? tomadaEn.toISOString() : null, desfase, origen,
-      ],
-    )
+    /*
+    * La fila y su eslabón van en LA MISMA transacción. La fila entra al manifiesto como
+    * pieza: insertándola aparte, una subida que llega mientras se cierra la actuación deja
+    * la fila escrita y el eslabón rechazado, y el verificador público informa como alterado
+    * un expediente que nadie tocó.
+    */
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await cliente.query(
+        `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps,
+                             idempotencia, tomada_en, desfase_reloj_ms, origen)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        [
+          mediaId, id, tipo, guia, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256,
+          gps ? JSON.stringify(gps) : null,
+          idem, tomadaEn ? tomadaEn.toISOString() : null, desfase, origen,
+        ],
+      )
 
-    await registrarEvento(id, tipo === 'audio' ? 'audio_incorporado' : 'fotografia_incorporada', {
-      media_id: mediaId,
-      guia_id: guia,
-      mime: guardado.mime,
-      bytes: guardado.bytes,
-      sha256: guardado.sha256,
-      origen,
-      desfase_reloj_ms: desfase,
-      coincide_hash_del_telefono: coincideHash,
-    }, { reservado: { gps } })
+      await registrarEvento(id, tipo === 'audio' ? 'audio_incorporado' : 'fotografia_incorporada', {
+        media_id: mediaId,
+        guia_id: guia,
+        mime: guardado.mime,
+        bytes: guardado.bytes,
+        sha256: guardado.sha256,
+        origen,
+        desfase_reloj_ms: desfase,
+        coincide_hash_del_telefono: coincideHash,
+      }, { reservado: { gps }, cliente })
+      await cliente.query('COMMIT')
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
+    }
 
     /*
      * Lectura automática del documento del tercero.

@@ -123,6 +123,20 @@ export async function registrarEvento(
   const propio = !opciones.cliente
   try {
     if (propio) await cliente.query('BEGIN')
+
+    /*
+     * Un escritor que llega mientras el cierre tiene el caso bloqueado espera acá. Sin
+     * tope esperaría indefinidamente, reteniendo una conexión del pool y una del pooler:
+     * con varios escritores a la vez —el guardado automático, la cola de fotos, un testigo
+     * que escanea el QR— eso agota el límite de conexiones del proyecto y la base empieza a
+     * rechazar TODO, no sólo al que esperaba.
+     *
+     * Con tope, el que no alcanza el lock falla rápido y con un mensaje que se entiende, y
+     * el cliente reintenta. Ocho segundos es holgado: el cierre ya no incluye la llamada
+     * de red al sello de tiempo.
+     */
+    await cliente.query("SET LOCAL lock_timeout = '8s'")
+
     const caso = await cliente.query<{ estado: string }>(
       'SELECT estado FROM casos WHERE id = $1 FOR UPDATE',
       [casoId],
