@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Icono } from './Iconos'
 
 type Productor = { id: string; nombre: string; aseguradora: string }
 
@@ -76,22 +77,28 @@ export function EntregaExpediente({ casoId }: { casoId: string }) {
   }
 
   return (
-    <div className="tarjeta">
-      <h3>Entregar el expediente</h3>
+    <div className="tarjeta entrega-expediente">
+      <div className="entrega-encabezado">
+        <span className="entrega-icono">
+          <Icono nombre="escudo" />
+        </span>
+        <div>
+          <h3>Entregar el expediente</h3>
+          <p className="mini entrega-subtitulo">Compartilo desde este teléfono o mandáselo a tu productor.</p>
+        </div>
+      </div>
 
-      <div className="pila">
-        <a className="boton boton-primario" href={`/api/casos/${casoId}/pdf?descargar=1`}>
-          Descargar el expediente
-        </a>
+      <div className="pila entrega-acciones">
         {puedeCompartir ? (
           <button className="boton boton-secundario" onClick={compartir}>
+            <Icono nombre="compartir" />
             Compartir
           </button>
         ) : null}
       </div>
 
       {productores.length > 0 ? (
-        <div className="campo">
+        <div className="campo entrega-productor">
           <label htmlFor="productor">Mandárselo a mi productor</label>
           <select id="productor" value={elegido} onChange={(e) => setElegido(e.target.value)}>
             <option value="">Elegir...</option>
@@ -102,6 +109,7 @@ export function EntregaExpediente({ casoId }: { casoId: string }) {
             ))}
           </select>
           <button className="boton boton-secundario" onClick={enviar} disabled={!elegido || enviando}>
+            <Icono nombre="compartir" />
             {enviando ? 'Enviando...' : 'Enviar'}
           </button>
         </div>

@@ -59,9 +59,9 @@ export function PantallaTestigos({
           más que un dato anotado por vos.
         </p>
 
-        <div className="tarjeta centrado">
+        <div className="tarjeta tarjeta-qr centrado">
           {svg ? <div className="qr qr-imagen" dangerouslySetInnerHTML={{ __html: svg }} /> : <p className="apagado">Generando el código...</p>}
-          <button className="boton-secundario" onClick={compartir} style={{ width: '100%', marginTop: 10 }}>
+          <button className="boton-secundario boton-ancho boton-compartir-qr" onClick={compartir}>
             Compartir el enlace
           </button>
         </div>
@@ -71,7 +71,7 @@ export function PantallaTestigos({
             <h3>Ya cargaron sus datos ({testigos.length})</h3>
             <div className="pila">
               {testigos.map((t) => (
-                <div key={t.id} className="faltante" style={{ pointerEvents: 'none' }}>
+                <div key={t.id} className="faltante testigo-registrado">
                   <span className="punto" data-estado="ok" />
                   {t.nombre}
                 </div>

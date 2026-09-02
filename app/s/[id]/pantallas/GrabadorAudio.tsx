@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { Icono } from '@/app/components/Iconos'
 import type { Subir } from '../tipos'
 
 /* ================= Audio ================= */
@@ -64,21 +65,23 @@ export function GrabadorAudio({ subir, yaGrabado, casoId }: { subir: Subir; yaGr
   const mmss = `${String(Math.floor(segundos / 60)).padStart(2, '0')}:${String(segundos % 60).padStart(2, '0')}`
 
   return (
-    <div>
-      {listo ? <div className="aviso" data-nivel="ok" style={{ marginBottom: 12 }}>Relato incorporado al expediente.</div> : null}
+    <div className="grabador-audio">
+      {listo ? <div className="aviso aviso-relato" data-nivel="ok">Relato incorporado al expediente.</div> : null}
       {fallo ? <div className="aviso" data-nivel="alerta">{fallo}</div> : null}
 
       {!grabando ? (
         <button
-          className={listo ? 'boton-secundario' : 'boton-primario'}
+          className={`${listo ? 'boton-secundario' : 'boton-primario'} boton-grabacion`}
           onClick={empezar}
           disabled={subiendo}
-          style={{ width: '100%', minHeight: 72, fontSize: 18 }}
         >
+          <span className="grabacion-icono">
+            <Icono nombre="microfono" />
+          </span>
           {subiendo ? 'Incorporando el audio...' : listo ? 'Grabar otra vez' : 'Empezar a grabar'}
         </button>
       ) : (
-        <button className="boton-emergencia" onClick={frenar} style={{ minHeight: 72, fontSize: 18 }}>
+        <button className="boton-emergencia boton-grabacion" onClick={frenar}>
           <span className="grabando" />
           Detener · {mmss}
         </button>

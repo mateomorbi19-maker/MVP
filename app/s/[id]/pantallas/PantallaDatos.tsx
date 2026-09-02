@@ -23,50 +23,52 @@ export function PantallaDatos({
           hasta que cierres.
         </p>
 
-        <div className="pila">
-          <div className="campo">
-            <label htmlFor="patente">Patente de tu vehículo</label>
-            <input
-              id="patente"
-              className="campo-grande"
-              type="text"
-              placeholder="AB 123 CD"
-              autoCapitalize="characters"
-              value={datos.patente}
-              onChange={(e) => anotar('patente', e.target.value)}
-            />
-          </div>
-          <div className="campo">
-            <label htmlFor="poliza">Número de póliza</label>
-            <input
-              id="poliza"
-              className="campo-grande"
-              type="text"
-              value={datos.poliza}
-              onChange={(e) => anotar('poliza', e.target.value)}
-            />
-          </div>
-          <div className="campo">
-            <label htmlFor="asegurado">Nombre y apellido</label>
-            <input
-              id="asegurado"
-              className="campo-grande"
-              type="text"
-              placeholder="Como figura en la póliza"
-              value={datos.asegurado}
-              onChange={(e) => anotar('asegurado', e.target.value)}
-            />
-          </div>
-          <div className="campo">
-            <label htmlFor="telefono">Teléfono de contacto</label>
-            <input
-              id="telefono"
-              className="campo-grande"
-              type="tel"
-              placeholder="11 5555 5555"
-              value={datos.telefono}
-              onChange={(e) => anotar('telefono', e.target.value)}
-            />
+        <div className="tarjeta formulario-datos">
+          <div className="pila">
+            <div className="campo">
+              <label htmlFor="patente">Patente de tu vehículo</label>
+              <input
+                id="patente"
+                className="campo-grande"
+                type="text"
+                placeholder="AB 123 CD"
+                autoCapitalize="characters"
+                value={datos.patente}
+                onChange={(e) => anotar('patente', e.target.value)}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="poliza">Número de póliza</label>
+              <input
+                id="poliza"
+                className="campo-grande"
+                type="text"
+                value={datos.poliza}
+                onChange={(e) => anotar('poliza', e.target.value)}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="asegurado">Nombre y apellido</label>
+              <input
+                id="asegurado"
+                className="campo-grande"
+                type="text"
+                placeholder="Como figura en la póliza"
+                value={datos.asegurado}
+                onChange={(e) => anotar('asegurado', e.target.value)}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="telefono">Teléfono de contacto</label>
+              <input
+                id="telefono"
+                className="campo-grande"
+                type="tel"
+                placeholder="11 5555 5555"
+                value={datos.telefono}
+                onChange={(e) => anotar('telefono', e.target.value)}
+              />
+            </div>
           </div>
         </div>
       </div>

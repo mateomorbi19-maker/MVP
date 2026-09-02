@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icono } from '@/app/components/Iconos'
 import type { Faltante } from '@/lib/recorrido'
 import type { Media, Testigo, Ubicacion } from '../tipos'
 
@@ -53,16 +54,23 @@ export function PantallaRevision({
   return (
     <>
       <div className="pantalla-cuerpo">
-        <div className="rotulo">Último paso</div>
-        <h1 className="pregunta">Antes de cerrar</h1>
-        <p className="pregunta-ayuda">
-          Al cerrar, el expediente se sella. Cualquier cambio posterior queda en evidencia al verificarlo, y el número
-          de actuación permite que lo compruebe cualquiera.
-        </p>
+        <div className="revision-encabezado">
+          <span className="revision-escudo">
+            <Icono nombre="escudo" />
+          </span>
+          <div className="revision-encabezado-texto">
+            <div className="rotulo">Último paso</div>
+            <h1 className="pregunta">Antes de cerrar</h1>
+            <p className="pregunta-ayuda">
+              Al cerrar, el expediente se sella. Cualquier cambio posterior queda en evidencia al verificarlo, y el
+              número de actuación permite que lo compruebe cualquiera.
+            </p>
+          </div>
+        </div>
 
-        <div className="tarjeta">
-          <h3 style={{ marginBottom: 12 }}>Lo que se va a sellar</h3>
-          <div className="pila">
+        <div className="tarjeta tarjeta-resumen">
+          <h3 className="tarjeta-resumen-titulo">Lo que se va a sellar</h3>
+          <div className="pila lista-resumen">
             <Linea etiqueta="Ubicación y clima" ok={ubicacion !== null} texto={ubicacion ? 'Registrados' : 'Sin registrar'} />
             <Linea
               etiqueta="Respuestas obligatorias"
@@ -78,20 +86,20 @@ export function PantallaRevision({
         {ubicacion === null ? (
           <div className="aviso" data-nivel="atencion">
             <strong>El expediente va a quedar sin ubicación.</strong>
-            <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
+            <p className="aviso-detalle">
               Sin ella no hay clima ni hora solar con qué contrastar la declaración. Si todavía estás en el lugar,
               conviene resolverlo ahora.
             </p>
-            <button className="boton-secundario" onClick={alReintentarGps} style={{ width: '100%' }}>
+            <button className="boton-secundario boton-ancho" onClick={alReintentarGps}>
               Reintentar la ubicación
             </button>
           </div>
         ) : null}
 
         {faltantes.length > 0 ? (
-          <div className="tarjeta">
-            <h3 style={{ marginBottom: 4 }}>Quedó sin completar</h3>
-            <p className="mini" style={{ marginBottom: 12 }}>
+          <div className="tarjeta tarjeta-faltantes">
+            <h3 className="tarjeta-faltantes-titulo">Quedó sin completar</h3>
+            <p className="mini tarjeta-faltantes-ayuda">
               Podés cerrar igual, pero cada faltante debilita el expediente y queda asentado como tal. Tocá cualquiera
               para completarlo.
             </p>
@@ -121,12 +129,12 @@ export function PantallaRevision({
 
 export function Linea({ etiqueta, ok, texto }: { etiqueta: string; ok: boolean; texto: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+    <div className="linea-resumen">
+      <span className="linea-resumen-etiqueta">
         <span className="punto" data-estado={ok ? 'ok' : 'espera'} />
         {etiqueta}
       </span>
-      <span className="mini" style={{ textAlign: 'right' }}>
+      <span className="mini linea-resumen-estado">
         {texto}
       </span>
     </div>

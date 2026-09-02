@@ -87,7 +87,7 @@ export function PantallaFirma({
         <h1 className="pregunta">Firmá lo que declaraste</h1>
 
         {acta ? (
-          <div className="tarjeta">
+          <div className="tarjeta tarjeta-declaracion">
             <p className="pregunta-ayuda">{acta.declaracion}</p>
             <p className="mini">
               La firma cubre la carátula, tus {acta.resumen.respuestas} respuestas, {acta.resumen.fotos} fotografías,{' '}
@@ -103,7 +103,7 @@ export function PantallaFirma({
           </div>
         ) : null}
 
-        <div className="campo">
+        <div className="campo campo-firmante">
           <label htmlFor="firmante">Aclaración</label>
           <input id="firmante" type="text" value={firmante} onChange={(e) => setFirmante(e.target.value)} />
         </div>

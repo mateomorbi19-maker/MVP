@@ -18,7 +18,7 @@ export function PantallaEmergencia({ variante, seguir }: { variante: 'confirmado
       <div className="pantalla-cuerpo">
         <div className="emergencia">
           <h1>{dudoso ? 'Fijate si alguien está herido' : 'Llamá ahora'}</h1>
-          <p style={{ marginBottom: 18 }}>
+          <p className="emergencia-descripcion">
             {dudoso
               ? 'Ante la duda, llamá. Una ambulancia que llega de más no cuesta nada; una que no llega, sí.'
               : 'Primero la gente. El registro queda guardado y podés volver cuando la situación esté controlada.'}
@@ -28,7 +28,7 @@ export function PantallaEmergencia({ variante, seguir }: { variante: 'confirmado
       </div>
 
       <div className="barra-accion">
-        <button className="boton-secundario" onClick={seguir} style={{ width: '100%' }}>
+        <button className="boton-secundario boton-ancho" onClick={seguir}>
           Ya están siendo asistidos, seguir
         </button>
       </div>

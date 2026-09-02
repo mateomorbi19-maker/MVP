@@ -46,7 +46,7 @@ export function PantallaConsentimiento({
           </div>
         ) : null}
 
-        <div className="tarjeta centrado">
+        <div className="tarjeta tarjeta-qr centrado">
           {svg ? (
             <div className="qr qr-imagen" dangerouslySetInnerHTML={{ __html: svg }} />
           ) : (

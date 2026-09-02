@@ -1,5 +1,6 @@
 'use client'
 
+import { Icono } from '@/app/components/Iconos'
 
 /* ================= Corte: lo urgente ya está ================= */
 
@@ -16,8 +17,10 @@ export function PantallaCorte({
     <>
       <div className="pantalla-cuerpo">
         <div className="hito">
-          <div className="hito-simbolo">✓</div>
-          <h1 className="pregunta" style={{ marginBottom: 10 }}>
+          <div className="hito-simbolo">
+            <Icono nombre="tilde" />
+          </div>
+          <h1 className="pregunta hito-titulo">
             Ya tenés lo importante
           </h1>
           <p className="pregunta-ayuda">
@@ -26,12 +29,12 @@ export function PantallaCorte({
           </p>
         </div>
 
-        <div className="tarjeta centrado">
-          <h3 style={{ marginBottom: 4 }}>Número de actuación</h3>
-          <p className="numero-actuacion" style={{ margin: '4px 0 10px' }}>
+        <div className="tarjeta tarjeta-actuacion centrado">
+          <h3 className="tarjeta-actuacion-titulo">Número de actuación</h3>
+          <p className="numero-actuacion tarjeta-actuacion-numero">
             {casoId}
           </p>
-          <p className="mini" style={{ margin: 0 }}>
+          <p className="mini tarjeta-actuacion-nota">
             Podés cerrar la aplicación e irte. Al volver a abrirla, retomás justo acá.
           </p>
         </div>
@@ -41,7 +44,7 @@ export function PantallaCorte({
         <button className="boton-primario" onClick={seguir}>
           Completar el resto ahora
         </button>
-        <button className="boton-secundario" onClick={alCierre} style={{ width: '100%' }}>
+        <button className="boton-secundario boton-ancho" onClick={alCierre}>
           Ir directo al cierre
         </button>
       </div>

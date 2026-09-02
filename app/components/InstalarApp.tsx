@@ -72,7 +72,7 @@ export function InstalarApp() {
     return (
       <div className="tarjeta-plana">
         <h3>Instalá la aplicación</h3>
-        <p className="mini" style={{ marginBottom: 12 }}>
+        <p className="mini instalar-descripcion">
           Queda en la pantalla de inicio, abre a pantalla completa y pide los permisos de ubicación y cámara como
           cualquier otra aplicación del teléfono. Es la forma recomendada de usarla en la calle.
         </p>
@@ -89,15 +89,15 @@ export function InstalarApp() {
         <h3>Instalá la aplicación</h3>
         {!verPasosIOS ? (
           <>
-            <p className="mini" style={{ marginBottom: 12 }}>
+            <p className="mini instalar-descripcion">
               Se puede agregar a la pantalla de inicio para que abra como una aplicación, sin barra de navegador.
             </p>
-            <button className="boton-secundario" onClick={() => setVerPasosIOS(true)} style={{ width: '100%' }}>
+            <button className="boton-secundario boton-ancho" onClick={() => setVerPasosIOS(true)}>
               Ver cómo se hace
             </button>
           </>
         ) : (
-          <ol className="mini" style={{ margin: 0, paddingLeft: 20, lineHeight: 1.9 }}>
+          <ol className="mini instalar-pasos">
             <li>
               Tocá el botón <strong>Compartir</strong> abajo en el centro (el cuadrado con la flecha hacia arriba).
             </li>

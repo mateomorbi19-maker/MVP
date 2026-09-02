@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icono } from '@/app/components/Iconos'
 import type { FalloGps, Ubicacion } from '../tipos'
 
 /* ================= Ubicación ================= */
@@ -59,8 +60,11 @@ export function ChipUbicacion({
   if (estado !== 'error') {
     return (
       <div className="chip" data-estado={estado}>
+        <span className="chip-icono">
+          <Icono nombre="ubicacion" />
+        </span>
         <span className="punto" data-estado={estado === 'ok' ? 'ok' : 'espera'} />
-        <span>
+        <span className="chip-texto">
           {estado === 'ok'
             ? `Ubicación registrada${ubicacion?.direccion ? ` · ${ubicacion.direccion.split(',').slice(0, 2).join(', ')}` : ''}`
             : 'Registrando la ubicación...'}
@@ -82,12 +86,12 @@ export function ChipUbicacion({
       {abierto ? (
         <div className="aviso" data-nivel="atencion">
           <strong>{guia.titulo}</strong>
-          <p style={{ margin: '6px 0 10px', fontSize: 13.5 }}>
+          <p className="aviso-detalle">
             Sin ubicación, el expediente pierde el registro objetivo del lugar, la hora solar y el clima. Son
             justamente los datos que después permiten contrastar la declaración.
           </p>
-          <p style={{ margin: '0 0 12px', fontSize: 13.5 }}>{guia.comoResolver}</p>
-          <button className="boton-secundario" onClick={alReintentar} style={{ width: '100%' }}>
+          <p className="aviso-instruccion">{guia.comoResolver}</p>
+          <button className="boton-secundario boton-ancho" onClick={alReintentar}>
             Reintentar la ubicación
           </button>
         </div>

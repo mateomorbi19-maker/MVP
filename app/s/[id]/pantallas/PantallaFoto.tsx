@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Icono } from '@/app/components/Iconos'
 import { type Paso } from '@/lib/recorrido'
 import type { Media, Subir } from '../tipos'
 
@@ -53,12 +54,19 @@ export function PantallaFoto({
         {tomada ? (
           <div className="foto-tomada">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`/api/media/${tomada.id}`} alt={paso.guia.titulo} />
+            <img className="foto-tomada-imagen" src={`/api/media/${tomada.id}`} alt={paso.guia.titulo} />
+            <div className="foto-tomada-estado">
+              <Icono nombre="tilde" />
+              Foto incorporada
+            </div>
           </div>
         ) : (
           <label className="foto-guiada">
-            {subiendo ? 'Subiendo...' : 'Sacar la foto'}
-            <small>La hora y el lugar los pone el sistema, no el archivo</small>
+            <span className="foto-guiada-icono">
+              <Icono nombre="camara" />
+            </span>
+            <span className="foto-guiada-accion">{subiendo ? 'Subiendo...' : 'Sacar la foto'}</span>
+            <small className="foto-guiada-nota">La hora y el lugar los pone el sistema, no el archivo</small>
             <input type="file" accept="image/*" capture="environment" className="entrada-oculta" onChange={elegir} disabled={subiendo} />
           </label>
         )}
@@ -70,7 +78,8 @@ export function PantallaFoto({
             <button className="boton-primario" onClick={seguir}>
               Seguir
             </button>
-            <label className="boton boton-secundario" style={{ cursor: 'pointer' }}>
+            <label className="boton boton-secundario foto-repetir">
+              <Icono nombre="camara" />
               Repetir la foto
               <input type="file" accept="image/*" capture="environment" className="entrada-oculta" onChange={elegir} />
             </label>

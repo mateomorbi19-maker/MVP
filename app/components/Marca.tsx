@@ -1,11 +1,14 @@
 import Link from 'next/link'
+import { Icono } from './Iconos'
 
 export function Marca({ enlace = true, sub }: { enlace?: boolean; sub?: string }) {
   const contenido = (
     <>
-      <div className="marca-punto">AD</div>
-      <div>
-        <div className="marca-texto">Acta Digital de Siniestro</div>
+      <div className="marca-punto">
+        <Icono nombre="escudo" />
+      </div>
+      <div className="marca-contenido">
+        <div className="marca-texto">Accidente Certificado</div>
         {sub ? <div className="marca-sub">{sub}</div> : null}
       </div>
     </>
@@ -14,7 +17,7 @@ export function Marca({ enlace = true, sub }: { enlace?: boolean; sub?: string }
   if (!enlace) return <div className="marca">{contenido}</div>
 
   return (
-    <Link href="/" className="marca" style={{ color: 'inherit', textDecoration: 'none' }}>
+    <Link href="/" className="marca marca-enlace">
       {contenido}
     </Link>
   )

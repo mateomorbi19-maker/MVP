@@ -118,18 +118,19 @@ export function LienzoFirma({
   }
 
   return (
-    <div>
+    <div className="firma-digital">
       <div className="lienzo-firma-area" ref={contenedor}>
         <canvas
           ref={canvas}
           className="lienzo-firma"
+          aria-label="Área para dibujar la firma"
           onPointerDown={empezar}
           onPointerMove={mover}
           onPointerUp={terminar}
           onPointerCancel={terminar}
         />
       </div>
-      <button className="omitir" onClick={borrar} disabled={!hayTrazo}>
+      <button className="omitir firma-borrar" onClick={borrar} disabled={!hayTrazo}>
         Borrar y firmar de nuevo
       </button>
     </div>

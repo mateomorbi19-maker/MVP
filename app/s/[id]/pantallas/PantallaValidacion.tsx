@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { Icono } from '@/app/components/Iconos'
 
 type Campo = { clave: string; etiqueta: string; lectura: string; estado: 'verificado' | 'revisar' }
 type Lectura = {
@@ -131,12 +132,17 @@ export function PantallaValidacion({ casoId, seguir }: { casoId: string; seguir:
         ) : null}
 
         {listas.map((l) => (
-          <div className="tarjeta" key={l.id}>
-            <h3>{l.tipo_documento}</h3>
+          <div className="tarjeta tarjeta-validacion" key={l.id}>
+            <div className="validacion-documento">
+              <span className="validacion-documento-icono">
+                <Icono nombre="archivo" />
+              </span>
+              <h3 className="validacion-documento-titulo">{l.tipo_documento}</h3>
+            </div>
             {l.campos.map((c) => {
               const clave = `${l.id}:${c.clave}`
               return (
-                <div className="campo" key={clave}>
+                <div className="campo campo-validacion" key={clave}>
                   <label htmlFor={clave}>
                     {c.etiqueta}{' '}
                     <span className="insignia" data-nivel={c.estado === 'verificado' ? 'ok' : 'atencion'}>
@@ -145,6 +151,7 @@ export function PantallaValidacion({ casoId, seguir }: { casoId: string; seguir:
                   </label>
                   <input
                     id={clave}
+                    className="entrada-validacion"
                     type="text"
                     value={valores[clave] ?? ''}
                     placeholder={c.estado === 'revisar' ? `Se leyó: ${c.lectura}` : undefined}

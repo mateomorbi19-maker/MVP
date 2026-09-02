@@ -114,7 +114,7 @@ export function PantallaPregunta({
         ) : null}
 
         {pregunta.tipo === 'numero' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="campo-con-unidad">
             <input
               id={pregunta.id}
               className="campo-grande"
@@ -124,7 +124,7 @@ export function PantallaPregunta({
               value={typeof valor === 'number' || typeof valor === 'string' ? String(valor) : ''}
               onChange={(e) => responder(pregunta.id, e.target.value === '' ? '' : Number(e.target.value))}
             />
-            {pregunta.unidad ? <span className="apagado" style={{ fontSize: 17 }}>{pregunta.unidad}</span> : null}
+            {pregunta.unidad ? <span className="apagado campo-unidad">{pregunta.unidad}</span> : null}
           </div>
         ) : null}
 
