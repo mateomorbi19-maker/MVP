@@ -13,7 +13,7 @@ referencia las trae invertidas.
 
 | | |
 | --- | --- |
-| Archivos | `public/sw.js` (push y notificationclick) · `app/aviso/page.tsx` · `components/DetectorImpacto.tsx` |
+| Archivos | `public/sw.js` (push y notificationclick) · `app/aviso/page.tsx` · `app/components/ModoViaje.tsx` |
 | Endpoints | `GET /api/push/clave-publica` · `POST /api/push/dispositivos` · `POST /api/telemetria` |
 
 Límite que hay que tener presente antes de maquetarla: **en iPhone no existe.** Web Push
@@ -248,7 +248,7 @@ Dos cosas que hay que saber antes de tocar cualquier texto que termine acá:
 | Cuenta | `app/cuenta/page.tsx` | Quién sos, cambiar la contraseña, cerrar sesión, y los accesos al resto |
 | Mis actuaciones | `app/historial/page.tsx` | Las actuaciones de la persona, con el estado de cada trámite |
 | Mi póliza | `app/poliza/page.tsx` | Pólizas y documentación del vehículo, cargadas antes del choque |
-| Mis datos | `app/perfil/page.tsx` | Carátula precargada, contacto de confianza y modo viaje |
+| Mis datos | `app/perfil/page.tsx` | Carátula precargada y contacto de confianza. El modo viaje pasó a la tarjeta del inicio y a `app/components/ModoViaje.tsx`, global |
 | Aviso de impacto | `app/aviso/page.tsx` | Lo que abre la notificación del detector. Los tres botones que en iPhone no caben dentro de la notificación |
 
 ---

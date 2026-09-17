@@ -196,6 +196,8 @@ de esta lista:
 - «Lectura de demostración… no salen de la foto» (revisión de la lectura automática).
 - El pie del croquis, que aclara que es declarativo y no un peritaje.
 - «Funciona sólo con la aplicación abierta» (modo viaje).
+- «No llama ni le avisa a nadie por su cuenta» (modo viaje).
+- «La aplicación no llama sola a emergencias» (alerta).
 - «La aplicación no llama ni manda mensajes por su cuenta» (contacto de confianza).
 - Todo lo que diga firma **electrónica**, art. 5 de la Ley 25.506, y los arts. 7 y 8.
 

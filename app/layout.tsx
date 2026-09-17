@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { BombaCola } from './components/BombaCola'
+import { ModoViaje } from './components/ModoViaje'
 
 export const metadata: Metadata = {
   title: 'Acta Digital de Siniestro',
@@ -46,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es-AR">
       <body>
-        {children}
+        <ModoViaje>{children}</ModoViaje>
         {/*
           Va en el layout y no en el recorrido: en iPhone no hay Background Sync, así que la
           cola sólo avanza con la aplicación abierta. Si la persona reabre en el inicio y no

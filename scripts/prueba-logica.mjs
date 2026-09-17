@@ -18,7 +18,7 @@ import { PLANTILLAS, figurasDelCroquis, limpiarCroquis } from '../lib/croquis.ts
 import { MAPEO, PROVEEDOR_SIMULADO, extraccionActiva, vistaParaAsegurado } from '../lib/extraccion.ts'
 import { DECLARACION, construirActa } from '../lib/acta.ts'
 import { cifrarCarga, derivarClaves } from '../lib/cifrado.ts'
-import { UMBRALES, analizarImpacto, planEscalamiento } from '../lib/impacto.ts'
+import { UMBRALES, analizarImpacto, evaluarEpisodio, frenadaBrusca, planEscalamiento } from '../lib/impacto.ts'
 import { createDecipheriv, createECDH } from 'node:crypto'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
@@ -812,6 +812,52 @@ console.log('\n[10] Impacto y notificaciones')
   verificar('sin respuesta se escala, pero sin llamar solo', planEscalamiento(v, false).ofrecerEmergencias === true)
   verificar('si la persona contesta, no se escala nada', planEscalamiento(v, true).ofrecerEmergencias === false)
   verificar('los umbrales tienen valores de referencia razonables', UMBRALES.sospechaG >= 3 && UMBRALES.confirmadoG >= UMBRALES.sospechaG)
+}
+
+/* El modo viaje: acelerómetro a 60 Hz y GPS a 1 Hz, en series separadas. */
+{
+  const G = 9.80665
+  const PASO = 16.67
+  const T_PICO = 3000
+  const muestras = (fn, n = 360) =>
+    Array.from({ length: n }, (_, i) => {
+      const t = i * PASO
+      const m = fn(t)
+      return { t, ax: m.g * G, ay: 0, az: 0, gTotal: m.gTotal ?? 1 + Math.abs(m.g), giro: null }
+    })
+  const velocidades = (fn) => Array.from({ length: 13 }, (_, s) => ({ t: s * 1000, kmh: fn(s * 1000) }))
+  const golpe = (ms, g) => (t) => ({ g: t >= T_PICO && t < T_PICO + ms ? g : 0.1 })
+
+  const sacudir = muestras((t) => ({ g: (t / 3000) * 6 * Math.sin((2 * Math.PI * t) / 250) }), 200)
+  const vs = evaluarEpisodio(sacudir, [])
+  verificar('viaje: sacudir el teléfono en la mano sin GPS no dispara', vs.nivel === 'nada', vs.motivo)
+
+  const vp = evaluarEpisodio(muestras(golpe(40, 8)), velocidades(() => 50))
+  verificar('viaje: un pozo a 50 km/h que sigue a 50 no dispara', vp.nivel === 'nada', vp.motivo)
+
+  const vc = evaluarEpisodio(muestras(golpe(80, 12)), velocidades((t) => (t < T_PICO ? 50 : 0)))
+  verificar('viaje: un choque de 12 g que deja el auto detenido se confirma', vc.nivel === 'confirmado', vc.motivo)
+
+  const vsv = evaluarEpisodio(muestras(golpe(80, 12)), [])
+  verificar('viaje: el mismo choque sin velocidades queda en sospecha', vsv.nivel === 'sospecha', vsv.motivo)
+
+  const vq = evaluarEpisodio(muestras(golpe(80, 12)), velocidades(() => 0))
+  verificar('viaje: un golpe con el auto quieto no dispara', vq.nivel === 'nada', vq.motivo)
+
+  const caida = muestras((t) =>
+    t >= T_PICO - 200 && t < T_PICO ? { g: 1, gTotal: 0.02 } : t >= T_PICO && t < T_PICO + 50 ? { g: 15 } : { g: 0.1 },
+  )
+  const vf = evaluarEpisodio(caida, velocidades(() => 50))
+  verificar('viaje: el teléfono que se cae con el auto andando no dispara', vf.nivel === 'nada', vf.motivo)
+
+  const frenando = [
+    { t: 0, kmh: 60 },
+    { t: 1000, kmh: 42 },
+    { t: 2000, kmh: 24 },
+    { t: 3000, kmh: 22 },
+  ]
+  verificar('viaje: una frenada fuerte que no detiene el auto se cuenta', frenadaBrusca(frenando, 3000))
+  verificar('viaje: circular parejo no cuenta frenadas', !frenadaBrusca(velocidades(() => 50), 3000))
 }
 
 /* ---------- Resultado ---------- */

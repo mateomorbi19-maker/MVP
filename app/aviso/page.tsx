@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Marca } from '@/app/components/Marca'
 import { BotonesEmergencia } from '@/app/components/BotonesEmergencia'
@@ -18,21 +18,9 @@ import { recordarActuacion } from '@/lib/local'
  */
 function Aviso() {
   const router = useRouter()
-  const accion = useSearchParams().get('accion')
   const telemetria = useSearchParams().get('t')
   const [abriendo, setAbriendo] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    // Si la notificación se venció sin respuesta, queda registrado.
-    if (telemetria && accion === null) {
-      fetch(`/api/telemetria/${telemetria}/respuesta`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ respuesta: 'sin_respuesta' }),
-      }).catch(() => undefined)
-    }
-  }, [telemetria, accion])
 
   async function reportar() {
     setAbriendo(true)

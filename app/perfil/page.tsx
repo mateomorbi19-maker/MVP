@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Marca } from '@/app/components/Marca'
-import { DetectorImpacto } from '@/app/components/DetectorImpacto'
 import { SinSesion } from '@/app/components/SinSesion'
 
 type Contacto = { nombre: string; telefono: string; relacion: string | null }
@@ -141,8 +140,8 @@ export default function Perfil() {
         <div className="tarjeta">
           <h3>Contacto de confianza</h3>
           <p className="apagado mini">
-            A quién avisarle si el teléfono detecta un impacto y no respondés. Avisale a esa persona que la cargaste:
-            son sus datos, no los tuyos.
+            A quién vas a poder llamar con un toque desde la pantalla de ayuda si el teléfono detecta un golpe. Avisale
+            a esa persona que la cargaste: son sus datos, no los tuyos.
           </p>
           {/* El aviso va antes de los campos y no al final de la tarjeta, que es donde uno lo
               pondría por instinto. Con el teclado abierto sus 135px empujaban el botón Guardar
@@ -174,12 +173,6 @@ export default function Perfil() {
         </button>
       </form>
       )}
-
-      {/* El botón azul a ancho completo pegado al borde de arriba de la tarjeta se lee como su
-          encabezado, y el pulgar cae sobre «Encender el modo viaje» en vez de sobre Guardar.
-          Misma separación que /cuenta entre los accesos y las acciones de sesión. */}
-      <div className="separacion-bloque" />
-      <DetectorImpacto />
 
       <p className="centrado">
         <Link href="/cuenta" className="boton boton-fantasma">

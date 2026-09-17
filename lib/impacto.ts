@@ -215,3 +215,190 @@ export function planEscalamiento(veredicto: Veredicto, respondio: boolean): Plan
         : 'No hubo respuesta. Se ofrecen las llamadas de emergencia y queda abierto el borrador de la denuncia.',
   }
 }
+
+/* ---------- Modo viaje: un episodio con muestras y velocidades por separado ---------- */
+
+/*
+ * El detector de arriba recibe una serie con la velocidad pegada a cada lectura, que es lo
+ * que sirve para la ingesta. En el auto no llegan así: el acelerómetro da 60 muestras por
+ * segundo y el GPS una, con relojes que no coinciden. Por eso el modo viaje evalúa las dos
+ * series por separado, sobre un reloj monótono común.
+ */
+
+const G_VIAJE = 9.80665
+
+export interface MuestraViaje {
+  /** Milisegundos, reloj monótono. */
+  t: number
+  /** Aceleración sin gravedad, en m/s². */
+  ax: number
+  ay: number
+  az: number
+  /** Módulo con gravedad, en g. */
+  gTotal: number
+  /** Norma del giro en grados por segundo, cuando el equipo la da. */
+  giro: number | null
+}
+
+export interface VelocidadViaje {
+  t: number
+  kmh: number
+}
+
+export type NivelViaje = 'nada' | 'sospecha' | 'confirmado'
+
+export interface VeredictoViaje {
+  nivel: NivelViaje
+  picoG: number
+  tPico: number
+  motivo: string
+  siguioAndando: boolean
+  detenido: boolean
+  velocidadDisponible: boolean
+}
+
+const RANGO_NIVEL: Record<NivelViaje, number> = { nada: 0, sospecha: 1, confirmado: 2 }
+
+const moduloG = (m: MuestraViaje) => Math.hypot(m.ax, m.ay, m.az) / G_VIAJE
+
+function medianaViaje(v: number[]): number {
+  const o = [...v].sort((a, b) => a - b)
+  return o[Math.floor(o.length / 2)]
+}
+
+/** Recorre desde el pico mientras la aceleración siga alta, perdonando una muestra suelta. */
+function msSostenido(muestras: MuestraViaje[], iPico: number): number {
+  let inicio = iPico
+  let fin = iPico
+  let faltas = 0
+  for (let i = iPico - 1; i >= 0; i--) {
+    if (moduloG(muestras[i]) >= 2) {
+      inicio = i
+      faltas = 0
+    } else if (++faltas > 1) break
+  }
+  faltas = 0
+  for (let i = iPico + 1; i < muestras.length; i++) {
+    if (moduloG(muestras[i]) >= 2) {
+      fin = i
+      faltas = 0
+    } else if (++faltas > 1) break
+  }
+  return muestras[fin].t - muestras[inicio].t
+}
+
+/** Giro brusco o caída libre justo antes del pico: el teléfono se movió solo, no el auto. */
+function fueManipulado(muestras: MuestraViaje[], tPico: number): boolean {
+  let desdeCaida: number | null = null
+  for (const m of muestras) {
+    if (m.giro !== null && m.giro >= 300 && m.t >= tPico - 700 && m.t <= tPico - 80) return true
+    if (m.t < tPico - 700 || m.t > tPico - 30) continue
+    if (m.gTotal < 0.5) {
+      if (desdeCaida === null) desdeCaida = m.t
+      if (m.t - desdeCaida >= 50) return true
+    } else desdeCaida = null
+  }
+  return false
+}
+
+/** Una mano que sacude empieza a ir y venir antes del pico; un choque llega de golpe. */
+function fueSacudida(muestras: MuestraViaje[], pico: MuestraViaje): boolean {
+  const ejes = [Math.abs(pico.ax), Math.abs(pico.ay), Math.abs(pico.az)]
+  const eje = ejes.indexOf(Math.max(...ejes))
+  let lobulos = 0
+  let signo = 0
+  for (const m of muestras) {
+    if (m.t < pico.t - 1500 || m.t > pico.t - 100) continue
+    const valor = eje === 0 ? m.ax : eje === 1 ? m.ay : m.az
+    if (Math.abs(valor) < 2 * G_VIAJE) continue
+    const s = Math.sign(valor)
+    if (s !== signo) {
+      lobulos++
+      signo = s
+    }
+  }
+  return lobulos >= 2
+}
+
+function evaluarPico(muestras: MuestraViaje[], iPico: number, velocidades: VelocidadViaje[]): VeredictoViaje {
+  const pico = muestras[iPico]
+  const tPico = pico.t
+  const picoG = Math.round(moduloG(pico) * 10) / 10
+  const sostenido = msSostenido(muestras, iPico) >= 30
+  const manipulado = fueManipulado(muestras, tPico)
+  const sacudida = fueSacudida(muestras, pico)
+
+  const cercanas = velocidades.filter((v) => v.t >= tPico - 8000 && v.t <= tPico + 2500)
+  let previa = 0
+  for (let i = 0; i + 2 < cercanas.length; i++) {
+    previa = Math.max(previa, medianaViaje([cercanas[i].kmh, cercanas[i + 1].kmh, cercanas[i + 2].kmh]))
+  }
+  const ibaAndando = previa >= 15
+  const despues = velocidades.filter((v) => v.t >= tPico + 2000 && v.t <= tPico + 8000)
+  const detenido = despues.filter((v) => v.kmh <= 8).length >= 2
+  const ultimas = despues.slice(-3).map((v) => v.kmh)
+  const siguioAndando = !detenido && ultimas.length > 0 && medianaViaje(ultimas) >= Math.max(15, 0.5 * previa)
+  const velocidadDisponible =
+    velocidades.filter((v) => v.t >= tPico - 8000 && v.t <= tPico).length >= 2 &&
+    velocidades.filter((v) => v.t > tPico).length >= 2
+
+  const base = { picoG, tPico, siguioAndando, detenido, velocidadDisponible }
+  const con = (nivel: NivelViaje, motivo: string): VeredictoViaje => ({ ...base, nivel, motivo })
+
+  if (!sostenido) return con('nada', 'pico aislado, sin la duración de un choque')
+  if (velocidadDisponible) {
+    if (previa < 10) return con('nada', 'el auto no venía andando')
+    if (!ibaAndando) return con('nada', 'velocidad previa demasiado baja para un choque')
+    if (!manipulado && detenido) return con('confirmado', 'golpe sostenido y el auto se detuvo')
+    if (manipulado && detenido) return con('sospecha', 'el auto se detuvo, pero el teléfono se movió antes del golpe')
+    if (manipulado) return con('nada', 'el teléfono se cayó o lo movieron y el auto siguió')
+    if (siguioAndando) return con('nada', 'golpe con el auto en marcha')
+    return con('sospecha', 'golpe sostenido sin saber todavía si el auto se detuvo')
+  }
+  if (manipulado) return con('nada', 'el teléfono se cayó o lo movieron antes del golpe')
+  if (sacudida) return con('nada', 'movimiento de vaivén, como una mano que sacude el teléfono')
+  return con('sospecha', 'golpe sostenido sin velocidad para confirmarlo')
+}
+
+/** Evalúa un episodio completo: cada subpico por separado, y gana el nivel más alto. */
+export function evaluarEpisodio(muestras: MuestraViaje[], velocidades: VelocidadViaje[]): VeredictoViaje {
+  const grupos: number[][] = []
+  let ultimoT = -Infinity
+  muestras.forEach((m, i) => {
+    if (moduloG(m) < 4) return
+    if (m.t - ultimoT > 300 || grupos.length === 0) grupos.push([])
+    grupos[grupos.length - 1].push(i)
+    ultimoT = m.t
+  })
+
+  let mejor: VeredictoViaje = {
+    nivel: 'nada',
+    picoG: 0,
+    tPico: muestras[0]?.t ?? 0,
+    motivo: 'ninguna lectura llegó a 4 g',
+    siguioAndando: false,
+    detenido: false,
+    velocidadDisponible: false,
+  }
+  for (const grupo of grupos) {
+    const iPico = grupo.reduce((a, b) => (moduloG(muestras[b]) > moduloG(muestras[a]) ? b : a))
+    const v = evaluarPico(muestras, iPico, velocidades)
+    if (RANGO_NIVEL[v.nivel] > RANGO_NIVEL[mejor.nivel] || (v.nivel === mejor.nivel && v.picoG > mejor.picoG)) mejor = v
+  }
+  return mejor
+}
+
+/** Una desaceleración de 0,45 g sostenida 1,5 s en los últimos 3 s, sin llegar a detenerse. */
+export function frenadaBrusca(velocidades: VelocidadViaje[], ahora: number): boolean {
+  const recientes = velocidades.filter((v) => v.t >= ahora - 3000 && v.t <= ahora)
+  if (recientes.length < 2 || recientes[recientes.length - 1].kmh <= 8) return false
+  const tasa = 0.45 * 35.3
+  for (let i = 0; i < recientes.length; i++) {
+    if (recientes[i].kmh < 20) continue
+    for (let j = i + 1; j < recientes.length; j++) {
+      const dt = (recientes[j].t - recientes[i].t) / 1000
+      if (dt >= 1.5 && (recientes[i].kmh - recientes[j].kmh) / dt >= tasa && recientes[j].kmh > 8) return true
+    }
+  }
+  return false
+}

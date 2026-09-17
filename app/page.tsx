@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Marca } from './components/Marca'
@@ -9,6 +9,7 @@ import { BarraCuenta } from './components/BarraCuenta'
 import { BotonesEmergencia } from './components/BotonesEmergencia'
 import { Icono } from './components/Iconos'
 import { actuacionAbierta, recordarActuacion } from '@/lib/local'
+import { useModoViaje } from './components/ModoViaje'
 
 /**
  * Inicio.
@@ -35,12 +36,81 @@ const QUE_SE_REGISTRA = [
   { icono: 'microfono', titulo: 'Tu relato', detalle: 'con tus palabras' },
 ] as const
 
+/**
+ * El interruptor del modo viaje.
+ *
+ * Encender llama al motor directo desde el onClick, sin nada asíncrono antes: en iPhone el
+ * permiso de movimiento, la pantalla encendida y el sonido sólo se conceden dentro del toque.
+ */
+function TarjetaViaje() {
+  const { estado, motor } = useModoViaje()
+  const encendido = ['activo', 'en_pausa', 'pidiendo', 'reanudar_con_toque'].includes(estado.fase)
+
+  let linea: ReactNode = estado.fase === 'pidiendo' ? 'Pidiendo permisos...' : 'Apagado'
+  if (estado.fase === 'desconocido') linea = null
+  if (estado.fase === 'activo' || estado.fase === 'en_pausa') linea = `Activo · detección ${estado.minutosActivo} min`
+  if (estado.fase === 'activo' && estado.pantalla === 'sin_retener') linea = 'Tocá la pantalla para que no se apague'
+  if (estado.fase === 'reanudar_con_toque') {
+    linea = (
+      <button type="button" className="boton boton-secundario" onClick={() => motor?.reanudar()}>
+        Tocá para reanudar
+      </button>
+    )
+  }
+  if (estado.fase === 'sin_permiso') {
+    linea = 'Sin permiso de movimiento: habilitalo en los ajustes del navegador y volvé a encender.'
+  }
+  if (estado.fase === 'sin_lecturas') {
+    linea = 'Este equipo no entrega lecturas de movimiento: el modo viaje funciona en el teléfono.'
+  }
+  if (estado.fase === 'no_soportado') linea = estado.motivo
+  if (estado.fase === 'apagado' && estado.apagadoPor === 'inactividad') {
+    linea = 'Se apagó solo porque el auto estuvo detenido.'
+  }
+  if (estado.fase === 'apagado' && estado.apagadoPor === 'accidente') linea = 'Se apagó al registrar el accidente.'
+
+  return (
+    <section className="tarjeta-viaje" aria-labelledby="tarjeta-viaje-titulo">
+      <div className="tarjeta-viaje-encabezado">
+        <span className="acceso-icono">
+          <Icono nombre="auto" />
+        </span>
+        <h2 id="tarjeta-viaje-titulo" className="tarjeta-viaje-titulo">
+          Modo viaje
+        </h2>
+      </div>
+      <p className="tarjeta-viaje-texto">Funciona sólo con la aplicación abierta y la pantalla encendida.</p>
+      <p className="tarjeta-viaje-texto">No llama ni le avisa a nadie por su cuenta.</p>
+      <p className="mini">
+        Si detecta un posible choque, manda a tu aseguradora la hora, los sensores y la ubicación. Es optativo. Con la
+        pantalla encendida y el GPS gasta batería: conviene tenerlo enchufado.
+      </p>
+      <div className="tarjeta-viaje-pie">
+        <div className="tarjeta-viaje-estado" aria-live="polite">
+          {linea}
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={encendido}
+          className="interruptor-viaje"
+          disabled={!motor}
+          onClick={() => (encendido ? motor?.apagar() : motor?.encender())}
+        >
+          {encendido ? 'Apagar' : 'Encender'}
+        </button>
+      </div>
+    </section>
+  )
+}
+
 export default function Inicio() {
   const router = useRouter()
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [salud, setSalud] = useState<{ ok: boolean; detalle: string } | null>(null)
   const [abierta, setAbierta] = useState<string | null>(null)
+  const { motor } = useModoViaje()
 
   useEffect(() => {
     setAbierta(actuacionAbierta())
@@ -53,6 +123,8 @@ export default function Inicio() {
   }, [])
 
   async function iniciar() {
+    // Una vez en el recorrido el teléfono va en la mano: seguir detectando sólo daría falsas alarmas.
+    motor?.apagar('accidente')
     setEnviando(true)
     setError(null)
     try {
@@ -126,6 +198,8 @@ export default function Inicio() {
         </Link>
       ) : null}
 
+      <TarjetaViaje />
+
       <section className="bloque-inicio">
         <h2 className="bloque-titulo">¿Necesitás ayuda urgente?</h2>
         <p className="bloque-bajada">Llamá a los servicios de emergencia.</p>
@@ -156,7 +230,7 @@ export default function Inicio() {
       <div className="inicio-pie">
         <InstalarApp />
         <p className="mini centrado">
-          Vamos a pedirte permiso de ubicación, cámara y micrófono para registrar dónde, cuándo y cómo ocurrió. Los
+          Si registrás un accidente, vamos a pedirte permiso de ubicación, cámara y micrófono para registrar dónde, cuándo y cómo ocurrió. Los
           datos se usan sólo para documentar este siniestro ante tu aseguradora (Ley 25.326).
         </p>
         <BarraCuenta />

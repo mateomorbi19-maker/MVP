@@ -3,7 +3,7 @@ import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
 import { sha256 } from '@/lib/hash'
 import { leerSesion } from '@/lib/sesion'
-import { huellaVapid } from '@/lib/push'
+import { endpointPushValido, huellaVapid } from '@/lib/push'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +18,12 @@ export async function POST(req: Request) {
     const auth = typeof cuerpo?.auth === 'string' ? cuerpo.auth : ''
     if (!endpoint || !p256dh || !auth) {
       return NextResponse.json({ error: 'La suscripción llegó incompleta.' }, { status: 400 })
+    }
+    if (!endpointPushValido(endpoint)) {
+      return NextResponse.json(
+        { error: 'La suscripción no apunta a un servicio de notificaciones conocido. Volvé a activar los avisos desde el navegador.' },
+        { status: 400 },
+      )
     }
 
     const pg = await db()

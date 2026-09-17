@@ -104,9 +104,43 @@ export interface ResultadoEnvio {
   caducada: boolean
 }
 
+/*
+ * El endpoint lo escribe el navegador, o sea cualquiera que llame a la API: sin esta lista
+ * el servidor haría POST firmados a la dirección que le pasen, incluida la red interna.
+ */
+const HOSTS_PUSH = [
+  'fcm.googleapis.com',
+  'android.googleapis.com',
+  'updates.push.services.mozilla.com',
+  'web.push.apple.com',
+]
+const SUFIJOS_PUSH = ['.push.apple.com', '.notify.windows.com']
+
+export function endpointPushValido(endpoint: unknown): boolean {
+  if (typeof endpoint !== 'string' || endpoint.length > 2000) return false
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:' || url.username || url.password) return false
+  if (url.port !== '' && url.port !== '443') return false
+  const host = url.hostname.toLowerCase()
+  return HOSTS_PUSH.includes(host) || SUFIJOS_PUSH.some((s) => host.endsWith(s))
+}
+
 /** Manda un aviso a un dispositivo. No lanza: devuelve por qué falló. */
 export async function enviarPush(suscripcion: Suscripcion, aviso: Aviso): Promise<ResultadoEnvio> {
   if (!pushActivo()) return { ok: false, estado: 0, motivo: 'Las notificaciones están desactivadas.', caducada: false }
+  if (!endpointPushValido(suscripcion.endpoint)) {
+    return {
+      ok: false,
+      estado: 0,
+      motivo: 'La suscripción no apunta a un servicio de notificaciones conocido: no se le mandó nada.',
+      caducada: false,
+    }
+  }
 
   try {
     const carga = cifrarCarga(suscripcion, JSON.stringify(aviso))
@@ -121,20 +155,30 @@ export async function enviarPush(suscripcion: Suscripcion, aviso: Aviso): Promis
       },
       body: new Uint8Array(carga),
       signal: AbortSignal.timeout(10_000),
+      // Una redirección llevaría la firma VAPID a un host que no pasó por la lista.
+      redirect: 'manual',
     })
+
+    if (res.status >= 300 && res.status < 400) {
+      return {
+        ok: false,
+        estado: res.status,
+        motivo: 'El servicio de push respondió con una redirección y no se la siguió: revisá la suscripción.',
+        caducada: false,
+      }
+    }
 
     // 404 y 410 significan que el navegador dio de baja la suscripción.
     const caducada = res.status === 404 || res.status === 410
     if (res.ok) return { ok: true, estado: res.status, motivo: null, caducada: false }
 
-    const detalle = await res.text().catch(() => '')
     return {
       ok: false,
       estado: res.status,
       motivo:
         res.status === 403
           ? 'El servicio de push rechazó la clave VAPID. Suele pasar cuando la clave del servidor cambió: las suscripciones viejas quedaron atadas a la anterior y hay que volver a suscribir los teléfonos.'
-          : `El servicio de push respondió ${res.status}. ${detalle.slice(0, 200)}`,
+          : `El servicio de push respondió ${res.status}.`,
       caducada,
     }
   } catch (err) {
