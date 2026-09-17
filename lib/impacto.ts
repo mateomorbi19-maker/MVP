@@ -360,12 +360,29 @@ function evaluarPico(muestras: MuestraViaje[], iPico: number, velocidades: Veloc
   return con('sospecha', 'golpe sostenido sin velocidad para confirmarlo')
 }
 
+export interface OpcionesEpisodio {
+  /**
+   * Para mostrar el modo viaje sin chocar un auto: cualquier golpe de 2,5 g alerta. Saltea
+   * a propósito los descartes (caída libre, pico aislado, vaivén, velocidad), porque la
+   * demostración típica es justamente tirar el teléfono a la cama.
+   */
+  demo?: boolean
+}
+
+const UMBRAL_EPISODIO_G = 4
+const UMBRAL_DEMO_G = 2.5
+
 /** Evalúa un episodio completo: cada subpico por separado, y gana el nivel más alto. */
-export function evaluarEpisodio(muestras: MuestraViaje[], velocidades: VelocidadViaje[]): VeredictoViaje {
+export function evaluarEpisodio(
+  muestras: MuestraViaje[],
+  velocidades: VelocidadViaje[],
+  opciones: OpcionesEpisodio = {},
+): VeredictoViaje {
+  const umbral = opciones.demo ? UMBRAL_DEMO_G : UMBRAL_EPISODIO_G
   const grupos: number[][] = []
   let ultimoT = -Infinity
   muestras.forEach((m, i) => {
-    if (moduloG(m) < 4) return
+    if (moduloG(m) < umbral) return
     if (m.t - ultimoT > 300 || grupos.length === 0) grupos.push([])
     grupos[grupos.length - 1].push(i)
     ultimoT = m.t
@@ -375,14 +392,24 @@ export function evaluarEpisodio(muestras: MuestraViaje[], velocidades: Velocidad
     nivel: 'nada',
     picoG: 0,
     tPico: muestras[0]?.t ?? 0,
-    motivo: 'ninguna lectura llegó a 4 g',
+    motivo: `ninguna lectura llegó a ${umbral} g`,
     siguioAndando: false,
     detenido: false,
     velocidadDisponible: false,
   }
   for (const grupo of grupos) {
     const iPico = grupo.reduce((a, b) => (moduloG(muestras[b]) > moduloG(muestras[a]) ? b : a))
-    const v = evaluarPico(muestras, iPico, velocidades)
+    const v = opciones.demo
+      ? {
+          nivel: 'sospecha' as NivelViaje,
+          picoG: Math.round(moduloG(muestras[iPico]) * 10) / 10,
+          tPico: muestras[iPico].t,
+          motivo: 'Golpe detectado en modo demostración',
+          siguioAndando: false,
+          detenido: false,
+          velocidadDisponible: false,
+        }
+      : evaluarPico(muestras, iPico, velocidades)
     if (RANGO_NIVEL[v.nivel] > RANGO_NIVEL[mejor.nivel] || (v.nivel === mejor.nivel && v.picoG > mejor.picoG)) mejor = v
   }
   return mejor

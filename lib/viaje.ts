@@ -46,6 +46,7 @@ export interface EstadoModoViaje {
     nivel: NivelViaje
   }
   apagadoPor: null | MotivoApagado
+  demo: boolean
 }
 
 export interface MotorViaje {
@@ -58,6 +59,8 @@ export interface MotorViaje {
   responder(respuesta: 'estoy_bien' | 'necesito_ayuda'): void
   huboChoque(hubo: boolean): void
   probarAlerta(): void
+  cambiarDemo(activo: boolean): void
+  simularChoque(): void
   tocar(): void
   destruir(): void
 }
@@ -74,9 +77,17 @@ export const ESTADO_SERVIDOR: EstadoModoViaje = Object.freeze({
   inactividad: false,
   alerta: null,
   apagadoPor: null,
+  demo: false,
 })
 
 const CLAVE_INTENCION = 'acta:viaje'
+const CLAVE_DEMO = 'acta:viaje:demo'
+const VALOR_DEMO = 'encendido'
+const UMBRAL_FUERTE_G = 4
+const UMBRAL_FUERTE_DEMO_G = 2.5
+const CIERRE_EPISODIO_MS = 8000
+// En la demostración nadie espera ocho segundos con el teléfono en la cama para ver la alerta.
+const CIERRE_EPISODIO_DEMO_MS = 1500
 const G = 9.80665
 const PLAZO_ALERTA_MS = 30_000
 const MINUTO = 60_000
@@ -93,6 +104,14 @@ function leerIntencion(): { encendidoEn: number; ultimoLatido: number } | null {
     return typeof i?.encendidoEn === 'number' && typeof i?.ultimoLatido === 'number' ? i : null
   } catch {
     return null
+  }
+}
+
+function leerDemo(): boolean {
+  try {
+    return localStorage.getItem(CLAVE_DEMO) === VALOR_DEMO
+  } catch {
+    return false
   }
 }
 
@@ -118,7 +137,7 @@ function sesionAudio(tipo: string) {
 }
 
 class Motor implements MotorViaje {
-  private est: EstadoModoViaje = Object.freeze({ ...ESTADO_SERVIDOR, fase: 'apagado' as Fase })
+  private est: EstadoModoViaje = Object.freeze({ ...ESTADO_SERVIDOR, fase: 'apagado' as Fase, demo: leerDemo() })
   private oyentes = new Set<() => void>()
   private muestras: MuestraViaje[] = []
   private velocidades: VelocidadViaje[] = []
@@ -537,7 +556,8 @@ class Motor implements MotorViaje {
     }
 
     if (this.est.fase !== 'activo') return
-    if (Math.hypot(ax, ay, az) / G >= 4 && t > this.analizadoHasta) {
+    const umbral = this.est.demo ? UMBRAL_FUERTE_DEMO_G : UMBRAL_FUERTE_G
+    if (Math.hypot(ax, ay, az) / G >= umbral && t > this.analizadoHasta) {
       if (!this.episodio) this.episodio = { inicio: t, ultimoFuerte: t }
       else this.episodio.ultimoFuerte = t
     }
@@ -579,11 +599,12 @@ class Motor implements MotorViaje {
   private revisarEpisodio(ahora: number) {
     const ep = this.episodio
     if (!ep) return
-    if (ahora - ep.ultimoFuerte < 8000 && ahora - ep.inicio < 15_000) return
+    const cierre = this.est.demo ? CIERRE_EPISODIO_DEMO_MS : CIERRE_EPISODIO_MS
+    if (ahora - ep.ultimoFuerte < cierre && ahora - ep.inicio < 15_000) return
     this.episodio = null
     this.analizadoHasta = ahora
     const serie = this.muestras.filter((m) => m.t >= ep.inicio - 2000 && m.t <= ahora)
-    const veredicto = evaluarEpisodio(serie, this.velocidades)
+    const veredicto = evaluarEpisodio(serie, this.velocidades, { demo: this.est.demo })
     if (veredicto.nivel !== 'nada' && !this.est.alerta) this.abrirAlerta(veredicto, serie)
   }
 
@@ -716,6 +737,39 @@ class Motor implements MotorViaje {
     window.setTimeout(() => {
       if (!this.est.alerta) this.detenerTono()
     }, 1000)
+  }
+
+  cambiarDemo(activo: boolean) {
+    try {
+      if (activo) localStorage.setItem(CLAVE_DEMO, VALOR_DEMO)
+      else localStorage.removeItem(CLAVE_DEMO)
+    } catch {}
+    // Un episodio abierto con el otro umbral mezclaría los dos criterios.
+    this.episodio = null
+    this.set({ demo: activo })
+  }
+
+  /**
+   * Abre la alerta igual que una detección real, pero sin mandar telemetría: un choque
+   * simulado no puede llegar a la aseguradora como si hubiera pasado. El audio se destraba
+   * antes que nada porque sólo vale dentro del toque.
+   */
+  simularChoque() {
+    this.desbloquearAudio()
+    if (this.est.alerta || this.est.fase !== 'activo') return
+    this.plazo = Date.now() + PLAZO_ALERTA_MS
+    this.telemetriaId = null
+    this.respuestaPendiente = null
+    this.set({
+      alerta: {
+        estado: 'pregunta',
+        restanteS: PLAZO_ALERTA_MS / 1000,
+        ocurridoEn: Date.now(),
+        origenAyuda: null,
+        nivel: 'sospecha',
+      },
+    })
+    this.iniciarTono(null)
   }
 
   /** volumenFijo null: sube durante los últimos 15 segundos del plazo. */

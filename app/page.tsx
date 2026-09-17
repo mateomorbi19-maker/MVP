@@ -100,6 +100,32 @@ function TarjetaViaje() {
           {encendido ? 'Apagar' : 'Encender'}
         </button>
       </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={estado.demo}
+        className="interruptor-demo"
+        disabled={!motor}
+        onClick={() => motor?.cambiarDemo(!estado.demo)}
+      >
+        Modo demostración (más sensible)
+      </button>
+      {estado.demo ? (
+        <>
+          <p className="mini">
+            En modo demostración alerta con golpes suaves, por ejemplo tirar el celular a la cama. No lo uses para
+            manejar.
+          </p>
+          <button
+            type="button"
+            className="boton boton-secundario"
+            disabled={!motor || estado.fase !== 'activo'}
+            onClick={() => motor?.simularChoque()}
+          >
+            Simular un choque
+          </button>
+        </>
+      ) : null}
     </section>
   )
 }

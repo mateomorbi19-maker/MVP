@@ -850,6 +850,15 @@ console.log('\n[10] Impacto y notificaciones')
   const vf = evaluarEpisodio(caida, velocidades(() => 50))
   verificar('viaje: el teléfono que se cae con el auto andando no dispara', vf.nivel === 'nada', vf.motivo)
 
+  // El teléfono tirado a la cama: caída libre y un aterrizaje blando de 3 g.
+  const cama = muestras((t) =>
+    t >= T_PICO - 300 && t < T_PICO ? { g: 1, gTotal: 0.02 } : t >= T_PICO && t < T_PICO + 50 ? { g: 3 } : { g: 0.1 },
+  )
+  const vcama = evaluarEpisodio(cama, [])
+  verificar('viaje: el teléfono tirado a la cama no dispara el detector real', vcama.nivel === 'nada', vcama.motivo)
+  const vdemo = evaluarEpisodio(cama, [], { demo: true })
+  verificar('viaje: en modo demostración el teléfono tirado a la cama alerta', vdemo.nivel === 'sospecha', vdemo.motivo)
+
   const frenando = [
     { t: 0, kmh: 60 },
     { t: 1000, kmh: 42 },

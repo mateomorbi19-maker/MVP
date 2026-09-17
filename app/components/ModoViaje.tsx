@@ -107,6 +107,7 @@ function Capa() {
         </dl>
         <p>Detección activa {estado.minutosActivo} min</p>
         <p>Frenadas bruscas registradas: {estado.frenadas}</p>
+        {estado.demo ? <p>Modo demostración activo</p> : null}
         <p className="mini">
           Funciona sólo con la aplicación abierta y la pantalla encendida. No llama ni le avisa a nadie por su cuenta.
         </p>
