@@ -88,7 +88,7 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | Emergencia | `pantallas/PantallaEmergencia.tsx` | `.emergencia`, `.boton-llamada` | ninguno (`tel:`) |
 | Resumen de lo esencial | `pantallas/PantallaResumen.tsx` | `.aviso[data-nivel]`, `.lista-esenciales`, `.acceso`, `.acceso-icono-redondo`, `.nota-pie` | ninguno |
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
-| Una toma (hasta cinco fotos) | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-grilla`, `.miniatura`, `.miniatura-estado`, `.entrada-oculta` | `POST /api/casos/[id]/media` |
+| Una toma (hasta cinco fotos) | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-grilla`, `.miniatura`, `.miniatura-estado`, `.miniatura-pdf`, `.cargar-pdf`, `.entrada-oculta` | `POST /api/casos/[id]/media` |
 | Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
 | Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
 | Corte | `pantallas/PantallaCorte.tsx` | `.hito-corte`, `.hito-simbolo`, `.acceso-boton`, `.numero-actuacion`, `.nota-pie` | ninguno; «guardar y relatar luego» vuelve a `/` |
@@ -100,6 +100,10 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 porque ya parece un botón— deja de abrir la cámara. Sacar `capture` abre la galería, y la
 evidencia deja de ser una toma del lugar. El `<small>` que dice «La hora y el lugar los
 pone el sistema, no el archivo» sostiene el valor probatorio: no se borra.
+
+Las tomas de papeles (`admitePdf` en `GUIA_FOTOS`) suman un segundo `<label>` «Cargar PDF»
+con `accept="application/pdf"` y **sin** `capture`: con capture el PDF no se podría elegir.
+Comparte el techo de cinco piezas por toma y se guarda como media de tipo `documento`.
 
 ## 5 · Revisión de lo que leyó la máquina
 

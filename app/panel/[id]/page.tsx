@@ -28,6 +28,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
   const consistencia = caso.consistencia ?? (await calcularConsistencia(id))
   const fotos = medias.filter((m) => m.tipo === 'foto')
   const audios = medias.filter((m) => m.tipo === 'audio')
+  const documentos = medias.filter((m) => m.tipo === 'documento')
 
   return (
     <main className="envoltura-ancha">
@@ -199,6 +200,25 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
                 <audio className="pieza-audio-reproductor" controls src={`/api/media/${a.id}`} />
                 <p className="mono pie-huella">
                   {a.id} · SHA-256 {a.sha256}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* --- Papeles cargados en PDF: no tienen miniatura, van como enlace --- */}
+      {documentos.length > 0 ? (
+        <section className="bloque-panel">
+          <h2>Documentos en PDF ({documentos.length})</h2>
+          <div className="tarjeta">
+            {documentos.map((d) => (
+              <div className="pieza-audio" key={d.id}>
+                <a href={`/api/media/${d.id}`} target="_blank" rel="noreferrer">
+                  {GUIA_FOTOS.find((g) => g.id === d.guia_id)?.titulo ?? 'Documento'}
+                </a>
+                <p className="mono pie-huella">
+                  {d.id} · SHA-256 {d.sha256}
                 </p>
               </div>
             ))}

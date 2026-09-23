@@ -7,12 +7,30 @@ import type { Media, Subir } from '../tipos'
 
 /* ================= Fotos de una toma, hasta cinco por pantalla ================= */
 
+const MIME_PDF = 'application/pdf'
+
 type Captura = {
   clave: string
   archivo: File
   url: string
   estado: 'subiendo' | 'guardada' | 'fallo'
   mediaId: string | null
+  esPdf: boolean
+}
+
+/*
+ * La ficha de un PDF: no hay miniatura que mostrar, así que se ve el nombre del archivo
+ * para que la persona reconozca cuál cargó. Tocarla lo abre en otra pestaña.
+ */
+function FichaPdf({ href, nombre, children }: { href: string; nombre: string; children: React.ReactNode }) {
+  return (
+    <a className="miniatura miniatura-pdf" href={href} target="_blank" rel="noreferrer">
+      <Icono nombre="archivo" />
+      <strong>PDF</strong>
+      <span className="miniatura-pdf-nombre">{nombre}</span>
+      {children}
+    </a>
+  )
 }
 
 export function PantallaFoto({
@@ -50,7 +68,7 @@ export function PantallaFoto({
     actualizar(captura.clave, { estado: 'subiendo' })
     setFallo(null)
     try {
-      const mediaId = await subir(captura.archivo, 'foto', paso.guia.id)
+      const mediaId = await subir(captura.archivo, captura.esPdf ? 'documento' : 'foto', paso.guia.id)
       actualizar(captura.clave, { estado: 'guardada', mediaId })
     } catch (err) {
       actualizar(captura.clave, { estado: 'fallo' })
@@ -64,7 +82,14 @@ export function PantallaFoto({
     if (!archivo || lleno) return
     const url = URL.createObjectURL(archivo)
     urls.current.push(url)
-    const captura: Captura = { clave: crypto.randomUUID(), archivo, url, estado: 'subiendo', mediaId: null }
+    const captura: Captura = {
+      clave: crypto.randomUUID(),
+      archivo,
+      url,
+      estado: 'subiendo',
+      mediaId: null,
+      esPdf: archivo.type === MIME_PDF,
+    }
     setCapturas((prev) => [...prev, captura])
     void enviar(captura)
   }
@@ -83,20 +108,40 @@ export function PantallaFoto({
 
         {anteriores.length + capturas.length > 0 ? (
           <div className="foto-grilla">
-            {anteriores.map((m) => (
-              <div key={m.id} className="miniatura">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/media/${m.id}`} alt={paso.guia.titulo} />
-                <span className="insignia miniatura-estado" data-nivel="ok">Guardada</span>
-              </div>
-            ))}
+            {anteriores.map((m) =>
+              m.tipo === 'documento' ? (
+                <FichaPdf key={m.id} href={`/api/media/${m.id}`} nombre={paso.guia.titulo}>
+                  <span className="insignia miniatura-estado" data-nivel="ok">Guardada</span>
+                </FichaPdf>
+              ) : (
+                <div key={m.id} className="miniatura">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/media/${m.id}`} alt={paso.guia.titulo} />
+                  <span className="insignia miniatura-estado" data-nivel="ok">Guardada</span>
+                </div>
+              ),
+            )}
             {capturas.map((c) =>
               c.estado === 'fallo' ? (
                 <button key={c.clave} className="miniatura miniatura-reintentar" onClick={() => void enviar(c)} disabled={lleno}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={c.url} alt={paso.guia.titulo} />
+                  {c.esPdf ? (
+                    <span className="miniatura-pdf">
+                      <Icono nombre="archivo" />
+                      <strong>PDF</strong>
+                      <span className="miniatura-pdf-nombre">{c.archivo.name}</span>
+                    </span>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.url} alt={paso.guia.titulo} />
+                  )}
                   <span className="insignia miniatura-estado" data-nivel="alerta">Reintentar</span>
                 </button>
+              ) : c.esPdf ? (
+                <FichaPdf key={c.clave} href={c.url} nombre={c.archivo.name}>
+                  <span className="insignia miniatura-estado" data-nivel={c.estado === 'guardada' ? 'ok' : 'neutra'}>
+                    {c.estado === 'guardada' ? 'Guardada' : 'Subiendo'}
+                  </span>
+                </FichaPdf>
               ) : (
                 <div key={c.clave} className="miniatura">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -111,16 +156,27 @@ export function PantallaFoto({
         ) : null}
 
         {lleno ? null : (
-          <label className={cantidad > 0 ? 'foto-guiada foto-guiada-compacta' : 'foto-guiada'}>
-            <span className="foto-guiada-icono">
-              <Icono nombre="camara" />
-            </span>
-            <span className="foto-guiada-accion">
-              {cantidad > 0 ? `Agregar otra foto (${cantidad + 1} de ${MAXIMO_FOTOS_POR_GUIA})` : 'Sacar foto'}
-            </span>
-            <small className="foto-guiada-nota">La hora y el lugar los pone el sistema, no el archivo</small>
-            <input type="file" accept="image/*" capture="environment" className="entrada-oculta" onChange={elegir} />
-          </label>
+          <>
+            <label className={cantidad > 0 ? 'foto-guiada foto-guiada-compacta' : 'foto-guiada'}>
+              <span className="foto-guiada-icono">
+                <Icono nombre="camara" />
+              </span>
+              <span className="foto-guiada-accion">
+                {cantidad > 0 ? `Agregar otra foto (${cantidad + 1} de ${MAXIMO_FOTOS_POR_GUIA})` : 'Sacar foto'}
+              </span>
+              <small className="foto-guiada-nota">La hora y el lugar los pone el sistema, no el archivo</small>
+              <input type="file" accept="image/*" capture="environment" className="entrada-oculta" onChange={elegir} />
+            </label>
+            {/* Sin capture a propósito: capture manda derecho a la cámara y el PDF no se podría
+                elegir nunca. Sólo aparece en las tomas de papeles. */}
+            {paso.guia.admitePdf ? (
+              <label className="boton boton-secundario cargar-pdf">
+                <Icono nombre="archivo" />
+                Cargar PDF
+                <input type="file" accept="application/pdf" className="entrada-oculta" onChange={elegir} />
+              </label>
+            ) : null}
+          </>
         )}
       </div>
 

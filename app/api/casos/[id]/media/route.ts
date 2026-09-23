@@ -4,7 +4,7 @@ import { exigirAccesoCaso } from '@/lib/posesion'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
-import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO } from '@/lib/almacenamiento'
+import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO, MIME_PDF } from '@/lib/almacenamiento'
 import { GUIA_FOTOS } from '@/lib/cuestionario'
 import { MAXIMO_FOTOS_POR_GUIA } from '@/lib/recorrido'
 import { GUIA_A_DOCUMENTO, extraccionActiva, proveedorActivo } from '@/lib/extraccion'
@@ -17,9 +17,10 @@ export const maxDuration = 60
 type Ctx = { params: Promise<{ id: string }> }
 
 const GUIAS = new Set(GUIA_FOTOS.map((g) => g.id))
+const GUIAS_CON_PDF = new Set(GUIA_FOTOS.filter((g) => g.admitePdf).map((g) => g.id))
 
 /**
- * Incorpora una foto o un audio.
+ * Incorpora una foto, un audio o un PDF de una toma de papeles.
  *
  * La hora y la posición se toman de acá, del servidor y de la geolocalización en vivo,
  * y NO de los metadatos EXIF del archivo, que cualquiera puede editar antes de subirlo.
@@ -46,9 +47,16 @@ export async function POST(req: Request, { params }: Ctx) {
       )
     }
 
-    const tipo = form.get('tipo') === 'audio' ? 'audio' : 'foto'
     const guiaCruda = form.get('guia_id')
     const guia = typeof guiaCruda === 'string' && GUIAS.has(guiaCruda) ? guiaCruda : null
+
+    // El tipo de un PDF lo decide el mime y no el formulario: declarado como «foto», un PDF
+    // entraría al manifiesto como pieza fotográfica del hecho.
+    const esPdf = (archivo.type || '').split(';')[0].trim().toLowerCase() === MIME_PDF
+    if (esPdf && (!guia || !GUIAS_CON_PDF.has(guia))) {
+      return NextResponse.json({ error: 'Esta toma sólo admite fotos.' }, { status: 400 })
+    }
+    const tipo = esPdf ? 'documento' : form.get('tipo') === 'audio' ? 'audio' : 'foto'
 
     const lat = Number(form.get('lat'))
     const lon = Number(form.get('lon'))
@@ -73,9 +81,9 @@ export async function POST(req: Request, { params }: Ctx) {
 
     // Va después de la idempotencia: el reintento de la quinta foto tiene que devolver la
     // quinta, no rechazarse como si fuera una sexta.
-    if (tipo === 'foto' && guia) {
+    if (tipo !== 'audio' && guia) {
       const cuenta = await pg.query(
-        `SELECT count(*)::int AS n FROM medias WHERE caso_id = $1 AND tipo = 'foto' AND guia_id = $2`,
+        `SELECT count(*)::int AS n FROM medias WHERE caso_id = $1 AND tipo IN ('foto', 'documento') AND guia_id = $2`,
         [id, guia],
       )
       if (cuenta.rows[0].n >= MAXIMO_FOTOS_POR_GUIA) {
@@ -86,9 +94,9 @@ export async function POST(req: Request, { params }: Ctx) {
       }
     }
 
-    const mediaId = nuevoId(tipo === 'audio' ? 'AUD' : 'IMG')
+    const mediaId = nuevoId(tipo === 'audio' ? 'AUD' : tipo === 'documento' ? 'DOC' : 'IMG')
     const datos = new Uint8Array(await archivo.arrayBuffer())
-    const guardado = await guardarArchivo(id, mediaId, archivo.type, datos)
+    const guardado = await guardarArchivo(id, mediaId, archivo.type, datos, esPdf)
 
     /*
      * El hash que declaró el teléfono se REVALIDA acá. Si no coincide, el archivo cambió
@@ -139,7 +147,9 @@ export async function POST(req: Request, { params }: Ctx) {
         ],
       )
 
-      await registrarEvento(id, tipo === 'audio' ? 'audio_incorporado' : 'fotografia_incorporada', {
+      const evento =
+        tipo === 'audio' ? 'audio_incorporado' : tipo === 'documento' ? 'documento_incorporado' : 'fotografia_incorporada'
+      await registrarEvento(id, evento, {
         media_id: mediaId,
         guia_id: guia,
         mime: guardado.mime,
@@ -167,7 +177,8 @@ export async function POST(req: Request, { params }: Ctx) {
      * Va en su propio try/catch: si esto falla, la fotografía queda incorporada lo mismo.
      * Es el endpoint que se usa parado al lado del auto.
      */
-    const tipoDocumento = guia ? GUIA_A_DOCUMENTO[guia] : undefined
+    // Un PDF no se manda a leer: la lectura automática trabaja sobre imágenes.
+    const tipoDocumento = guia && !esPdf ? GUIA_A_DOCUMENTO[guia] : undefined
     if (tipoDocumento && extraccionActiva()) {
       try {
         const consintio = await pg.query(

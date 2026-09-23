@@ -41,6 +41,7 @@ const ROTULO_ESLABON: Record<string, string> = {
   respuestas_registradas: 'Respuestas registradas',
   ubicacion_registrada: 'Ubicación registrada',
   fotografia_incorporada: 'Fotografía incorporada',
+  documento_incorporado: 'Documento en PDF incorporado',
   audio_incorporado: 'Relato en audio incorporado',
   sensores_incorporados: 'Lecturas de sensores incorporadas',
   extraccion_solicitada: 'Lectura automática solicitada',

@@ -104,6 +104,18 @@ verificar(
 
 verificar('las guías de foto no tienen ids repetidos', new Set(GUIA_FOTOS.map((g) => g.id)).size === GUIA_FOTOS.length)
 
+{
+  const papeles = ['licencia_propia', 'cedula_propia', 'seguro_propio', 'cedula_tercero', 'licencia_tercero', 'seguro_tercero']
+  const conPdf = GUIA_FOTOS.filter((g) => g.admitePdf).map((g) => g.id).sort()
+  verificar('sólo las seis tomas de papeles admiten PDF', JSON.stringify(conPdf) === JSON.stringify([...papeles].sort()), conPdf.join(', '))
+  const piezas = [
+    { id: 'a', tipo: 'foto', guia_id: 'cedula_tercero' },
+    { id: 'b', tipo: 'documento', guia_id: 'cedula_tercero' },
+    { id: 'c', tipo: 'audio', guia_id: null },
+  ]
+  verificar('un PDF cuenta dentro del techo de piezas de su toma', fotosDeGuia(piezas, 'cedula_tercero').length === 2)
+}
+
 verificar(
   'las preguntas no tienen ids repetidos',
   new Set(SECCIONES.flatMap((s) => s.preguntas.map((p) => p.id))).size ===

@@ -701,6 +701,12 @@ export interface GuiaFoto {
   obligatoria: boolean
   grupo: GrupoFoto
   dependeDe?: Condicion | Condicion[]
+  /**
+   * La toma acepta también un PDF. Sólo los papeles: la póliza o la cédula digital llegan
+   * como PDF y fotografiar la pantalla del teléfono pierde legibilidad. El daño y el lugar
+   * siguen siendo sólo fotos, porque ahí la evidencia es la toma en el lugar.
+   */
+  admitePdf?: true
 }
 
 export const GUIA_FOTOS: GuiaFoto[] = [
@@ -734,6 +740,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     instruccion: 'Apoyala sobre una superficie lisa y que se lean el nombre y el vencimiento.',
     obligatoria: false,
     grupo: 'documentos',
+    admitePdf: true,
   },
   {
     id: 'cedula_propia',
@@ -741,6 +748,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     instruccion: 'La cédula verde o azul, del lado donde figuran la patente y el titular.',
     obligatoria: false,
     grupo: 'documentos',
+    admitePdf: true,
   },
   {
     id: 'seguro_propio',
@@ -748,6 +756,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     instruccion: 'La constancia impresa o la pantalla de la app de tu aseguradora. Que se lea el número de póliza.',
     obligatoria: false,
     grupo: 'documentos',
+    admitePdf: true,
   },
   {
     id: 'cedula_tercero',
@@ -755,6 +764,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     instruccion: 'Pedile la cédula verde o azul y sacale una foto.',
     obligatoria: false,
     grupo: 'documentos',
+    admitePdf: true,
     dependeDe: HAY_OTRO_VEHICULO,
   },
   {
@@ -763,6 +773,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     instruccion: 'Pedile la licencia de conducir y sacale una foto.',
     obligatoria: false,
     grupo: 'documentos',
+    admitePdf: true,
     dependeDe: HAY_TERCERO,
   },
   {
@@ -771,6 +782,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     instruccion: 'Pedile la constancia de seguro, impresa o en el teléfono, y que se lean la aseguradora y la póliza.',
     obligatoria: false,
     grupo: 'documentos',
+    admitePdf: true,
     dependeDe: HAY_OTRO_VEHICULO,
   },
   {

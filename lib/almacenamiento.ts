@@ -31,7 +31,10 @@ const MIMES_PERMITIDOS = new Set([
   'audio/wav',
 ])
 
+export const MIME_PDF = 'application/pdf'
+
 const EXTENSIONES: Record<string, string> = {
+  [MIME_PDF]: 'pdf',
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
@@ -54,9 +57,16 @@ export interface ArchivoGuardado {
   mime: string
 }
 
-/** El mime llega del navegador: se normaliza y se valida contra la lista permitida. */
-export function validarMime(mime: string): string {
+/**
+ * El mime llega del navegador: se normaliza y se valida contra la lista permitida.
+ *
+ * El PDF no entra a MIMES_PERMITIDOS sino por pedido explícito: sólo el POST de media lo
+ * habilita, y sólo para las tomas de papeles. Sumado a la lista general, la firma o
+ * cualquier otra pieza del expediente aceptarían un PDF sin que nadie lo decidiera.
+ */
+export function validarMime(mime: string, admitirPdf = false): string {
   const limpio = (mime || '').split(';')[0].trim().toLowerCase()
+  if (admitirPdf && limpio === MIME_PDF) return limpio
   if (!MIMES_PERMITIDOS.has(limpio)) {
     throw new ErrorArchivo(`Tipo de archivo no admitido: ${limpio || 'desconocido'}`)
   }
@@ -68,8 +78,9 @@ export async function guardarArchivo(
   mediaId: string,
   mime: string,
   datos: Uint8Array,
+  admitirPdf = false,
 ): Promise<ArchivoGuardado> {
-  const mimeValido = validarMime(mime)
+  const mimeValido = validarMime(mime, admitirPdf)
   if (datos.length === 0) throw new ErrorArchivo('El archivo llegó vacío.')
   if (datos.length > TAMANO_MAXIMO) {
     throw new ErrorArchivo(`El archivo supera el máximo de ${Math.round(TAMANO_MAXIMO / 1024 / 1024)} MB.`)
@@ -107,7 +118,8 @@ export async function leerArchivo(rutaRelativa: string): Promise<Buffer> {
  * MIMES_PERMITIDOS es la lista de las fotos y audios del hecho, y la usa el POST de media
  * del recorrido. Sumarle application/pdf para poder adjuntar la póliza permitiría subir un
  * PDF como «fotografía del siniestro», y ese PDF entraría al manifiesto como pieza
- * fotográfica del expediente sellado.
+ * fotográfica del expediente sellado. El recorrido admite PDF sólo en las tomas de papeles,
+ * con validarMime(mime, true), y lo guarda como pieza de tipo «documento», no «foto».
  */
 const MIMES_DOCUMENTOS = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/heic'])
 

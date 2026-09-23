@@ -162,7 +162,7 @@ export async function calcularConsistencia(casoId: string): Promise<InformeConsi
     clima: caso.clima,
     direccion: caso.direccion,
     gpsCapturadoEn: caso.gps?.capturado_en ?? null,
-    fotos: medias.filter((m) => m.tipo === 'foto').map((m) => ({ guia_id: m.guia_id })),
+    fotos: medias.filter((m) => m.tipo === 'foto' || m.tipo === 'documento').map((m) => ({ guia_id: m.guia_id })),
     fotosObligatorias: fotosObligatorias(caso.respuestas),
     tieneAudio: medias.some((m) => m.tipo === 'audio'),
     tieneFirma: medias.some((m) => m.tipo === 'firma'),

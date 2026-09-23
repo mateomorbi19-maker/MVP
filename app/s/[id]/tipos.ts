@@ -19,4 +19,4 @@ export type Media = MediaMinima
 export type Testigo = { id: string; nombre: string }
 export type Ubicacion = { lat: number; lon: number; direccion: string | null } | null
 export type Datos = { poliza: string; patente: string; asegurado: string; telefono: string }
-export type Subir = (archivo: File, tipo: 'foto' | 'audio', guiaId?: string) => Promise<string>
+export type Subir = (archivo: File, tipo: 'foto' | 'audio' | 'documento', guiaId?: string) => Promise<string>

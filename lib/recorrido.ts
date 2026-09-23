@@ -46,9 +46,14 @@ export interface MediaMinima {
  */
 export const MAXIMO_FOTOS_POR_GUIA = 5
 
-/** Las fotos incorporadas para una toma, en el orden en que se sacaron. */
+/**
+ * Las piezas incorporadas para una toma, en el orden en que se sacaron.
+ *
+ * Cuenta fotos y PDF juntos: el techo de cinco es por toma, no por formato, así que un
+ * papel cargado en PDF ocupa el mismo lugar que su foto.
+ */
 export function fotosDeGuia(medias: MediaMinima[], guiaId: string): MediaMinima[] {
-  return medias.filter((m) => m.tipo === 'foto' && m.guia_id === guiaId)
+  return medias.filter((m) => (m.tipo === 'foto' || m.tipo === 'documento') && m.guia_id === guiaId)
 }
 
 export type Paso =

@@ -409,7 +409,10 @@ console.log('\n[4] Marcado del que depende la funcionalidad')
     const cuerpo = leer(ruta)
     if (!ENTRADAS_SIN_CAPTURE[normalizar(ruta)]) {
       for (const m of cuerpo.matchAll(/<input[^>]*type="file"[^>]*>/g)) {
-        if (!m[0].includes('capture=')) malos.push(`${normalizar(ruta)}: entrada de archivo sin capture`)
+        // Una entrada que sólo acepta PDF no captura evidencia del lugar: con capture el
+        // navegador iría a la cámara y el PDF no se podría elegir nunca.
+        const soloPdf = /accept="application\/pdf"/.test(m[0])
+        if (!soloPdf && !m[0].includes('capture=')) malos.push(`${normalizar(ruta)}: entrada de archivo sin capture`)
       }
     }
     if (/<input[^>]*type="file"/.test(cuerpo) && !/<label/.test(cuerpo)) {

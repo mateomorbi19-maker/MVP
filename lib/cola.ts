@@ -24,7 +24,7 @@ const ALMACEN = 'piezas'
 export interface PiezaEnCola {
   id: string
   casoId: string
-  tipo: 'foto' | 'audio'
+  tipo: 'foto' | 'audio' | 'documento'
   guiaId: string | null
   mime: string
   sha256: string

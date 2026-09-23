@@ -2335,6 +2335,42 @@ tr:last-child td {
   cursor: pointer;
 }
 
+/* Un PDF no tiene miniatura: se ve el ícono y el nombre, recortado para que un nombre
+   largo de correo no rompa la grilla de tres. */
+.miniatura-pdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 8px 6px 26px;
+  color: var(--acento);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.miniatura-pdf .icono {
+  width: 28px;
+  height: 28px;
+}
+
+.miniatura-pdf-nombre {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tinta-3);
+  font-size: 10.5px;
+}
+
+.cargar-pdf {
+  width: 100%;
+  margin-top: 10px;
+  cursor: pointer;
+}
+
 .foto-guiada-compacta {
   padding: 16px 16px;
   gap: 6px;
