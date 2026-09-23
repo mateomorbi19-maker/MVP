@@ -400,6 +400,12 @@ button:disabled,
   box-shadow: 0 10px 22px rgb(var(--emergencia-rgb) / 0.22);
 }
 
+.boton-peligro {
+  background: var(--superficie);
+  color: var(--emergencia);
+  border-color: rgb(var(--emergencia-rgb) / 0.38);
+}
+
 .boton-ancho {
   width: 100%;
 }

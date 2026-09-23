@@ -593,6 +593,10 @@ CREATE INDEX IF NOT EXISTS telemetria_usuario_idx ON telemetria (usuario_id, ts 
 -- De dónde salió la actuación: del botón, o de un impacto detectado.
 ALTER TABLE casos ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'boton';
 
+-- La persona quitó de su lista una actuación ya sellada. No se borra: la aseguradora y el
+-- verificador la siguen necesitando. Es una preferencia de vista, fuera de la cadena.
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS oculta_por_asegurado BOOLEAN NOT NULL DEFAULT false;
+
 -- UNA sola definición, que sirve a las dos tablas append-only. Con una función por tabla,
 -- cualquiera que la redefiniera después en este mismo string ganaría en silencio: SCHEMA
 -- se ejecuta como una sola consulta multi-sentencia y Postgres se queda con la última.

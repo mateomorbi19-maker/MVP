@@ -1,7 +1,8 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { db } from './db'
-import { DIR_MEDIA } from './almacenamiento'
+import { DIR_MEDIA, DIR_SERIES } from './almacenamiento'
+import { ErrorActuacionCerrada } from './hash'
 import { anotarEnBitacora } from './bitacora'
 
 /**
@@ -112,7 +113,11 @@ export async function anonimizar(casoId: string, motivo: string): Promise<void> 
  * control sobre eventos y gestiones y la baja no funciona nunca, con un error que habla de
  * append-only y no de expurgo.
  */
-export async function expurgar(casoId: string, motivo: string): Promise<void> {
+export async function expurgar(
+  casoId: string,
+  motivo: string,
+  opciones: { soloAbierta?: boolean } = {},
+): Promise<void> {
   const pg = await db()
   const caso = await pg.query<{ hash_maestro: string | null; creado_en: string; cerrado_en: string | null; bloqueo_legal: boolean }>(
     'SELECT hash_maestro, creado_en, cerrado_en, bloqueo_legal FROM casos WHERE id = $1',
@@ -125,6 +130,12 @@ export async function expurgar(casoId: string, motivo: string): Promise<void> {
   const cliente = await pg.connect()
   try {
     await cliente.query('BEGIN')
+    if (opciones.soloAbierta) {
+      // El estado se relee bloqueado: el cierre toma el mismo FOR UPDATE, y un sellado que
+      // entra entre la lectura de afuera y este borrado no puede terminar expurgado.
+      const actual = await cliente.query<{ estado: string }>('SELECT estado FROM casos WHERE id = $1 FOR UPDATE', [casoId])
+      if (actual.rows[0]?.estado === 'cerrado') throw new ErrorActuacionCerrada(casoId)
+    }
     await cliente.query('SELECT set_config($1, $2, true)', ['acta.expurgo_caso', casoId])
     await cliente.query(
       `INSERT INTO expurgos (caso_id, hash_maestro, abierta_en, cerrada_en, motivo)
@@ -140,8 +151,22 @@ export async function expurgar(casoId: string, motivo: string): Promise<void> {
     cliente.release()
   }
 
-  await rm(join(DIR_MEDIA, casoId), { recursive: true, force: true }).catch(() => undefined)
+  await Promise.all([
+    rm(join(DIR_MEDIA, casoId), { recursive: true, force: true }).catch(() => undefined),
+    rm(join(DIR_SERIES, casoId), { recursive: true, force: true }).catch(() => undefined),
+  ])
   await anotarEnBitacora('expurgo', { caso_id: casoId, motivo })
+}
+
+/**
+ * Qué pasa cuando la persona elimina una actuación suya.
+ *
+ * La abierta todavía no es un expediente: se borra entera. La sellada ya puede estar en
+ * manos de la aseguradora o presentada en un reclamo, así que no se toca: sólo sale de
+ * la lista de quien la pidió quitar.
+ */
+export function bajaPorAsegurado(estado: string): 'borrada' | 'oculta' {
+  return estado === 'cerrado' ? 'oculta' : 'borrada'
 }
 
 /** Qué actuaciones cumplieron su plazo. Sin plazos configurados, ninguna. */

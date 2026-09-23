@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
-import { exigirAccesoCaso } from '@/lib/posesion'
+import { exigirAccesoCaso, tienePosesion } from '@/lib/posesion'
+import { leerSesion } from '@/lib/sesion'
+import { anotarEnBitacora } from '@/lib/bitacora'
+import { ErrorRetencion, bajaPorAsegurado, expurgar } from '@/lib/retencion'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso, listarMedias, listarTestigos, limpiarDatosAsegurado } from '@/lib/casos'
@@ -106,5 +109,51 @@ export async function PATCH(req: Request, { params }: Ctx) {
     return NextResponse.json({ ok: true, respuestas: actualizado?.respuestas ?? caso.respuestas })
   } catch (err) {
     return errorApi('caso:PATCH', err, 'No se pudieron guardar las respuestas.')
+  }
+}
+
+const NO_ES_TUYA = 'No encontramos esa actuación en tu cuenta ni en este teléfono.'
+
+/**
+ * La persona elimina una actuación suya.
+ *
+ * Abierta, se borra entera por el mismo camino que el expurgo de retención, que es el
+ * único que sabe pasar el disparador append-only y deja constancia de la baja. Sellada,
+ * sólo se quita de su lista: el expediente ya puede estar presentado, y la aseguradora y
+ * el verificador público lo siguen necesitando. Ocultar no toca la cadena.
+ *
+ * No alcanza con exigirAccesoCaso: ese acceso lo tienen también el productor y la
+ * aseguradora, y ellos no pueden borrar una actuación del asegurado. Inexistente y ajena
+ * contestan lo mismo, para no confirmar que un id existe.
+ */
+export async function DELETE(_req: Request, { params }: Ctx) {
+  const { id } = await params
+  try {
+    const caso = await obtenerCaso(id)
+    if (!caso) return NextResponse.json({ error: NO_ES_TUYA }, { status: 404 })
+
+    const sesion = await leerSesion()
+    const titular = Boolean(sesion && caso.usuario_id && caso.usuario_id === sesion.usuario_id)
+    const gestor = sesion?.rol === 'productor' || sesion?.rol === 'aseguradora'
+    const poseedor = !gestor && (await tienePosesion(id))
+    if (!titular && !poseedor) return NextResponse.json({ error: NO_ES_TUYA }, { status: 404 })
+
+    const accion = bajaPorAsegurado(caso.estado)
+    if (accion === 'oculta') {
+      const pg = await db()
+      await pg.query('UPDATE casos SET oculta_por_asegurado = true WHERE id = $1', [id])
+      await anotarEnBitacora('oculta_por_asegurado', {}, { casoId: id, usuarioId: sesion?.usuario_id ?? null })
+    } else {
+      try {
+        await expurgar(id, 'Eliminada por el asegurado antes de cerrarla', { soloAbierta: true })
+      } catch (err) {
+        // Bloqueo legal o una baja simultánea: no es una falla, y el mensaje dice qué pasa.
+        if (err instanceof ErrorRetencion) return NextResponse.json({ error: err.message }, { status: 409 })
+        throw err
+      }
+    }
+    return NextResponse.json({ ok: true, accion })
+  } catch (err) {
+    return errorApi('caso:DELETE', err, 'No se pudo eliminar la actuación. Probá de nuevo en un minuto.')
   }
 }

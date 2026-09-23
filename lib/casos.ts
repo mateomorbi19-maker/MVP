@@ -79,8 +79,10 @@ export async function listarCasos(alcance: AlcanceCasos): Promise<Caso[]> {
   }
   const columna = alcance.tipo === 'de_productor' ? 'productor_id' : 'usuario_id'
   const valor = alcance.tipo === 'de_productor' ? alcance.productorId : alcance.usuarioId
+  // Lo que el asegurado quitó de su lista sigue siendo del productor: el filtro es sólo suyo.
+  const filtro = alcance.tipo === 'de_usuario' ? ' AND NOT oculta_por_asegurado' : ''
   const res = await pg.query(
-    `SELECT * FROM casos WHERE ${columna} = $1 ORDER BY creado_en DESC LIMIT 200`,
+    `SELECT * FROM casos WHERE ${columna} = $1${filtro} ORDER BY creado_en DESC LIMIT 200`,
     [valor],
   )
   return res.rows.map(mapear)

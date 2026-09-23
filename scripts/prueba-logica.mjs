@@ -23,6 +23,7 @@ import { UMBRALES, analizarImpacto, evaluarEpisodio, frenadaBrusca, planEscalami
 import { createDecipheriv, createECDH } from 'node:crypto'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
 import { MAXIMO_FOTOS_POR_GUIA, construirPasos, faltantes, fotosDeGuia, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
+import { bajaPorAsegurado } from '../lib/retencion.ts'
 import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
 
 let fallos = 0
@@ -973,6 +974,11 @@ console.log('\n[10] Impacto y notificaciones')
     vacia instanceof ErrorDocumentacion && licencia.categoria === 'B1' && esTipoDocumentacion('poliza') && !esTipoDocumentacion('vtv'),
   )
 }
+
+/* ---------- Baja pedida por el asegurado ---------- */
+verificar('baja: una actuación abierta se borra entera', bajaPorAsegurado('abierto') === 'borrada')
+verificar('baja: una actuación sellada sólo se quita de la lista', bajaPorAsegurado('cerrado') === 'oculta')
+verificar('baja: sólo el estado cerrado protege el expediente del borrado', bajaPorAsegurado('abierto') !== bajaPorAsegurado('cerrado'))
 
 /* ---------- Resultado ---------- */
 console.log(`\n${pruebas - fallos}/${pruebas} verificaciones pasaron`)

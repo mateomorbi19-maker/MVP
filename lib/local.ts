@@ -53,6 +53,20 @@ export function olvidarActuacion(): void {
   }
 }
 
+/**
+ * Olvida todo lo que este teléfono recuerda de una actuación eliminada. A diferencia de
+ * olvidarActuacion no la guarda como última: ya no hay nada que reclamar desde una cuenta.
+ */
+export function olvidarEliminada(id: string): void {
+  try {
+    if (window.localStorage.getItem(CLAVE) === id) window.localStorage.removeItem(CLAVE)
+    if (window.localStorage.getItem('acta:ultima') === id) window.localStorage.removeItem('acta:ultima')
+    window.localStorage.removeItem(CLAVE_SECRETO + ':' + id)
+  } catch {
+    /* ídem */
+  }
+}
+
 /** La última actuación cerrada en este teléfono, para poder vincularla a una cuenta. */
 export function ultimaActuacion(): string | null {
   try {

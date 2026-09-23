@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Marca } from '@/app/components/Marca'
 import { Icono } from '@/app/components/Iconos'
 import { SinSesion } from '@/app/components/SinSesion'
+import { olvidarEliminada } from '@/lib/local'
 
 type Fila = {
   id: string
@@ -24,6 +25,31 @@ export default function Historial() {
   const [filas, setFilas] = useState<Fila[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [sinSesion, setSinSesion] = useState(false)
+  const [confirmando, setConfirmando] = useState<string | null>(null)
+  const [eliminando, setEliminando] = useState(false)
+
+  async function eliminar(id: string) {
+    setEliminando(true)
+    setError(null)
+    try {
+      const r = await fetch(`/api/casos/${id}`, { method: 'DELETE' })
+      const c = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(c?.error ?? 'No se pudo eliminar la actuación. Probá de nuevo en un minuto.')
+      olvidarEliminada(id)
+      setFilas((actuales) => (actuales ?? []).filter((f) => f.id !== id))
+      setConfirmando(null)
+    } catch (e) {
+      setError(
+        e instanceof TypeError
+          ? 'No se pudo conectar con el servidor. Revisá que tengas señal o wifi y probá de nuevo.'
+          : e instanceof Error
+            ? e.message
+            : 'No se pudo eliminar la actuación. Probá de nuevo en un minuto.',
+      )
+    } finally {
+      setEliminando(false)
+    }
+  }
 
   useEffect(() => {
     fetch('/api/historial')
@@ -109,7 +135,37 @@ export default function Historial() {
                 Seguir completándola
               </Link>
             )}
+            {confirmando === f.id ? null : (
+              <button type="button" className="boton boton-fantasma" onClick={() => setConfirmando(f.id)}>
+                Eliminar
+              </button>
+            )}
           </div>
+          {confirmando === f.id ? (
+            <div className="aviso" data-nivel="alerta">
+              {f.estado === 'cerrado'
+                ? 'La actuación ya está sellada: se quita de tu lista, pero sigue disponible para tu aseguradora.'
+                : 'Se borra la actuación con sus fotos y datos. No se puede deshacer.'}
+              <div className="fila-botones">
+                <button
+                  type="button"
+                  className="boton boton-peligro"
+                  disabled={eliminando}
+                  onClick={() => eliminar(f.id)}
+                >
+                  {f.estado === 'cerrado' ? 'Quitar de mi lista' : 'Eliminar'}
+                </button>
+                <button
+                  type="button"
+                  className="boton boton-secundario"
+                  disabled={eliminando}
+                  onClick={() => setConfirmando(null)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ))}
 
