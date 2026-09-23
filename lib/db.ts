@@ -342,6 +342,31 @@ CREATE TABLE IF NOT EXISTS documentos_poliza (
 );
 CREATE INDEX IF NOT EXISTS documentos_poliza_idx ON documentos_poliza (poliza_id, creado_en DESC);
 
+-- Licencia y cédula cargadas a mano. No cuelgan de una póliza: la licencia es de la
+-- persona y la cédula puede ser de un auto que todavía no tiene póliza cargada.
+CREATE TABLE IF NOT EXISTS documentacion_usuario (
+  usuario_id     TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo           TEXT NOT NULL CHECK (tipo IN ('licencia', 'cedula')),
+  datos          JSONB NOT NULL,
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (usuario_id, tipo)
+);
+
+-- Fotos y PDF de la documentación, por persona y no por póliza: así la póliza en PDF se
+-- puede subir antes de tipear su número, y nada de esto se mezcla con la evidencia del hecho.
+CREATE TABLE IF NOT EXISTS archivos_usuario (
+  id         TEXT PRIMARY KEY,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo       TEXT NOT NULL CHECK (tipo IN ('poliza', 'licencia', 'cedula')),
+  archivo    TEXT NOT NULL,
+  mime       TEXT NOT NULL,
+  bytes      INTEGER NOT NULL,
+  sha256     TEXT NOT NULL,
+  nombre     TEXT,
+  creado_en  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS archivos_usuario_idx ON archivos_usuario (usuario_id, tipo, creado_en);
+
 -- Contacto de confianza para el escalamiento por impacto.
 -- Es un dato personal de alguien que NO está presente para consentir su tratamiento: se
 -- guarda el mínimo, se usa sólo para eso, y no entra al expediente ni al PDF.
@@ -604,7 +629,7 @@ CREATE TRIGGER gestiones_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos', 'dispositivos', 'telemetria'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'documentacion_usuario', 'archivos_usuario', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos', 'dispositivos', 'telemetria'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

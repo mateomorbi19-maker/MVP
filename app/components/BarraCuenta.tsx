@@ -72,7 +72,7 @@ export function BarraCuenta() {
       {aviso ? <div className="aviso" data-nivel="ok">{aviso}</div> : null}
       <div className="enlaces-pie">
         <Link href="/historial">Mis actuaciones</Link>
-        <Link href="/poliza">Mi póliza</Link>
+        <Link href="/poliza">Mi documentación</Link>
         {sesion.rol !== 'asegurado' ? <Link href="/panel">Panel</Link> : null}
         <Link href="/cuenta">Mi cuenta</Link>
       </div>

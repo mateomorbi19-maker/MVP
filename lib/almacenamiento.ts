@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { sha256 } from './hash'
 
@@ -162,6 +162,13 @@ export async function leerDocumento(rutaRelativa: string): Promise<Buffer> {
     throw new ErrorArchivo('Ruta de archivo inválida.')
   }
   return readFile(destino)
+}
+
+/** Borra un documento que la persona quitó, con la misma guarda que leerDocumento. */
+export async function borrarDocumento(rutaRelativa: string): Promise<void> {
+  const destino = resolve(DIR_DOCUMENTOS, rutaRelativa)
+  if (!destino.startsWith(resolve(DIR_DOCUMENTOS))) throw new ErrorArchivo('Ruta de archivo inválida.')
+  await rm(destino, { force: true })
 }
 
 /* ================= Series de sensores ================= */

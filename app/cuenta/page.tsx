@@ -31,8 +31,8 @@ const SECCIONES = [
   {
     href: '/poliza',
     icono: 'escudo',
-    titulo: 'Mi póliza y documentación',
-    detalle: 'Tu cobertura, la cédula, la licencia y el productor asignado.',
+    titulo: 'Mi documentación',
+    detalle: 'Tu póliza, tu licencia y la cédula del vehículo, a mano, en foto o en PDF.',
     soloEquipo: false,
   },
   {

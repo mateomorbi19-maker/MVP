@@ -3291,3 +3291,61 @@ tr:last-child td {
   font-size: 14px;
   color: var(--tinta-2);
 }
+
+/* ---------- Mi documentación ---------- */
+
+.documentacion-poliza {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.documentacion-poliza .enlace {
+  display: block;
+  margin-top: 4px;
+}
+
+.documentacion-poliza-titulo {
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.adjuntos {
+  margin-top: 20px;
+}
+
+/* Una debajo de la otra: las tres juntas en fila no entran a 375px con su texto. */
+.adjuntar-opciones {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.adjunto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adjunto-acciones {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Blancos de toque de 32px: son acciones secundarias debajo de una miniatura de ~105px. */
+.adjunto-accion {
+  min-height: 32px;
+  padding: 6px 4px;
+  border: 0;
+  background: none;
+  color: var(--acento);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.adjunto-quitar {
+  color: var(--alerta);
+}

@@ -252,7 +252,7 @@ Dos cosas que hay que saber antes de tocar cualquier texto que termine acá:
 | Panel de la aseguradora | `app/panel/page.tsx`, `app/panel/[id]/page.tsx` | Listado y detalle, con el informe de consistencia |
 | Cuenta | `app/cuenta/page.tsx` | Quién sos, cambiar la contraseña, cerrar sesión, y los accesos al resto |
 | Mis actuaciones | `app/historial/page.tsx` | Las actuaciones de la persona, con el estado de cada trámite |
-| Mi póliza | `app/poliza/page.tsx` | Pólizas y documentación del vehículo, cargadas antes del choque |
+| Mi documentación | `app/poliza/page.tsx` | Póliza, licencia y cédula, a mano, en foto o en PDF, cargadas antes del choque |
 | Mis datos | `app/perfil/page.tsx` | Carátula precargada y contacto de confianza. El modo viaje pasó a la tarjeta del inicio y a `app/components/ModoViaje.tsx`, global |
 | Aviso de impacto | `app/aviso/page.tsx` | Lo que abre la notificación del detector. Los tres botones que en iPhone no caben dentro de la notificación |
 

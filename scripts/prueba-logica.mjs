@@ -18,6 +18,7 @@ import { PLANTILLAS, figurasDelCroquis, limpiarCroquis } from '../lib/croquis.ts
 import { MAPEO, PROVEEDOR_SIMULADO, extraccionActiva, vistaParaAsegurado } from '../lib/extraccion.ts'
 import { DECLARACION, construirActa } from '../lib/acta.ts'
 import { cifrarCarga, derivarClaves } from '../lib/cifrado.ts'
+import { ErrorDocumentacion, esTipoDocumentacion, limpiarCedula, limpiarLicencia } from '../lib/documentacion.ts'
 import { UMBRALES, analizarImpacto, evaluarEpisodio, frenadaBrusca, planEscalamiento } from '../lib/impacto.ts'
 import { createDecipheriv, createECDH } from 'node:crypto'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
@@ -945,6 +946,32 @@ console.log('\n[10] Impacto y notificaciones')
   ]
   verificar('viaje: una frenada fuerte que no detiene el auto se cuenta', frenadaBrusca(frenando, 3000))
   verificar('viaje: circular parejo no cuenta frenadas', !frenadaBrusca(velocidades(() => 50), 3000))
+}
+
+/* ---------- Mi documentación ---------- */
+{
+  const cedula = limpiarCedula({ patente: ' ab-123 cd ', titular: '  ' })
+  verificar('documentación: la patente de la cédula queda sin espacios ni guiones', cedula.patente === 'AB123CD' && cedula.titular === null, JSON.stringify(cedula))
+
+  let rechazada = null
+  try {
+    limpiarLicencia({ vencimiento: '2027-02-31' })
+  } catch (err) {
+    rechazada = err
+  }
+  verificar('documentación: una licencia con vencimiento imposible se rechaza con qué arreglar', rechazada instanceof ErrorDocumentacion && /fecha completa/.test(rechazada.message))
+
+  let vacia = null
+  try {
+    limpiarCedula({})
+  } catch (err) {
+    vacia = err
+  }
+  const licencia = limpiarLicencia({ numero: '123', categoria: 'b1', vencimiento: '2028-01-15' })
+  verificar(
+    'documentación: una cédula vacía no se guarda y la licencia normaliza la categoría',
+    vacia instanceof ErrorDocumentacion && licencia.categoria === 'B1' && esTipoDocumentacion('poliza') && !esTipoDocumentacion('vtv'),
+  )
 }
 
 /* ---------- Resultado ---------- */

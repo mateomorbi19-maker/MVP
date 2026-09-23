@@ -220,8 +220,8 @@ export default function Inicio() {
           <Icono nombre="archivo" />
         </span>
         <span className="acceso-texto">
-          <span className="acceso-titulo">Mi póliza y documentación</span>
-          <span className="acceso-detalle">Tu cobertura, la documentación del vehículo y el productor asignado.</span>
+          <span className="acceso-titulo">Mi documentación</span>
+          <span className="acceso-detalle">Tu póliza, tu licencia y la cédula del vehículo, a mano, en foto o en PDF.</span>
         </span>
         <span className="acceso-flecha" aria-hidden="true">
           →
