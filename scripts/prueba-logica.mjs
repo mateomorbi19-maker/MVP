@@ -21,7 +21,7 @@ import { cifrarCarga, derivarClaves } from '../lib/cifrado.ts'
 import { UMBRALES, analizarImpacto, evaluarEpisodio, frenadaBrusca, planEscalamiento } from '../lib/impacto.ts'
 import { createDecipheriv, createECDH } from 'node:crypto'
 import { GUIA_FOTOS, RECORRIDO, SECCIONES, fotosObligatorias, preguntasVisibles, seccionPorId } from '../lib/cuestionario.ts'
-import { construirPasos, faltantes, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
+import { MAXIMO_FOTOS_POR_GUIA, construirPasos, faltantes, fotosDeGuia, pasoInicial, respondida, vacia } from '../lib/recorrido.ts'
 import { CLAVE_INEXISTENTE, hashearClave, hashToken, normalizarDni, nuevoToken, validarClave, verificarClave } from '../lib/claves.ts'
 
 let fallos = 0
@@ -279,6 +279,19 @@ verificar(
   'cada faltante lleva la clave de la pantalla a la que hay que volver',
   faltantes(sinContestar, {}, []).every((f) => typeof f.clave === 'string' && typeof f.texto === 'string'),
 )
+
+/* Varias fotos por toma: se cuentan todas, y con una sola ya no falta. */
+{
+  const guia = GUIA_FOTOS.find((g) => g.obligatoria)
+  const varias = [1, 2, 3].map((n) => ({ id: `IMG-${n}`, tipo: 'foto', guia_id: guia.id }))
+  verificar('las fotos de una toma se cuentan todas', fotosDeGuia([...varias, { id: 'AUD-1', tipo: 'audio', guia_id: null }], guia.id).length === 3)
+  verificar('una toma admite hasta cinco fotos', MAXIMO_FOTOS_POR_GUIA === 5)
+  verificar(
+    'con una foto la toma obligatoria ya no figura como faltante',
+    !faltantes(pasosCompletos, respuestasCompletas, [varias[0], ...mediasCompletas.filter((m) => m.guia_id !== guia.id)])
+      .some((f) => f.texto === `Foto: ${guia.titulo}`),
+  )
+}
 
 /* ---------- 1. Serialización canónica y cadena ---------- */
 console.log('\n[1] Serialización canónica y encadenado')

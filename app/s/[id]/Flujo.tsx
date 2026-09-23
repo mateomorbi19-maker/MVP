@@ -371,7 +371,7 @@ export function Flujo(props: Props) {
    *
    * El sha256 se calcula acá, sobre los bytes que salieron de la cámara, y el servidor lo
    * revalida. El identificador de idempotencia se genera por CAPTURA y nunca se reutiliza:
-   * generado por guía, «repetir la foto» devolvería la anterior.
+   * generado por guía, la segunda foto de una toma devolvería la primera.
    */
   const subir = useCallback<Subir>(
     async (archivo, tipo, guiaId) => {
@@ -396,7 +396,8 @@ export function Flujo(props: Props) {
 
       // La pieza se muestra apenas se guarda: para la persona ya está incorporada, y lo
       // está —lo que puede faltar es que haya llegado al servidor, y eso lo dice la cola.
-      setMedias((prev) => [...prev.filter((m) => !guiaId || m.guia_id !== guiaId), { id, tipo, guia_id: guiaId ?? null }])
+      // Se suma y no reemplaza: cada toma lleva hasta cinco fotos y todas son evidencia.
+      setMedias((prev) => [...prev.filter((m) => m.id !== id), { id, tipo, guia_id: guiaId ?? null }])
       return id
     },
     [props.casoId, ubicacion],

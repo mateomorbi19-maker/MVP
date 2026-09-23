@@ -88,7 +88,7 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | Emergencia | `pantallas/PantallaEmergencia.tsx` | `.emergencia`, `.boton-llamada` | ninguno (`tel:`) |
 | Resumen de lo esencial | `pantallas/PantallaResumen.tsx` | `.aviso[data-nivel]`, `.lista-esenciales`, `.acceso`, `.acceso-icono-redondo`, `.nota-pie` | ninguno |
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
-| Una foto | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-tomada`, `.entrada-oculta`, `.miniatura` | `POST /api/casos/[id]/media` |
+| Una toma (hasta cinco fotos) | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-grilla`, `.miniatura`, `.miniatura-estado`, `.entrada-oculta` | `POST /api/casos/[id]/media` |
 | Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
 | Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
 | Corte | `pantallas/PantallaCorte.tsx` | `.hito-corte`, `.hito-simbolo`, `.acceso-boton`, `.numero-actuacion`, `.nota-pie` | ninguno; «guardar y relatar luego» vuelve a `/` |

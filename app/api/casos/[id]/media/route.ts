@@ -6,6 +6,7 @@ import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
 import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO } from '@/lib/almacenamiento'
 import { GUIA_FOTOS } from '@/lib/cuestionario'
+import { MAXIMO_FOTOS_POR_GUIA } from '@/lib/recorrido'
 import { GUIA_A_DOCUMENTO, extraccionActiva, proveedorActivo } from '@/lib/extraccion'
 import { encolarLectura } from '@/lib/cola-extraccion'
 
@@ -67,6 +68,21 @@ export async function POST(req: Request, { params }: Ctx) {
       const yaEsta = await pg.query('SELECT id, sha256 FROM medias WHERE idempotencia = $1', [idem])
       if ((yaEsta.rowCount ?? 0) > 0) {
         return NextResponse.json({ id: yaEsta.rows[0].id, sha256: yaEsta.rows[0].sha256, repetido: true }, { status: 200 })
+      }
+    }
+
+    // Va después de la idempotencia: el reintento de la quinta foto tiene que devolver la
+    // quinta, no rechazarse como si fuera una sexta.
+    if (tipo === 'foto' && guia) {
+      const cuenta = await pg.query(
+        `SELECT count(*)::int AS n FROM medias WHERE caso_id = $1 AND tipo = 'foto' AND guia_id = $2`,
+        [id, guia],
+      )
+      if (cuenta.rows[0].n >= MAXIMO_FOTOS_POR_GUIA) {
+        return NextResponse.json(
+          { error: `Ya hay ${MAXIMO_FOTOS_POR_GUIA} fotos para esta toma: no se pueden agregar más.` },
+          { status: 400 },
+        )
       }
     }
 

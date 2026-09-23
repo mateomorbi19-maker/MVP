@@ -2313,6 +2313,43 @@ tr:last-child td {
   cursor: pointer;
 }
 
+/* Tres por fila: a 375px cada miniatura queda en ~105px, que alcanza para reconocer el
+   encuadre sin empujar el botón de agregar fuera de la pantalla. */
+.foto-grilla {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.miniatura-estado {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+
+.miniatura-reintentar {
+  padding: 0;
+  cursor: pointer;
+}
+
+.foto-guiada-compacta {
+  padding: 16px 16px;
+  gap: 6px;
+}
+
+.foto-guiada-compacta .foto-guiada-icono {
+  width: 48px;
+  height: 48px;
+}
+
+.foto-guiada-compacta .foto-guiada-icono .icono {
+  width: 24px;
+  height: 24px;
+}
+
 .foto-repetir .icono {
   width: 20px;
   height: 20px;

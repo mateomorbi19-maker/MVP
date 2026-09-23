@@ -37,6 +37,20 @@ export interface MediaMinima {
   guia_id: string | null
 }
 
+/**
+ * Cuántas fotos admite cada toma.
+ *
+ * Un daño rara vez entra en un solo encuadre, pero sin techo una persona nerviosa sube
+ * treinta fotos iguales y el liquidador tiene que mirarlas todas. El servidor aplica el
+ * mismo número: el límite del teléfono se saltea con una subida a mano.
+ */
+export const MAXIMO_FOTOS_POR_GUIA = 5
+
+/** Las fotos incorporadas para una toma, en el orden en que se sacaron. */
+export function fotosDeGuia(medias: MediaMinima[], guiaId: string): MediaMinima[] {
+  return medias.filter((m) => m.tipo === 'foto' && m.guia_id === guiaId)
+}
+
 export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'pregunta'; seccion: Seccion; pregunta: Pregunta }
   /**
