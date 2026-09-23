@@ -104,20 +104,19 @@ function Capa() {
           <dd>{estado.fase === 'activo' ? 'Activo' : estado.fase === 'en_pausa' ? 'En pausa' : 'Detenido'}</dd>
           <dt>Velocidad</dt>
           <dd>{estado.velocidadKmh === null ? 'Sin dato del GPS' : `${estado.velocidadKmh} km/h`}</dd>
+          <dt>Tiempo</dt>
+          <dd>{estado.minutosActivo} min</dd>
+          <dt>Frenadas</dt>
+          <dd>{estado.frenadas}</dd>
         </dl>
-        <p>Detección activa {estado.minutosActivo} min</p>
-        <p>Frenadas bruscas registradas: {estado.frenadas}</p>
-        {estado.demo ? <p>Modo demostración activo</p> : null}
-        <p className="mini">
-          Funciona sólo con la aplicación abierta y la pantalla encendida. No llama ni le avisa a nadie por su cuenta.
-        </p>
-        <div className="pila">
-          <button type="button" className="boton boton-secundario" onClick={() => motor?.probarAlerta()}>
+        {estado.demo ? <p className="tarjeta-viaje-nota">Modo demostración: detecta golpes suaves.</p> : null}
+        <div className="botonera-viaje">
+          <button type="button" className="boton-viaje" onClick={() => motor?.probarAlerta()}>
             Probar la alerta
           </button>
           <button
             type="button"
-            className="boton boton-secundario"
+            className="boton-viaje"
             onClick={() => {
               motor?.apagar()
               hoja.current?.close()
@@ -125,7 +124,7 @@ function Capa() {
           >
             Apagar el modo viaje
           </button>
-          <button type="button" className="boton boton-fantasma" onClick={() => hoja.current?.close()}>
+          <button type="button" className="boton-viaje boton-viaje-principal" onClick={() => hoja.current?.close()}>
             Cerrar
           </button>
         </div>

@@ -1581,16 +1581,8 @@ tr:last-child td {
   font-weight: 600;
 }
 
-.tarjeta-viaje-pie {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-/* Alto fijo: los mensajes de estado cambian de largo y no pueden correr el botón bajo el dedo. */
+/* Alto fijo: los mensajes de estado cambian de largo y no pueden correr los botones bajo el dedo. */
 .tarjeta-viaje-estado {
-  flex: 1;
   min-height: 44px;
   display: flex;
   align-items: center;
@@ -1598,38 +1590,50 @@ tr:last-child td {
   color: var(--tinta-2);
 }
 
-.interruptor-viaje {
-  min-height: 48px;
-  min-width: 112px;
-  border-radius: 999px;
-  border: 1px solid var(--accion);
-  background: var(--superficie);
-  color: var(--accion);
-  font-weight: 800;
-  padding: 8px 18px;
+/* Dos columnas iguales: todos los botones miden lo mismo y quedan alineados. */
+.botonera-viaje {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-.interruptor-viaje[aria-checked='true'] {
+.boton-viaje {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--tinta);
+  cursor: pointer;
+}
+
+.boton-viaje:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.boton-viaje[aria-checked='true'] {
+  border-color: var(--accion);
   background: var(--accion);
   color: var(--sobre-color);
 }
 
-/* Secundario a propósito: la demostración no puede competir con el interruptor real. */
-.interruptor-demo {
-  align-self: flex-start;
-  min-height: 44px;
-  border-radius: 999px;
-  border: 1px solid var(--borde);
-  background: var(--superficie);
-  color: var(--tinta-2);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 6px 14px;
-}
-
-.interruptor-demo[aria-checked='true'] {
+.boton-viaje-principal {
+  grid-column: 1 / -1;
   border-color: var(--accion);
   color: var(--accion);
+}
+
+.tarjeta-viaje-nota {
+  margin: 0;
+  min-height: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta-2);
 }
 
 .pildora-viaje {

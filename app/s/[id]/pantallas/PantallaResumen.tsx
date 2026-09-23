@@ -20,7 +20,6 @@ export function PantallaResumen({ seguir }: { seguir: () => void }) {
     <>
       <div className="pantalla-cuerpo">
         <h1 className="pregunta">Documentá el siniestro</h1>
-        <p className="pregunta-ayuda">Seguí el orden. Te guiaremos paso a paso.</p>
 
         <div className="aviso" data-nivel="info">
           Esto es lo más importante. Luego te pediremos el relato del siniestro. Con esto ya podés retirarte del lugar.

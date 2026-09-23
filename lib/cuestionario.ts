@@ -73,6 +73,11 @@ export interface Pregunta {
   omitir?: string
   /** La única que no se puede saltear: define si hay que pedir una ambulancia. */
   sinOmitir?: boolean
+  /**
+   * Retirada del recorrido. No se borra porque su id y sus respuestas siguen escritos en
+   * expedientes sellados, y el informe de esos expedientes necesita poder nombrarla.
+   */
+  oculta?: true
 }
 
 export interface Seccion {
@@ -251,15 +256,18 @@ export const VALOR = {
   },
 } as const
 
-/* Condiciones reutilizadas. */
-const HAY_TERCERO: Condicion = {
-  pregunta: 'tipo_siniestro',
-  valores: [VALOR.tipo_siniestro.COLISION_CON_OTRO_VEHICULO, VALOR.tipo_siniestro.ATROPELLO_A_PEATON_O_CICLISTA],
-}
+/*
+ * Condiciones reutilizadas.
+ *
+ * Se deciden por la cantidad de vehículos y no por el tipo de siniestro: esa pregunta
+ * salió del recorrido para acortarlo, y la cantidad ya dice si hay otro auto. Sin
+ * respuesta, ninguna se cumple y no se piden datos del tercero.
+ */
 const HAY_OTRO_VEHICULO: Condicion = {
-  pregunta: 'tipo_siniestro',
-  valores: [VALOR.tipo_siniestro.COLISION_CON_OTRO_VEHICULO],
+  pregunta: 'cantidad_vehiculos',
+  valores: [VALOR.cantidad_vehiculos.N2, VALOR.cantidad_vehiculos.N3, VALOR.cantidad_vehiculos.N4_O_MAS],
 }
+const HAY_TERCERO: Condicion = HAY_OTRO_VEHICULO
 /** Si se fugó, pedirle los datos al tercero es pedirle algo imposible. */
 const TERCERO_AUSENTE: Condicion = { pregunta: 'tercero_actitud', valores: [VALOR.tercero_actitud.SE_DIO_A_LA_FUGA] }
 
@@ -319,7 +327,7 @@ export const SECCIONES: Seccion[] = [
         texto: '¿Qué tipo de siniestro fue?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.tipo_siniestro),
-        requerida: true,
+        oculta: true,
       },
       {
         id: 'cantidad_vehiculos',
@@ -906,7 +914,7 @@ function visible(
 }
 
 export function preguntasVisibles(seccion: Seccion, respuestas: Record<string, unknown>): Pregunta[] {
-  return seccion.preguntas.filter((p) => visible(p, respuestas))
+  return seccion.preguntas.filter((p) => !p.oculta && visible(p, respuestas))
 }
 
 /** Las tomas que corresponden a este siniestro: sin tercero no se piden fotos del tercero. */

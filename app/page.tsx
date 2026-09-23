@@ -48,7 +48,7 @@ function TarjetaViaje() {
 
   let linea: ReactNode = estado.fase === 'pidiendo' ? 'Pidiendo permisos...' : 'Apagado'
   if (estado.fase === 'desconocido') linea = null
-  if (estado.fase === 'activo' || estado.fase === 'en_pausa') linea = `Activo · detección ${estado.minutosActivo} min`
+  if (estado.fase === 'activo' || estado.fase === 'en_pausa') linea = `Activo · ${estado.minutosActivo} min`
   if (estado.fase === 'activo' && estado.pantalla === 'sin_retener') linea = 'Tocá la pantalla para que no se apague'
   if (estado.fase === 'reanudar_con_toque') {
     linea = (
@@ -57,16 +57,10 @@ function TarjetaViaje() {
       </button>
     )
   }
-  if (estado.fase === 'sin_permiso') {
-    linea = 'Sin permiso de movimiento: habilitalo en los ajustes del navegador y volvé a encender.'
-  }
-  if (estado.fase === 'sin_lecturas') {
-    linea = 'Este equipo no entrega lecturas de movimiento: el modo viaje funciona en el teléfono.'
-  }
+  if (estado.fase === 'sin_permiso') linea = 'Sin permiso de movimiento: habilitalo en el navegador.'
+  if (estado.fase === 'sin_lecturas') linea = 'Este equipo no tiene sensores: usalo en el teléfono.'
   if (estado.fase === 'no_soportado') linea = estado.motivo
-  if (estado.fase === 'apagado' && estado.apagadoPor === 'inactividad') {
-    linea = 'Se apagó solo porque el auto estuvo detenido.'
-  }
+  if (estado.fase === 'apagado' && estado.apagadoPor === 'inactividad') linea = 'Se apagó: el auto estuvo detenido.'
   if (estado.fase === 'apagado' && estado.apagadoPor === 'accidente') linea = 'Se apagó al registrar el accidente.'
 
   return (
@@ -79,53 +73,42 @@ function TarjetaViaje() {
           Modo viaje
         </h2>
       </div>
-      <p className="tarjeta-viaje-texto">Funciona sólo con la aplicación abierta y la pantalla encendida.</p>
-      <p className="tarjeta-viaje-texto">No llama ni le avisa a nadie por su cuenta.</p>
-      <p className="mini">
-        Si detecta un posible choque, manda a tu aseguradora la hora, los sensores y la ubicación. Es optativo. Con la
-        pantalla encendida y el GPS gasta batería: conviene tenerlo enchufado.
-      </p>
-      <div className="tarjeta-viaje-pie">
-        <div className="tarjeta-viaje-estado" aria-live="polite">
-          {linea}
-        </div>
+      <p className="tarjeta-viaje-texto">Funciona sólo con la app abierta y la pantalla encendida.</p>
+      <div className="tarjeta-viaje-estado" aria-live="polite">
+        {linea}
+      </div>
+      <div className="botonera-viaje">
         <button
           type="button"
           role="switch"
           aria-checked={encendido}
-          className="interruptor-viaje"
+          className="boton-viaje boton-viaje-principal"
           disabled={!motor}
           onClick={() => (encendido ? motor?.apagar() : motor?.encender())}
         >
           {encendido ? 'Apagar' : 'Encender'}
         </button>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={estado.demo}
+          className="boton-viaje"
+          disabled={!motor}
+          onClick={() => motor?.cambiarDemo(!estado.demo)}
+        >
+          Modo demostración
+        </button>
+        <button
+          type="button"
+          className="boton-viaje"
+          disabled={!motor || estado.fase !== 'activo'}
+          onClick={() => motor?.simularChoque()}
+        >
+          Simular un choque
+        </button>
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={estado.demo}
-        className="interruptor-demo"
-        disabled={!motor}
-        onClick={() => motor?.cambiarDemo(!estado.demo)}
-      >
-        Modo demostración (más sensible)
-      </button>
-      {estado.demo ? (
-        <>
-          <p className="mini">
-            En modo demostración alerta con golpes suaves, por ejemplo tirar el celular a la cama. No lo uses para
-            manejar.
-          </p>
-          <button
-            type="button"
-            className="boton boton-secundario"
-            disabled={!motor || estado.fase !== 'activo'}
-            onClick={() => motor?.simularChoque()}
-          >
-            Simular un choque
-          </button>
-        </>
-      ) : null}
+      {/* El alto reservado evita que la tarjeta salte al prender y apagar la demostración. */}
+      <p className="tarjeta-viaje-nota">{estado.demo ? 'Modo demostración: detecta golpes suaves.' : null}</p>
     </section>
   )
 }

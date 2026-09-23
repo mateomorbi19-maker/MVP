@@ -64,8 +64,8 @@ verificar(
   ),
 )
 
-const contraArbol = { tipo_siniestro: 'Colisión con objeto fijo' }
-const contraAuto = { tipo_siniestro: 'Colisión con otro vehículo' }
+const contraArbol = { cantidad_vehiculos: '1' }
+const contraAuto = { cantidad_vehiculos: '2' }
 
 verificar(
   'sin otro vehículo no se exigen fotos del tercero',
@@ -159,20 +159,31 @@ verificar(
 
 verificar(
   'quien chocó contra un objeto fijo no ve las fotos del otro vehículo',
-  !construirPasos({ tipo_siniestro: 'Colisión con objeto fijo' }).some((p) => p.clave === 'f:patente_tercero'),
+  !construirPasos({ cantidad_vehiculos: '1' }).some((p) => p.clave === 'f:patente_tercero'),
 )
 verificar(
   'quien chocó contra otro vehículo sí las ve',
-  construirPasos({ tipo_siniestro: 'Colisión con otro vehículo' }).some((p) => p.clave === 'f:patente_tercero'),
+  construirPasos({ cantidad_vehiculos: '2' }).some((p) => p.clave === 'f:patente_tercero'),
+)
+
+verificar(
+  'la pregunta del tipo de siniestro no se muestra',
+  ![sinContestar, construirPasos({ cantidad_vehiculos: '2', tipo_siniestro: 'Colisión con otro vehículo' })].some((pasos) =>
+    pasos.some((p) => p.clave === 'p:tipo_siniestro'),
+  ),
+)
+verificar(
+  'sin contestar la cantidad de vehículos no se pide nada del tercero',
+  !sinContestar.some((p) => p.tipo === 'consentimiento' || p.clave === 'f:patente_tercero'),
 )
 
 verificar('el recorrido termina en la pantalla final', sinContestar[sinContestar.length - 1]?.tipo === 'final')
 
 /* Lo esencial primero: el corte llega apenas están las fotos y los papeles. */
-const soloMio = construirPasos({ heridos: 'No, nadie', tipo_siniestro: 'Colisión con objeto fijo' })
+const soloMio = construirPasos({ heridos: 'No, nadie', cantidad_vehiculos: '1' })
 const conOtro = construirPasos({
   heridos: 'No, nadie',
-  tipo_siniestro: 'Colisión con otro vehículo',
+  cantidad_vehiculos: '2',
   tercero_actitud: 'Sí, está acá',
 })
 const claves = (pasos) => pasos.map((p) => p.clave)
@@ -387,7 +398,7 @@ const entradaBase = {
   direccion: 'Avenida Rivadavia 5000, Caballito, Buenos Aires',
   gpsCapturadoEn: new Date().toISOString(),
   fotos: [],
-  fotosObligatorias: fotosObligatorias({ tipo_siniestro: 'Colisión con otro vehículo' }),
+  fotosObligatorias: fotosObligatorias({ cantidad_vehiculos: '2' }),
   tieneAudio: false,
   testigos: 0,
 }
