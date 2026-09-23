@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { construirPasos, faltantes, pasoInicial, respondida, type Respuestas } from '@/lib/recorrido'
 import { olvidarActuacion, recordarActuacion } from '@/lib/local'
 import { drenar, encolar, huellaDe } from '@/lib/cola'
@@ -13,6 +14,7 @@ import { PantallaEmergencia } from './pantallas/PantallaEmergencia'
 import { PantallaFoto } from './pantallas/PantallaFoto'
 import { PantallaTestigos } from './pantallas/PantallaTestigos'
 import { PantallaCorte } from './pantallas/PantallaCorte'
+import { PantallaResumen } from './pantallas/PantallaResumen'
 import { PantallaCroquis } from './pantallas/PantallaCroquis'
 import { PantallaConsentimiento } from './pantallas/PantallaConsentimiento'
 import { PantallaValidacion } from './pantallas/PantallaValidacion'
@@ -37,6 +39,7 @@ interface Props {
 /* ================= Componente principal ================= */
 
 export function Flujo(props: Props) {
+  const router = useRouter()
   const [respuestas, setRespuestas] = useState<Respuestas>(props.respuestasIniciales)
   const [datos, setDatos] = useState<Datos>(props.datosIniciales)
   const [medias, setMedias] = useState<Media[]>(props.mediasIniciales)
@@ -448,6 +451,8 @@ export function Flujo(props: Props) {
 
         {actual?.tipo === 'emergencia' ? <PantallaEmergencia variante={actual.variante} seguir={() => mover(1)} /> : null}
 
+        {actual?.tipo === 'resumen' ? <PantallaResumen seguir={() => mover(1)} /> : null}
+
         {actual?.tipo === 'foto' ? (
           <PantallaFoto key={actual.clave} paso={actual} medias={medias} subir={subir} seguir={() => mover(1)} />
         ) : null}
@@ -462,7 +467,15 @@ export function Flujo(props: Props) {
         ) : null}
 
         {actual?.tipo === 'corte' ? (
-          <PantallaCorte casoId={props.casoId} seguir={() => mover(1)} alCierre={() => irA('revision')} />
+          <PantallaCorte
+            casoId={props.casoId}
+            seguir={() => mover(1)}
+            alGuardar={async () => {
+              // La actuación queda abierta a propósito: el inicio la ofrece para retomarla.
+              await enviarPendientes()
+              router.push('/')
+            }}
+          />
         ) : null}
 
         {actual?.tipo === 'consentimiento' ? (

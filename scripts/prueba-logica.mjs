@@ -168,6 +168,48 @@ verificar(
 
 verificar('el recorrido termina en la pantalla final', sinContestar[sinContestar.length - 1]?.tipo === 'final')
 
+/* Lo esencial primero: el corte llega apenas están las fotos y los papeles. */
+const soloMio = construirPasos({ heridos: 'No, nadie', tipo_siniestro: 'Colisión con objeto fijo' })
+const conOtro = construirPasos({
+  heridos: 'No, nadie',
+  tipo_siniestro: 'Colisión con otro vehículo',
+  tercero_actitud: 'Sí, está acá',
+})
+const claves = (pasos) => pasos.map((p) => p.clave)
+const iResumen = claves(conOtro).indexOf('resumen')
+verificar(
+  'el resumen va justo después de la seguridad',
+  iResumen > 0 &&
+    conOtro.slice(0, iResumen).every((p) => p.tipo === 'emergencia' || p.seccion?.id === 'triage') &&
+    conOtro[iResumen + 1]?.clave === 'f:dano_propio',
+  claves(conOtro).slice(0, 8).join(', '),
+)
+verificar(
+  'sin otro vehículo no hay fotos ni consentimiento del tercero',
+  !soloMio.some((p) => p.tipo === 'consentimiento' || (p.tipo === 'foto' && p.guia.grupo === 'tercero')) &&
+    !soloMio.some((p) => p.clave === 'f:seguro_tercero' || p.clave === 'f:licencia_tercero'),
+)
+verificar(
+  'con otro vehículo el consentimiento va antes de sus documentos',
+  claves(conOtro).indexOf('consentimiento') < claves(conOtro).indexOf('f:licencia_tercero') &&
+    claves(conOtro).indexOf('consentimiento') > claves(conOtro).indexOf('f:patente_tercero'),
+)
+const iCorte = claves(conOtro).indexOf('corte')
+const ultimaDocumento = conOtro.findLastIndex((p) => p.tipo === 'foto' && p.guia.grupo === 'documentos')
+verificar('el corte va justo después de las fotos de documentos', iCorte === ultimaDocumento + 1, String(iCorte))
+verificar(
+  'las fotos del lugar van después del corte',
+  conOtro.filter((p) => p.tipo === 'foto' && p.guia.grupo === 'lugar').every((p) => claves(conOtro).indexOf(p.clave) > iCorte),
+)
+verificar(
+  'toda guía de foto tiene su grupo',
+  GUIA_FOTOS.every((g) => ['propio', 'tercero', 'documentos', 'lugar'].includes(g.grupo)),
+)
+verificar(
+  'toda guía de foto aparece en alguna tanda del recorrido',
+  GUIA_FOTOS.every((g) => RECORRIDO.some((e) => e.tipo === 'fotos' && e.grupo === g.grupo)),
+)
+
 /* Dónde se retoma. */
 verificar(
   'sin nada contestado se retoma en la primera pregunta',

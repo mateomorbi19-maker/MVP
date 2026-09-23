@@ -99,7 +99,7 @@ const IDS_CONGELADOS = [
 const GUIAS_CONGELADAS = [
   'posicion_final', 'patente_tercero', 'dano_tercero', 'pano_atras', 'pano_frente',
   'dano_propio', 'patente_propia', 'pavimento', 'cedula_tercero', 'licencia_tercero',
-  'senalizacion', 'libre',
+  'senalizacion', 'libre', 'licencia_propia', 'cedula_propia', 'seguro_propio', 'seguro_tercero',
 ]
 
 /*
@@ -172,15 +172,17 @@ const ELEMENTOS_ADMITIDOS = {
 console.log('\n[1] Valores del cuestionario')
 
 const idsActuales = SECCIONES.flatMap((s) => s.preguntas.map((p) => p.id))
+// Se compara sin orden: reordenar está permitido, renombrar no.
+const mismosIds = (a, b) => a.length === b.length && [...a].sort().every((id, i) => id === [...b].sort()[i])
 verificar(
   'ninguna pregunta cambió de id',
-  IDS_CONGELADOS.length === idsActuales.length && IDS_CONGELADOS.every((id, i) => id === idsActuales[i]),
+  mismosIds(IDS_CONGELADOS, idsActuales),
   'los ids de pregunta los usan el motor de consistencia, el PDF y la validación del PATCH, y están escritos dentro de expedientes ya sellados. Se pueden reordenar; no se pueden renombrar.',
 )
 
 verificar(
   'ninguna toma fotográfica cambió de id',
-  GUIAS_CONGELADAS.length === GUIA_FOTOS.length && GUIAS_CONGELADAS.every((id, i) => id === GUIA_FOTOS[i].id),
+  mismosIds(GUIAS_CONGELADAS, GUIA_FOTOS.map((g) => g.id)),
   'el id de la guía queda guardado en cada fotografía incorporada: renombrarlo desvincula la foto de su consigna en los expedientes anteriores.',
 )
 

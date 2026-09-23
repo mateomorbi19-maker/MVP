@@ -303,21 +303,17 @@ export const SECCIONES: Seccion[] = [
   },
 
   /* ---------------- Bloque 1: sólo se puede contestar en el lugar ---------------- */
+  /*
+   * Va separada de «Qué pasó» porque se contesta antes de las fotos del tercero: de estas
+   * respuestas depende si hay otro vehículo que fotografiar y un tercero a quien pedirle
+   * el consentimiento. Preguntarlas después obligaba a pedir todo a ciegas.
+   */
   {
-    id: 'identificacion',
-    titulo: 'Qué pasó',
-    descripcion: 'Tres datos para saber cómo seguir.',
+    id: 'vehiculos',
+    titulo: 'Los vehículos',
+    descripcion: 'Para saber qué fotos pedirte.',
     bloque: 'lugar',
     preguntas: [
-      {
-        id: 'momento_declarado',
-        texto: '¿Hace cuánto pasó?',
-        ayuda: 'Cuanto antes se registre, más valor probatorio tiene.',
-        tipo: 'opcion',
-        opciones: Object.values(VALOR.momento_declarado),
-        requerida: true,
-        contrasta: 'hora',
-      },
       {
         id: 'tipo_siniestro',
         texto: '¿Qué tipo de siniestro fue?',
@@ -332,14 +328,6 @@ export const SECCIONES: Seccion[] = [
         opciones: Object.values(VALOR.cantidad_vehiculos),
         requerida: true,
       },
-    ],
-  },
-  {
-    id: 'terceros',
-    titulo: 'El otro vehículo',
-    descripcion: 'Estos datos son los que más se pierden si no se toman en el momento.',
-    bloque: 'lugar',
-    preguntas: [
       {
         id: 'tercero_actitud',
         texto: '¿El otro conductor sigue en el lugar?',
@@ -349,6 +337,31 @@ export const SECCIONES: Seccion[] = [
         criticaCobertura: true,
         dependeDe: HAY_TERCERO,
       },
+    ],
+  },
+  {
+    id: 'identificacion',
+    titulo: 'Qué pasó',
+    descripcion: 'Cuándo pasó.',
+    bloque: 'lugar',
+    preguntas: [
+      {
+        id: 'momento_declarado',
+        texto: '¿Hace cuánto pasó?',
+        ayuda: 'Cuanto antes se registre, más valor probatorio tiene.',
+        tipo: 'opcion',
+        opciones: Object.values(VALOR.momento_declarado),
+        requerida: true,
+        contrasta: 'hora',
+      },
+    ],
+  },
+  {
+    id: 'terceros',
+    titulo: 'El otro vehículo',
+    descripcion: 'Estos datos son los que más se pierden si no se toman en el momento.',
+    bloque: 'lugar',
+    preguntas: [
       {
         id: 'tercero_patente',
         texto: 'Patente del otro vehículo',
@@ -664,27 +677,39 @@ export const GUIA_RELATO = [
 
 /* ================= Fotografías ================= */
 
-/** Las tomas que el sistema pide una por una, en orden de urgencia. */
+/**
+ * En qué tanda del recorrido se pide cada toma.
+ *
+ * Las tres primeras van antes del corte porque son lo que se pierde si la persona se va:
+ * el daño, las patentes y los papeles del otro. El lugar va después, con el relato.
+ */
+export type GrupoFoto = 'propio' | 'tercero' | 'documentos' | 'lugar'
+
+/** Las tomas que el sistema pide una por una; dentro de cada grupo, en orden de urgencia. */
 export interface GuiaFoto {
   id: string
   titulo: string
   instruccion: string
   obligatoria: boolean
+  grupo: GrupoFoto
   dependeDe?: Condicion | Condicion[]
 }
 
 export const GUIA_FOTOS: GuiaFoto[] = [
   {
-    id: 'posicion_final',
-    titulo: 'Cómo quedaron los autos',
-    instruccion: 'No los muevas todavía. Que se vea cómo quedó cada uno respecto del otro.',
+    id: 'dano_propio',
+    titulo: 'Daño de tu vehículo',
+    instruccion: 'Acercate al golpe principal de tu auto y sacá la foto a un metro de distancia.',
     obligatoria: true,
+    grupo: 'propio',
   },
+  { id: 'patente_propia', titulo: 'Tu patente', instruccion: 'Que se lea con claridad.', obligatoria: true, grupo: 'propio' },
   {
     id: 'patente_tercero',
     titulo: 'Patente del otro vehículo',
     instruccion: 'Que se lea con claridad. Es la foto que más se olvida y la más difícil de recuperar después.',
     obligatoria: true,
+    grupo: 'tercero',
     dependeDe: HAY_OTRO_VEHICULO,
   },
   {
@@ -692,38 +717,36 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     titulo: 'Daño del otro vehículo',
     instruccion: 'Acercate al golpe del otro auto y sacá la foto a un metro de distancia.',
     obligatoria: false,
+    grupo: 'tercero',
     dependeDe: HAY_OTRO_VEHICULO,
   },
   {
-    id: 'pano_atras',
-    titulo: 'Vista general desde atrás',
-    instruccion: 'Alejate unos 10 pasos hacia atrás. Que se vean los vehículos y la calle.',
-    obligatoria: true,
+    id: 'licencia_propia',
+    titulo: 'Tu licencia de conducir',
+    instruccion: 'Apoyala sobre una superficie lisa y que se lean el nombre y el vencimiento.',
+    obligatoria: false,
+    grupo: 'documentos',
   },
   {
-    id: 'pano_frente',
-    titulo: 'Vista general desde adelante',
-    instruccion: 'Lo mismo pero desde el otro lado, para que se vea el cruce completo.',
-    obligatoria: true,
+    id: 'cedula_propia',
+    titulo: 'Cédula de tu vehículo',
+    instruccion: 'La cédula verde o azul, del lado donde figuran la patente y el titular.',
+    obligatoria: false,
+    grupo: 'documentos',
   },
   {
-    id: 'dano_propio',
-    titulo: 'Daño de tu vehículo',
-    instruccion: 'Acercate al golpe principal de tu auto y sacá la foto a un metro de distancia.',
-    obligatoria: true,
-  },
-  { id: 'patente_propia', titulo: 'Tu patente', instruccion: 'Que se lea con claridad.', obligatoria: true },
-  {
-    id: 'pavimento',
-    titulo: 'Estado del pavimento',
-    instruccion: 'Apuntá al piso donde ocurrió el impacto. Si hay huellas de frenada, vidrios o restos, que se vean.',
-    obligatoria: true,
+    id: 'seguro_propio',
+    titulo: 'Tu póliza o constancia de seguro',
+    instruccion: 'La constancia impresa o la pantalla de la app de tu aseguradora. Que se lea el número de póliza.',
+    obligatoria: false,
+    grupo: 'documentos',
   },
   {
     id: 'cedula_tercero',
     titulo: 'Cédula del otro vehículo',
     instruccion: 'Pedile la cédula verde o azul y sacale una foto.',
     obligatoria: false,
+    grupo: 'documentos',
     dependeDe: HAY_OTRO_VEHICULO,
   },
   {
@@ -731,19 +754,58 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     titulo: 'Licencia del otro conductor',
     instruccion: 'Pedile la licencia de conducir y sacale una foto.',
     obligatoria: false,
+    grupo: 'documentos',
     dependeDe: HAY_TERCERO,
+  },
+  {
+    id: 'seguro_tercero',
+    titulo: 'Seguro del otro vehículo',
+    instruccion: 'Pedile la constancia de seguro, impresa o en el teléfono, y que se lean la aseguradora y la póliza.',
+    obligatoria: false,
+    grupo: 'documentos',
+    dependeDe: HAY_OTRO_VEHICULO,
+  },
+  {
+    id: 'posicion_final',
+    titulo: 'Cómo quedaron los autos',
+    instruccion: 'Si todavía no los moviste, que se vea cómo quedó cada uno respecto del otro.',
+    obligatoria: true,
+    grupo: 'lugar',
+  },
+  {
+    id: 'pano_atras',
+    titulo: 'Vista general desde atrás',
+    instruccion: 'Alejate unos 10 pasos hacia atrás. Que se vean los vehículos y la calle.',
+    obligatoria: true,
+    grupo: 'lugar',
+  },
+  {
+    id: 'pano_frente',
+    titulo: 'Vista general desde adelante',
+    instruccion: 'Lo mismo pero desde el otro lado, para que se vea el cruce completo.',
+    obligatoria: true,
+    grupo: 'lugar',
+  },
+  {
+    id: 'pavimento',
+    titulo: 'Estado del pavimento',
+    instruccion: 'Apuntá al piso donde ocurrió el impacto. Si hay huellas de frenada, vidrios o restos, que se vean.',
+    obligatoria: true,
+    grupo: 'lugar',
   },
   {
     id: 'senalizacion',
     titulo: 'Señalización del lugar',
     instruccion: 'Sacá el semáforo, el cartel o la señal que corresponda al cruce.',
     obligatoria: false,
+    grupo: 'lugar',
   },
   {
     id: 'libre',
     titulo: 'Lo que quieras agregar',
     instruccion: 'Cualquier cosa que te parezca importante y no esté en las fotos anteriores.',
     obligatoria: false,
+    grupo: 'lugar',
   },
 ]
 
@@ -759,7 +821,8 @@ export const GUIA_FOTOS: GuiaFoto[] = [
  */
 export type Etapa =
   | { tipo: 'seccion'; id: string }
-  | { tipo: 'fotos' }
+  | { tipo: 'fotos'; grupo: GrupoFoto }
+  | { tipo: 'resumen' }
   | { tipo: 'testigos' }
   | { tipo: 'corte' }
   | { tipo: 'croquis' }
@@ -772,20 +835,31 @@ export type Etapa =
 
 export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'triage' },
-  { tipo: 'seccion', id: 'identificacion' },
-  { tipo: 'seccion', id: 'terceros' },
   /*
-   * El consentimiento del tercero va ANTES de las fotos, y no es un detalle de orden.
-   * Dos de las tomas son la licencia y la cédula del otro conductor, y la lectura
-   * automática se dispara al subirlas. Procesar el documento de identidad de una persona
-   * que todavía no consintió nada es tratar el dato de un titular que no es el asegurado,
-   * y por quien el asegurado no puede consentir (arts. 5 y 11, Ley 25.326).
+   * Lo esencial primero, en el orden en que se pierde: el daño y las patentes, los
+   * papeles, y recién después el corte. Con eso la persona ya se puede ir del lugar;
+   * el relato y las demás preguntas se pueden completar más tarde.
+   */
+  { tipo: 'resumen' },
+  { tipo: 'fotos', grupo: 'propio' },
+  { tipo: 'seccion', id: 'vehiculos' },
+  { tipo: 'fotos', grupo: 'tercero' },
+  /*
+   * El consentimiento del tercero va ANTES de las fotos de documentos, y no es un detalle
+   * de orden. Dos de las tomas son la licencia y la cédula del otro conductor, y la
+   * lectura automática se dispara al subirlas. Procesar el documento de identidad de una
+   * persona que todavía no consintió nada es tratar el dato de un titular que no es el
+   * asegurado, y por quien el asegurado no puede consentir (arts. 5 y 11, Ley 25.326).
    *
    * No agrega fricción real: el tercero está parado al lado, y es justo el momento en que
    * se le pide el documento.
    */
   { tipo: 'consentimiento' },
-  { tipo: 'fotos' },
+  { tipo: 'fotos', grupo: 'documentos' },
+  { tipo: 'corte' },
+  { tipo: 'seccion', id: 'identificacion' },
+  { tipo: 'seccion', id: 'terceros' },
+  { tipo: 'fotos', grupo: 'lugar' },
   { tipo: 'seccion', id: 'relato' },
   { tipo: 'testigos' },
   /*
@@ -799,7 +873,6 @@ export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'contexto' },
   { tipo: 'seccion', id: 'estado' },
   { tipo: 'seccion', id: 'intervenciones' },
-  { tipo: 'corte' },
   { tipo: 'seccion', id: 'cobertura' },
   { tipo: 'seccion', id: 'relato_casa' },
   { tipo: 'croquis' },

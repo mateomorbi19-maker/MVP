@@ -86,10 +86,12 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | --- | --- | --- | --- |
 | Una pregunta | `pantallas/PantallaPregunta.tsx` | `.pregunta`, `.pregunta-ayuda`, `.opciones`, `.opcion[data-elegida]`, `.marca-opcion`, `.marca-opcion-punto`, `.zonas`, `.zona[data-elegida]`, `.campo`, `.omitir` | `PATCH /api/casos/[id]` |
 | Emergencia | `pantallas/PantallaEmergencia.tsx` | `.emergencia`, `.boton-llamada` | ninguno (`tel:`) |
+| Resumen de lo esencial | `pantallas/PantallaResumen.tsx` | `.aviso[data-nivel]`, `.lista-esenciales`, `.acceso`, `.acceso-icono-redondo`, `.nota-pie` | ninguno |
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
 | Una foto | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-tomada`, `.entrada-oculta`, `.miniatura` | `POST /api/casos/[id]/media` |
 | Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
 | Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
+| Corte | `pantallas/PantallaCorte.tsx` | `.hito-corte`, `.hito-simbolo`, `.acceso-boton`, `.numero-actuacion`, `.nota-pie` | ninguno; «guardar y relatar luego» vuelve a `/` |
 | Ubicación | `pantallas/ChipUbicacion.tsx` | `.chip[data-estado]`, `.punto[data-estado]`, `.chip-flecha` | `POST /api/casos/[id]/ubicacion` |
 | Conmutador | `Flujo.tsx` | `.envoltura-flujo`, `.pantalla[data-paso][data-bloque]`, `.progreso-fino`, `.progreso-fino-relleno`, `.volver` | — |
 
@@ -126,12 +128,11 @@ borra ni se suaviza.
 
 ## 6 · Modo casa · contexto y cierre
 
-Hoy son las preguntas del bloque `despues` más la pantalla de corte, con el mismo
-componente de pregunta de la etapa 4.
+Hoy son las preguntas del bloque `despues`, con el mismo componente de pregunta de la
+etapa 4. El corte se movió a la etapa 4: va justo después de las fotos de documentos.
 
 | Pantalla | Archivo | Clases |
 | --- | --- | --- |
-| Corte | `pantallas/PantallaCorte.tsx` | `.hito`, `.hito-simbolo`, `.numero-actuacion` |
 | Relato ampliado | `pantallas/PantallaPregunta.tsx` (tipo `parrafo`) | `.guia-relato`, `.campo-grande` |
 | Croquis | `pantallas/PantallaCroquis.tsx` + `components/CroquisVisor.tsx` | `.croquis`, `.croquis-lienzo`, `.croquis-calzada`, `.croquis-linea`, `.croquis-vehiculo`, `.croquis-flecha`, `.croquis-impacto` |
 | Carátula | `pantallas/PantallaDatos.tsx` | `.campo`, `.campo-grande` |

@@ -3147,3 +3147,70 @@ tr:last-child td {
     animation: none;
   }
 }
+
+/* ---------- Lo esencial del siniestro: resumen y corte ---------- */
+
+.acceso-icono-redondo {
+  border-radius: 50%;
+}
+
+.lista-esenciales {
+  margin: 18px 0 8px;
+}
+
+.lista-esenciales > .acceso:first-child {
+  margin-top: 0;
+}
+
+/* El acceso como botón: mismo aspecto que el enlace, ocupando todo el ancho. */
+.acceso-boton {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.acceso-boton:focus-visible {
+  outline: 3px solid rgb(var(--acento-rgb) / 0.45);
+  outline-offset: 2px;
+}
+
+.hito-corte {
+  text-align: center;
+  padding: 26px 20px 22px;
+  border-radius: var(--radio);
+  background: var(--acento);
+  color: var(--sobre-color);
+  box-shadow: var(--sombra);
+}
+
+.hito-corte .hito-simbolo {
+  background: var(--sobre-color);
+  color: var(--acento);
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  box-shadow: none;
+}
+
+.hito-corte .hito-simbolo .icono {
+  width: 34px;
+  height: 34px;
+}
+
+.hito-corte .pregunta,
+.hito-corte .pregunta-ayuda {
+  color: var(--sobre-color);
+}
+
+.nota-pie {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--tinta-3);
+}
+
+.nota-pie .numero-actuacion {
+  font-size: 14px;
+  color: var(--tinta-2);
+}

@@ -2,10 +2,12 @@ type NombreIcono =
   | 'archivo'
   | 'auto'
   | 'personas'
+  | 'reloj'
   | 'camara'
   | 'compartir'
   | 'descargar'
   | 'escudo'
+  | 'lapiz'
   | 'microfono'
   | 'telefono'
   | 'tilde'
@@ -88,6 +90,18 @@ export function Icono({ nombre, clase = 'icono' }: { nombre: NombreIcono; clase?
           <path d="M3.5 12.8h17" />
           <circle cx={7.5} cy={16.5} r={2} />
           <circle cx={16.5} cy={16.5} r={2} />
+        </>
+      ) : null}
+      {nombre === 'reloj' ? (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2" />
+        </>
+      ) : null}
+      {nombre === 'lapiz' ? (
+        <>
+          <path d="M4.5 19.5 5.3 15.6 15.8 5.1a2 2 0 0 1 2.8 0l.3.3a2 2 0 0 1 0 2.8L8.4 18.7l-3.9.8Z" />
+          <path d="m14 7 3 3" />
         </>
       ) : null}
       {nombre === 'verificar' ? (

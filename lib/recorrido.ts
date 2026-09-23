@@ -54,6 +54,7 @@ export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'consentimiento' }
   | { clave: string; bloque: Bloque; tipo: 'validacion' }
   | { clave: string; bloque: Bloque; tipo: 'firma' }
+  | { clave: string; bloque: Bloque; tipo: 'resumen' }
   | { clave: string; bloque: Bloque; tipo: 'corte' }
   /**
    * `masDeDosVehiculos` viaja resuelto: la pantalla no puede comparar contra el texto de
@@ -122,7 +123,7 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
     }
 
     if (etapa.tipo === 'fotos') {
-      const guias = fotosVisibles(respuestas)
+      const guias = fotosVisibles(respuestas).filter((g) => g.grupo === etapa.grupo)
       guias.forEach((guia, i) =>
         pasos.push({
           clave: `f:${guia.id}`,
@@ -136,7 +137,8 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
       continue
     }
 
-    const bloque: Bloque = etapa.tipo === 'testigos' || etapa.tipo === 'corte' ? 'lugar' : 'despues'
+    const bloque: Bloque =
+      etapa.tipo === 'testigos' || etapa.tipo === 'corte' || etapa.tipo === 'resumen' ? 'lugar' : 'despues'
     if (etapa.tipo === 'croquis') {
       const cuantos = respuestas.cantidad_vehiculos
       pasos.push({
