@@ -2984,41 +2984,6 @@ tr:last-child td {
   cursor: crosshair;
 }
 
-/* Aviso de piezas sin subir. Fijo abajo: tiene que verse desde cualquier pantalla. */
-/*
- * Aviso de piezas sin subir. Fijo abajo, pero POR ARRIBA de la barra de accion y sin
- * recibir el toque.
- *
- * Estaba a 10px del borde inferior, que es exactamente donde vive el boton principal de
- * `.barra-accion`. Con z-index 20 contra el 15 de la barra y sin pointer-events, el chip
- * cubria los dos tercios inferiores del boton «Seguir» y ademas se comia el dedo. Y
- * aparecia justo cuando hay piezas sin subir, o sea cuando no hay señal: el momento en
- * que mas falta hace poder avanzar.
- *
- * Los 164px salen de la barra mas alta que existe —foto tomada, corte, final—: 1 de
- * borde + 14 de relleno + 60 del boton principal + 8 de separacion + 52 del secundario +
- * 10 de relleno = 145, mas 11 de aire. El inset de seguridad se cuenta dos veces porque
- * lo llevan los dos: la barra en su relleno y `.envoltura-flujo` en el suyo.
- */
-.chip-cola {
-  position: fixed;
-  left: 50%;
-  bottom: calc(164px + 2 * env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  z-index: 20;
-  /* Es un role="status": informa, no se toca. Sin esto intercepta el toque del boton. */
-  pointer-events: none;
-  max-width: calc(100% - 24px);
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--atencion-fondo);
-  color: var(--atencion);
-  border: 1px solid var(--atencion);
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: var(--sombra);
-}
-
 /* ---------- Verificación pública ---------- */
 
 .tarjeta-titulo {

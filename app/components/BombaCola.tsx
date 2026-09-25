@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { drenar, todasLasPendientes } from '@/lib/cola'
+import { useEffect } from 'react'
+import { drenar } from '@/lib/cola'
 
 /**
  * Bombea la cola de subida.
@@ -12,29 +12,19 @@ import { drenar, todasLasPendientes } from '@/lib/cola'
  *
  * Se dispara al montar, cuando vuelve la conexión, y cuando la pestaña vuelve a estar
  * visible, que es el momento en que un teléfono suele recuperar señal.
+ *
+ * No dibuja nada. Mostraba un aviso fijo con las piezas sin subir, pero aparecía en medio
+ * de la pantalla justo cuando no hay señal y molestaba más de lo que ayudaba: la foto ya se
+ * ve incorporada en su toma, y la subida sigue igual aunque nadie la anuncie.
  */
 export function BombaCola() {
-  const [pendientes, setPendientes] = useState(0)
-
   useEffect(() => {
-    let vivo = true
-
-    const contar = async () => {
-      try {
-        const p = await todasLasPendientes()
-        if (vivo) setPendientes(p.length)
-      } catch {
-        /* sin IndexedDB: no hay cola que mostrar */
-      }
-    }
-
     const bombear = async () => {
       try {
         await drenar()
       } catch {
         /* se reintenta al próximo disparo */
       }
-      await contar()
     }
 
     bombear()
@@ -50,7 +40,6 @@ export function BombaCola() {
     const t = setInterval(bombear, 30_000)
 
     return () => {
-      vivo = false
       window.removeEventListener('online', bombear)
       document.removeEventListener('visibilitychange', alVolver)
       navigator.serviceWorker?.removeEventListener('message', alMensaje)
@@ -58,11 +47,5 @@ export function BombaCola() {
     }
   }, [])
 
-  if (pendientes === 0) return null
-
-  return (
-    <div className="chip-cola" role="status">
-      {pendientes} {pendientes === 1 ? 'pieza' : 'piezas'} sin subir. Se suben solas cuando haya señal.
-    </div>
-  )
+  return null
 }
