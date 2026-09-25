@@ -10,7 +10,6 @@ import type { Croquis } from '@/lib/croquis'
 import type { Datos, FalloGps, Media, Subir, Testigo, Ubicacion } from './tipos'
 import { ChipUbicacion } from './pantallas/ChipUbicacion'
 import { PantallaPregunta } from './pantallas/PantallaPregunta'
-import { PantallaEmergencia } from './pantallas/PantallaEmergencia'
 import { PantallaFoto } from './pantallas/PantallaFoto'
 import { PantallaTestigos } from './pantallas/PantallaTestigos'
 import { PantallaCorte } from './pantallas/PantallaCorte'
@@ -19,7 +18,6 @@ import { PantallaCroquis } from './pantallas/PantallaCroquis'
 import { PantallaConsentimiento } from './pantallas/PantallaConsentimiento'
 import { PantallaValidacion } from './pantallas/PantallaValidacion'
 import { PantallaFirma } from './pantallas/PantallaFirma'
-import { PantallaDatos } from './pantallas/PantallaDatos'
 import { PantallaRevision } from './pantallas/PantallaRevision'
 import { PantallaFinal } from './pantallas/PantallaFinal'
 
@@ -41,7 +39,6 @@ interface Props {
 export function Flujo(props: Props) {
   const router = useRouter()
   const [respuestas, setRespuestas] = useState<Respuestas>(props.respuestasIniciales)
-  const [datos, setDatos] = useState<Datos>(props.datosIniciales)
   const [medias, setMedias] = useState<Media[]>(props.mediasIniciales)
   const [testigos, setTestigos] = useState<Testigo[]>(props.testigosIniciales)
   const [ubicacion, setUbicacion] = useState<Ubicacion>(props.ubicacionInicial)
@@ -79,7 +76,7 @@ export function Flujo(props: Props) {
   const claveRef = useRef(clave)
   claveRef.current = clave
 
-  const pendientes = useRef<{ respuestas: Respuestas; datos: Partial<Datos> }>({ respuestas: {}, datos: {} })
+  const pendientes = useRef<{ respuestas: Respuestas }>({ respuestas: {} })
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cola = useRef<Promise<void>>(Promise.resolve())
 
@@ -190,17 +187,15 @@ export function Flujo(props: Props) {
      */
     cola.current = cola.current.then(async () => {
       const lote = pendientes.current
-      pendientes.current = { respuestas: {}, datos: {} }
-      const hayRespuestas = Object.keys(lote.respuestas).length > 0
-      const hayDatos = Object.keys(lote.datos).length > 0
-      if (!hayRespuestas && !hayDatos) return
+      pendientes.current = { respuestas: {} }
+      if (Object.keys(lote.respuestas).length === 0) return
 
       setGuardando(true)
       try {
         const res = await fetch(`/api/casos/${props.casoId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ respuestas: lote.respuestas, datos: lote.datos }),
+          body: JSON.stringify({ respuestas: lote.respuestas }),
         })
         if (!res.ok) {
           const cuerpo = await res.json().catch(() => ({}))
@@ -209,10 +204,7 @@ export function Flujo(props: Props) {
         setError(null)
       } catch (e) {
         // Se devuelven al buffer para reintentar en el próximo guardado.
-        pendientes.current = {
-          respuestas: { ...lote.respuestas, ...pendientes.current.respuestas },
-          datos: { ...lote.datos, ...pendientes.current.datos },
-        }
+        pendientes.current = { respuestas: { ...lote.respuestas, ...pendientes.current.respuestas } }
         setError(e instanceof Error ? e.message : 'No se pudo guardar.')
       } finally {
         setGuardando(false)
@@ -230,15 +222,6 @@ export function Flujo(props: Props) {
     (id: string, valor: unknown) => {
       setRespuestas((prev) => ({ ...prev, [id]: valor }))
       pendientes.current.respuestas[id] = valor
-      programarGuardado()
-    },
-    [programarGuardado],
-  )
-
-  const anotarDato = useCallback(
-    (clave: keyof Datos, valor: string) => {
-      setDatos((prev) => ({ ...prev, [clave]: valor }))
-      pendientes.current.datos[clave] = valor
       programarGuardado()
     },
     [programarGuardado],
@@ -407,8 +390,6 @@ export function Flujo(props: Props) {
 
   const cerrado = cierre !== null
   const porcentaje = pasos.length > 1 ? Math.round((indice / (pasos.length - 1)) * 100) : 0
-  // La pantalla de emergencia también lleva encabezado: si alguien tocó "Sí" por
-  // error, tiene que poder corregirlo sin depender del gesto de atrás del teléfono.
   const conEncabezado = actual && actual.tipo !== 'final' && !cerrado
   const conUbicacion = actual && actual.bloque !== 'seguridad' && actual.tipo !== 'final'
 
@@ -449,8 +430,6 @@ export function Flujo(props: Props) {
             subir={subir}
           />
         ) : null}
-
-        {actual?.tipo === 'emergencia' ? <PantallaEmergencia variante={actual.variante} seguir={() => mover(1)} /> : null}
 
         {actual?.tipo === 'resumen' ? <PantallaResumen seguir={() => mover(1)} /> : null}
 
@@ -494,10 +473,8 @@ export function Flujo(props: Props) {
           />
         ) : null}
 
-        {actual?.tipo === 'datos' ? <PantallaDatos datos={datos} anotar={anotarDato} seguir={() => mover(1)} /> : null}
-
         {actual?.tipo === 'firma' ? (
-          <PantallaFirma casoId={props.casoId} nombreSugerido={datos.asegurado} seguir={() => mover(1)} />
+          <PantallaFirma casoId={props.casoId} nombreSugerido={props.datosIniciales.asegurado} seguir={() => mover(1)} />
         ) : null}
 
         {actual?.tipo === 'revision' ? (

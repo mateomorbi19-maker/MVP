@@ -7,9 +7,10 @@
  *
  * EL ORDEN NO ES JURÍDICO, ES DE URGENCIA. Esto se contesta parado al lado del auto,
  * con adrenalina y una sola mano. Primero va lo que deja de existir cuando la persona
- * se va del lugar —la patente del tercero, cómo quedaron los vehículos, los testigos,
- * el relato en caliente— y al final lo que se puede completar sentado en casa —la
- * póliza, la licencia, la VTV—. Eso es lo que marca `bloque` en cada sección, y el
+ * se va del lugar —el daño de cada vehículo con su patente, los papeles del tercero, los
+ * testigos, el relato en caliente— y al final lo que se puede completar sentado en casa
+ * —quién manejaba, la VTV—. La licencia, la cédula y la póliza propias no se piden: la
+ * persona las carga una vez en Mi documentación. Eso es lo que marca `bloque` en cada sección, y el
  * recorrido concreto de pantallas está en `RECORRIDO`.
  *
  * Cada pregunta marcada con `contrasta` alimenta el motor de consistencia.
@@ -34,7 +35,8 @@ export type TipoPregunta =
 /**
  * Momento del recorrido al que pertenece la sección.
  *
- * `seguridad`  se contesta antes que nada: define si hay que pedir una ambulancia.
+ * `seguridad`  quedó sin preguntas en el recorrido: heridos y riesgo se retiraron para
+ *              acortarlo, y los teléfonos de emergencia siguen en el inicio.
  * `lugar`      sólo se puede contestar en el lugar del hecho. Es lo que se pierde.
  * `despues`    se puede completar más tarde, desde el mismo enlace.
  */
@@ -286,6 +288,7 @@ export const SECCIONES: Seccion[] = [
         opciones: Object.values(VALOR.heridos),
         requerida: true,
         sinOmitir: true,
+        oculta: true,
       },
       {
         id: 'heridos_gravedad',
@@ -293,12 +296,14 @@ export const SECCIONES: Seccion[] = [
         tipo: 'opcion',
         opciones: Object.values(VALOR.heridos_gravedad),
         dependeDe: { pregunta: 'heridos', valores: [VALOR.heridos.SI_HAY_HERIDOS] },
+        oculta: true,
       },
       {
         id: 'heridos_cantidad',
         texto: '¿Cuántas personas?',
         tipo: 'numero',
         dependeDe: { pregunta: 'heridos', valores: [VALOR.heridos.SI_HAY_HERIDOS] },
+        oculta: true,
       },
       {
         id: 'riesgo',
@@ -306,6 +311,7 @@ export const SECCIONES: Seccion[] = [
         ayuda: 'Tocá todo lo que corresponda.',
         tipo: 'multiple',
         opciones: Object.values(VALOR.riesgo),
+        oculta: true,
       },
     ],
   },
@@ -623,6 +629,8 @@ export const SECCIONES: Seccion[] = [
         opciones: Object.values(VALOR.licencia_vigente),
         requerida: true,
         criticaCobertura: true,
+        // El vencimiento ya está en la licencia que la persona cargó en Mi documentación.
+        oculta: true,
       },
       {
         id: 'vtv',
@@ -689,7 +697,8 @@ export const GUIA_RELATO = [
  * En qué tanda del recorrido se pide cada toma.
  *
  * Las tres primeras van antes del corte porque son lo que se pierde si la persona se va:
- * el daño, las patentes y los papeles del otro. El lugar va después, con el relato.
+ * el daño de cada vehículo con su patente y los papeles del otro. El lugar va después,
+ * con el relato.
  */
 export type GrupoFoto = 'propio' | 'tercero' | 'documentos' | 'lugar'
 
@@ -707,17 +716,34 @@ export interface GuiaFoto {
    * siguen siendo sólo fotos, porque ahí la evidencia es la toma en el lugar.
    */
   admitePdf?: true
+  /**
+   * Retirada del recorrido. No se borra por lo mismo que una pregunta oculta: su id está
+   * guardado en las fotos de expedientes sellados, y el PDF y el panel la nombran por él.
+   */
+  oculta?: true
 }
 
 export const GUIA_FOTOS: GuiaFoto[] = [
   {
     id: 'dano_propio',
     titulo: 'Daño de tu vehículo',
-    instruccion: 'Acercate al golpe principal de tu auto y sacá la foto a un metro de distancia.',
+    instruccion:
+      'Acercate al golpe principal de tu auto y sacá la foto a un metro de distancia. Que en la foto también se lea la patente: si no entra en el mismo encuadre, sumá otra foto.',
     obligatoria: true,
     grupo: 'propio',
   },
-  { id: 'patente_propia', titulo: 'Tu patente', instruccion: 'Que se lea con claridad.', obligatoria: true, grupo: 'propio' },
+  /*
+   * Las dos tomas de patente se retiraron: la patente se pide dentro de la foto del daño,
+   * que es una pantalla menos por vehículo y además ata el golpe a ese auto.
+   */
+  {
+    id: 'patente_propia',
+    titulo: 'Tu patente',
+    instruccion: 'Que se lea con claridad.',
+    obligatoria: true,
+    grupo: 'propio',
+    oculta: true,
+  },
   {
     id: 'patente_tercero',
     titulo: 'Patente del otro vehículo',
@@ -725,15 +751,22 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     obligatoria: true,
     grupo: 'tercero',
     dependeDe: HAY_OTRO_VEHICULO,
+    oculta: true,
   },
+  /*
+   * Obligatoria desde que absorbió a la de la patente del tercero, que lo era: es el dato
+   * más difícil de recuperar después.
+   */
   {
     id: 'dano_tercero',
     titulo: 'Daño del otro vehículo',
-    instruccion: 'Acercate al golpe del otro auto y sacá la foto a un metro de distancia.',
-    obligatoria: false,
+    instruccion:
+      'Acercate al golpe del otro auto y sacá la foto a un metro de distancia. Que en la foto también se lea su patente: si no entra en el mismo encuadre, sumá otra foto.',
+    obligatoria: true,
     grupo: 'tercero',
     dependeDe: HAY_OTRO_VEHICULO,
   },
+  /* Los papeles propios se retiraron: la persona los carga una vez en Mi documentación. */
   {
     id: 'licencia_propia',
     titulo: 'Tu licencia de conducir',
@@ -741,6 +774,8 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     obligatoria: false,
     grupo: 'documentos',
     admitePdf: true,
+
+    oculta: true,
   },
   {
     id: 'cedula_propia',
@@ -749,6 +784,8 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     obligatoria: false,
     grupo: 'documentos',
     admitePdf: true,
+
+    oculta: true,
   },
   {
     id: 'seguro_propio',
@@ -757,6 +794,8 @@ export const GUIA_FOTOS: GuiaFoto[] = [
     obligatoria: false,
     grupo: 'documentos',
     admitePdf: true,
+
+    oculta: true,
   },
   {
     id: 'cedula_tercero',
@@ -849,16 +888,16 @@ export type Etapa =
   | { tipo: 'consentimiento' }
   | { tipo: 'validacion' }
   | { tipo: 'firma' }
-  | { tipo: 'datos' }
   | { tipo: 'revision' }
   | { tipo: 'final' }
 
 export const RECORRIDO: Etapa[] = [
+  // Sin preguntas visibles: sigue acá porque toda sección tiene que estar en el recorrido.
   { tipo: 'seccion', id: 'triage' },
   /*
-   * Lo esencial primero, en el orden en que se pierde: el daño y las patentes, los
-   * papeles, y recién después el corte. Con eso la persona ya se puede ir del lugar;
-   * el relato y las demás preguntas se pueden completar más tarde.
+   * Lo esencial primero, en el orden en que se pierde: el daño de cada vehículo con su
+   * patente, los papeles del tercero, y recién después el corte. Con eso la persona ya se
+   * puede ir del lugar; el relato y las demás preguntas se pueden completar más tarde.
    */
   { tipo: 'resumen' },
   { tipo: 'fotos', grupo: 'propio' },
@@ -895,8 +934,11 @@ export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'intervenciones' },
   { tipo: 'seccion', id: 'cobertura' },
   { tipo: 'seccion', id: 'relato_casa' },
+  /*
+   * La carátula (patente, póliza, nombre y teléfono) ya no tiene pantalla: sale de la
+   * póliza de la cuenta al abrir la actuación, y sin cuenta queda vacía.
+   */
   { tipo: 'croquis' },
-  { tipo: 'datos' },
   /*
    * La firma va antes de la revisión y NO dentro de ella. La revisión ya es la pantalla más
    * cargada del recorrido —lo que se sella, los faltantes, el aviso de ubicación y el botón
@@ -931,7 +973,7 @@ export function preguntasVisibles(seccion: Seccion, respuestas: Record<string, u
 
 /** Las tomas que corresponden a este siniestro: sin tercero no se piden fotos del tercero. */
 export function fotosVisibles(respuestas: Record<string, unknown>): GuiaFoto[] {
-  return GUIA_FOTOS.filter((g) => visible(g, respuestas))
+  return GUIA_FOTOS.filter((g) => !g.oculta && visible(g, respuestas))
 }
 
 /**

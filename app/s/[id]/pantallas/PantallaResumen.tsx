@@ -10,9 +10,9 @@ import { Icono } from '@/app/components/Iconos'
  * abandona en la segunda toma.
  */
 const ESENCIALES = [
-  { titulo: 'Fotos de mi vehículo', detalle: 'Tu auto, daños y patente', icono: 'auto' },
-  { titulo: 'Fotos del vehículo del tercero', detalle: 'El otro auto y su patente', icono: 'auto' },
-  { titulo: 'Fotos de documentación propia y del tercero', detalle: 'Licencia, cédula y seguro', icono: 'archivo' },
+  { titulo: 'Fotos del daño de tu vehículo', detalle: 'Con la patente a la vista', icono: 'auto' },
+  { titulo: 'Fotos del daño del otro vehículo', detalle: 'Si hubo otro auto, también con su patente', icono: 'auto' },
+  { titulo: 'Documentación del otro conductor', detalle: 'Su licencia, su cédula y su seguro', icono: 'archivo' },
 ] as const
 
 export function PantallaResumen({ seguir }: { seguir: () => void }) {

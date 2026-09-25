@@ -439,7 +439,7 @@ console.log('\n[4] Marcado del que depende la funcionalidad')
     'ninguna pantalla del recorrido recibe el objeto de respuestas',
     conRespuestas.length === 0,
     conRespuestas.join('\n         ') +
-      '\n         Una pantalla recibe valores ya resueltos. La variante de la pantalla de emergencia la calcula lib/recorrido.ts justamente por esto.',
+      '\n         Una pantalla recibe valores ya resueltos. Lo que el croquis necesita saber de la cantidad de vehículos lo calcula lib/recorrido.ts justamente por esto.',
   )
 }
 

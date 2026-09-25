@@ -2116,8 +2116,8 @@ tr:last-child td {
  * palabra «Ambulancia». Pasa en una tablet y en el mismo telefono acostado, que es como
  * queda tirado en el asiento.
  *
- * `.emergencia` envuelve solo las dos pantallas rojas —la del recorrido y /aviso—; el
- * inicio usa `.bloque-inicio` y conserva sus tres columnas.
+ * `.emergencia` envuelve solo la pantalla roja de /aviso; el inicio usa `.bloque-inicio`
+ * y conserva sus tres columnas.
  */
 .emergencia .emergencias-inicio {
   grid-template-columns: 1fr;
@@ -2750,11 +2750,6 @@ tr:last-child td {
 
 /* ---------- Formularios y validación ---------- */
 
-.formulario-datos {
-  padding: 20px;
-}
-
-.formulario-datos .campo:last-child,
 .tarjeta-validacion .campo-validacion:last-child {
   margin-bottom: 0;
 }

@@ -51,8 +51,8 @@ texto claro sobre fondo claro. Lo que sí cambia con el tema es todo lo que est�
 tarjeta: `.bloque-titulo`, `.acceso` y el `.aviso` del pie.
 
 Las emergencias 911 / 100 / 107 salen de `lib/emergencias.ts` a través de
-`<BotonesEmergencia>`, el mismo componente que usa la pantalla de emergencia del recorrido
-y `/aviso`. Los tres números están en un solo lugar.
+`<BotonesEmergencia>`, el mismo componente que usan el modo viaje y `/aviso`. Los tres
+números están en un solo lugar.
 
 ## 3 · Ingreso
 
@@ -85,7 +85,6 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | Pantalla | Archivo | Clases | Endpoint |
 | --- | --- | --- | --- |
 | Una pregunta | `pantallas/PantallaPregunta.tsx` | `.pregunta`, `.pregunta-ayuda`, `.opciones`, `.opcion[data-elegida]`, `.marca-opcion`, `.marca-opcion-punto`, `.zonas`, `.zona[data-elegida]`, `.campo`, `.omitir` | `PATCH /api/casos/[id]` |
-| Emergencia | `pantallas/PantallaEmergencia.tsx` | `.emergencia`, `.boton-llamada` | ninguno (`tel:`) |
 | Resumen de lo esencial | `pantallas/PantallaResumen.tsx` | `.aviso[data-nivel]`, `.lista-esenciales`, `.acceso`, `.acceso-icono-redondo`, `.nota-pie` | ninguno |
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
 | Una toma (hasta cinco fotos) | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-grilla`, `.miniatura`, `.miniatura-estado`, `.miniatura-pdf`, `.cargar-pdf`, `.entrada-oculta` | `POST /api/casos/[id]/media` |
@@ -139,7 +138,6 @@ etapa 4. El corte se movió a la etapa 4: va justo después de las fotos de docu
 | --- | --- | --- |
 | Relato ampliado | `pantallas/PantallaPregunta.tsx` (tipo `parrafo`) | `.guia-relato`, `.campo-grande` |
 | Croquis | `pantallas/PantallaCroquis.tsx` + `components/CroquisVisor.tsx` | `.croquis`, `.croquis-lienzo`, `.croquis-calzada`, `.croquis-linea`, `.croquis-vehiculo`, `.croquis-flecha`, `.croquis-impacto` |
-| Carátula | `pantallas/PantallaDatos.tsx` | `.campo`, `.campo-grande` |
 
 **Intocable en el croquis:** `.croquis` declara `aspect-ratio: 1` y no recibe `width` y
 `height` por separado, ni `padding` ni `border` sobre el propio `<svg>` —el borde va en

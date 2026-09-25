@@ -231,11 +231,10 @@ docs/
   MAPA-PANTALLAS.md           del mockup al archivo
 ```
 
-Cada pantalla recibe **valores ya resueltos**, nunca el objeto de respuestas. La pantalla
-de emergencia recibe `variante: 'confirmado' | 'dudoso'` en vez de las respuestas
-justamente por esto: antes decidía su propio titular comparando contra el texto de una
-opción, y mejorar esa redacción cambiaba en silencio lo que ve alguien que no sabe si hay
-heridos, en la pantalla más crítica del producto.
+Cada pantalla recibe **valores ya resueltos**, nunca el objeto de respuestas. El croquis
+recibe `masDeDosVehiculos` en vez de las respuestas justamente por esto: si comparara
+contra el texto de una opción, mejorar esa redacción cambiaría en silencio lo que la
+pantalla hace.
 
 ---
 

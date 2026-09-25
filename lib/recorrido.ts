@@ -2,8 +2,8 @@
  * El armado del recorrido: qué pantallas hay y en cuál se retoma.
  *
  * Vive fuera del componente por dos motivos. Uno, se puede probar sin navegador ni base:
- * es la pieza que decide si alguien parado al lado del auto ve o no la pantalla de
- * llamar a la ambulancia, y hasta ahora no tenía una sola prueba. Dos, deja el
+ * es la pieza que decide qué se le pide a alguien parado al lado del auto antes de que
+ * se pueda ir. Dos, deja el
  * componente del recorrido como marcado y nada más, para que un cambio visual no pueda
  * tocar la lógica sin querer.
  *
@@ -58,16 +58,6 @@ export function fotosDeGuia(medias: MediaMinima[], guiaId: string): MediaMinima[
 
 export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'pregunta'; seccion: Seccion; pregunta: Pregunta }
-  /**
-   * `variante` viaja resuelta y la pantalla no recibe las respuestas.
-   *
-   * Antes la pantalla de emergencia decidía su propio titular comparando
-   * `respuestas.heridos === 'No lo sé'`. Con la pantalla en un archivo que un agente
-   * visual puede editar, mejorar esa redacción a «No estoy seguro» —que es lo que dice
-   * el mismo cuestionario en otras dos preguntas— cambiaba en silencio el texto que ve
-   * alguien que no sabe si hay heridos, en la pantalla más crítica del producto.
-   */
-  | { clave: string; bloque: Bloque; tipo: 'emergencia'; variante: 'confirmado' | 'dudoso' }
   | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
   | { clave: string; bloque: Bloque; tipo: 'testigos' }
   | { clave: string; bloque: Bloque; tipo: 'consentimiento' }
@@ -81,7 +71,6 @@ export type Paso =
    * cambiaría en silencio lo que la pantalla hace.
    */
   | { clave: string; bloque: Bloque; tipo: 'croquis'; masDeDosVehiculos: boolean }
-  | { clave: string; bloque: Bloque; tipo: 'datos' }
   | { clave: string; bloque: Bloque; tipo: 'revision' }
   | { clave: string; bloque: Bloque; tipo: 'final' }
 
@@ -109,16 +98,6 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
       if (!seccion) continue
       for (const pregunta of preguntasVisibles(seccion, respuestas)) {
         pasos.push({ clave: `p:${pregunta.id}`, bloque: seccion.bloque, tipo: 'pregunta', seccion, pregunta })
-        // La pantalla de llamada va pegada a la respuesta que la dispara.
-        const heridos = respuestas.heridos
-        if (pregunta.id === 'heridos' && typeof heridos === 'string' && heridos !== VALOR.heridos.NO_NADIE) {
-          pasos.push({
-            clave: 'emergencia',
-            bloque: 'seguridad',
-            tipo: 'emergencia',
-            variante: heridos === VALOR.heridos.NO_LO_SE ? 'dudoso' : 'confirmado',
-          })
-        }
       }
       continue
     }

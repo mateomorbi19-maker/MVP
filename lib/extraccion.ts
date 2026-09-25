@@ -30,11 +30,16 @@ import { sha256 } from './hash'
 
 export type TipoDocumento = 'licencia' | 'cedula' | 'patente'
 
-/** Qué guía de foto alimenta qué tipo de documento. */
+/**
+ * Qué guía de foto alimenta qué tipo de documento.
+ *
+ * La patente se lee de la foto del daño: la toma propia de la patente se retiró y ahora
+ * se pide que se vea dentro de esa foto.
+ */
 export const GUIA_A_DOCUMENTO: Record<string, TipoDocumento> = {
   licencia_tercero: 'licencia',
   cedula_tercero: 'cedula',
-  patente_tercero: 'patente',
+  dano_tercero: 'patente',
 }
 
 export interface CampoLeido {

@@ -57,7 +57,6 @@ verificar(
   SECCIONES.filter((s) => !idsDelRecorrido.includes(s.id)).map((s) => s.id).join(', '),
 )
 
-verificar('la primera pantalla pregunta por los heridos', SECCIONES[0].preguntas[0].id === 'heridos')
 
 verificar(
   'los datos de cobertura quedan para el final',
@@ -76,8 +75,17 @@ verificar(
 )
 
 verificar(
-  'con otro vehículo sí se exige la patente del tercero',
-  fotosObligatorias(contraAuto).includes('patente_tercero'),
+  'con otro vehículo sí se exige la foto del daño del tercero',
+  fotosObligatorias(contraAuto).includes('dano_tercero'),
+)
+verificar(
+  'ninguna toma retirada se exige',
+  !fotosObligatorias(contraAuto).some((id) => GUIA_FOTOS.find((g) => g.id === id)?.oculta),
+  fotosObligatorias(contraAuto).join(', '),
+)
+verificar(
+  'las fotos del daño piden que se vea la patente',
+  ['dano_propio', 'dano_tercero'].every((id) => GUIA_FOTOS.find((g) => g.id === id)?.instruccion.includes('patente')),
 )
 
 verificar(
@@ -127,57 +135,38 @@ verificar(
 /* ---------- 0b. Armado del recorrido ---------- */
 console.log('\n[0b] Armado del recorrido')
 
-/*
- * Los textos van escritos a mano, igual que en el motor de consistencia: si alguien
- * cambia la redacción de una respuesta de "heridos", esto tiene que fallar. Es la
- * pantalla que decide si se llama a una ambulancia.
- */
 const sinContestar = construirPasos({})
 verificar(
-  'sin contestar nada, la primera pantalla es la de heridos',
-  sinContestar[0]?.clave === 'p:heridos',
+  'sin contestar nada, la primera pantalla es el resumen de lo esencial',
+  sinContestar[0]?.clave === 'resumen',
   sinContestar[0]?.clave,
 )
-verificar(
-  'sin contestar nada no aparece la pantalla de emergencia',
-  !sinContestar.some((p) => p.tipo === 'emergencia'),
-)
 
-const conHeridos = construirPasos({ heridos: 'Sí, hay heridos' })
-const iHeridos = conHeridos.findIndex((p) => p.clave === 'p:heridos')
-verificar(
-  'declarar heridos inserta la pantalla de emergencia justo después',
-  conHeridos[iHeridos + 1]?.tipo === 'emergencia',
-  conHeridos[iHeridos + 1]?.clave,
-)
-verificar(
-  'con heridos confirmados la variante es la imperativa',
-  conHeridos[iHeridos + 1]?.variante === 'confirmado',
-  conHeridos[iHeridos + 1]?.variante,
-)
-
-const conDuda = construirPasos({ heridos: 'No lo sé' })
-verificar(
-  'no saber si hay heridos también lleva a la pantalla de emergencia',
-  conDuda.some((p) => p.tipo === 'emergencia'),
-)
-verificar(
-  'la duda usa la variante que no da una orden',
-  conDuda.find((p) => p.tipo === 'emergencia')?.variante === 'dudoso',
-)
-
-verificar(
-  'responder que no hay heridos no muestra la pantalla de emergencia',
-  !construirPasos({ heridos: 'No, nadie' }).some((p) => p.tipo === 'emergencia'),
-)
+/*
+ * Un expediente abierto antes del cambio ya tiene contestado heridos: aun así no vuelve a
+ * aparecer ninguna de las pantallas retiradas.
+ */
+{
+  const retiradas = ['p:heridos', 'p:heridos_gravedad', 'p:heridos_cantidad', 'p:riesgo', 'p:licencia_vigente', 'datos']
+  const viejo = construirPasos({ heridos: 'Sí, hay heridos', cantidad_vehiculos: '2' })
+  verificar(
+    'no se pregunta por heridos, riesgo, licencia ni carátula',
+    ![sinContestar, viejo].some((pasos) => pasos.some((p) => retiradas.includes(p.clave) || p.tipo === 'emergencia')),
+    viejo.map((p) => p.clave).filter((c) => retiradas.includes(c)).join(', '),
+  )
+  verificar(
+    'no se piden las patentes aparte ni los papeles propios',
+    !viejo.some((p) => ['f:patente_propia', 'f:patente_tercero', 'f:licencia_propia', 'f:cedula_propia', 'f:seguro_propio'].includes(p.clave)),
+  )
+}
 
 verificar(
   'quien chocó contra un objeto fijo no ve las fotos del otro vehículo',
-  !construirPasos({ cantidad_vehiculos: '1' }).some((p) => p.clave === 'f:patente_tercero'),
+  !construirPasos({ cantidad_vehiculos: '1' }).some((p) => p.clave === 'f:dano_tercero'),
 )
 verificar(
   'quien chocó contra otro vehículo sí las ve',
-  construirPasos({ cantidad_vehiculos: '2' }).some((p) => p.clave === 'f:patente_tercero'),
+  construirPasos({ cantidad_vehiculos: '2' }).some((p) => p.clave === 'f:dano_tercero'),
 )
 
 verificar(
@@ -188,26 +177,28 @@ verificar(
 )
 verificar(
   'sin contestar la cantidad de vehículos no se pide nada del tercero',
-  !sinContestar.some((p) => p.tipo === 'consentimiento' || p.clave === 'f:patente_tercero'),
+  !sinContestar.some((p) => p.tipo === 'consentimiento' || p.clave === 'f:dano_tercero'),
 )
 
 verificar('el recorrido termina en la pantalla final', sinContestar[sinContestar.length - 1]?.tipo === 'final')
 
 /* Lo esencial primero: el corte llega apenas están las fotos y los papeles. */
-const soloMio = construirPasos({ heridos: 'No, nadie', cantidad_vehiculos: '1' })
-const conOtro = construirPasos({
-  heridos: 'No, nadie',
-  cantidad_vehiculos: '2',
-  tercero_actitud: 'Sí, está acá',
-})
+const soloMio = construirPasos({ cantidad_vehiculos: '1' })
+const conOtro = construirPasos({ cantidad_vehiculos: '2', tercero_actitud: 'Sí, está acá' })
 const claves = (pasos) => pasos.map((p) => p.clave)
-const iResumen = claves(conOtro).indexOf('resumen')
+const antesDelCorte = (pasos) => claves(pasos).slice(0, claves(pasos).indexOf('corte')).join(', ')
+
+/* Lo que se pide antes de poder irse, pantalla por pantalla. Agregar una es una decisión. */
 verificar(
-  'el resumen va justo después de la seguridad',
-  iResumen > 0 &&
-    conOtro.slice(0, iResumen).every((p) => p.tipo === 'emergencia' || p.seccion?.id === 'triage') &&
-    conOtro[iResumen + 1]?.clave === 'f:dano_propio',
-  claves(conOtro).slice(0, 8).join(', '),
+  'sin otro vehículo, antes del corte sólo va la foto del daño',
+  antesDelCorte(soloMio) === 'resumen, f:dano_propio, p:cantidad_vehiculos',
+  antesDelCorte(soloMio),
+)
+verificar(
+  'con otro vehículo, antes del corte va su daño y su documentación',
+  antesDelCorte(conOtro) ===
+    'resumen, f:dano_propio, p:cantidad_vehiculos, p:tercero_actitud, f:dano_tercero, consentimiento, f:cedula_tercero, f:licencia_tercero, f:seguro_tercero',
+  antesDelCorte(conOtro),
 )
 verificar(
   'sin otro vehículo no hay fotos ni consentimiento del tercero',
@@ -217,7 +208,7 @@ verificar(
 verificar(
   'con otro vehículo el consentimiento va antes de sus documentos',
   claves(conOtro).indexOf('consentimiento') < claves(conOtro).indexOf('f:licencia_tercero') &&
-    claves(conOtro).indexOf('consentimiento') > claves(conOtro).indexOf('f:patente_tercero'),
+    claves(conOtro).indexOf('consentimiento') > claves(conOtro).indexOf('f:dano_tercero'),
 )
 const iCorte = claves(conOtro).indexOf('corte')
 const ultimaDocumento = conOtro.findLastIndex((p) => p.tipo === 'foto' && p.guia.grupo === 'documentos')
@@ -237,8 +228,9 @@ verificar(
 
 /* Dónde se retoma. */
 verificar(
-  'sin nada contestado se retoma en la primera pregunta',
-  pasoInicial(sinContestar, {}, []) === 'p:heridos',
+  'sin nada hecho se retoma en la foto del daño',
+  pasoInicial(sinContestar, {}, []) === 'f:dano_propio',
+  pasoInicial(sinContestar, {}, []),
 )
 
 /*

@@ -1,4 +1,4 @@
-import { EMERGENCIAS, EMERGENCIAS_EN_EL_LUGAR, type Emergencia } from '@/lib/emergencias'
+import { EMERGENCIAS } from '@/lib/emergencias'
 import { Icono } from './Iconos'
 
 /**
@@ -7,17 +7,10 @@ import { Icono } from './Iconos'
  * Marcado estático con href tel:. No consulta nada ni depende del servidor a propósito:
  * es lo último que tiene que seguir funcionando cuando todo lo demás falla.
  */
-export function BotonesEmergencia({ soloLugar = false }: { soloLugar?: boolean }) {
-  const lista: Emergencia[] = soloLugar ? EMERGENCIAS_EN_EL_LUGAR : EMERGENCIAS
-  /*
-   * `emergencias` sola ya da la grilla de una columna, que es lo que la pantalla del lugar
-   * necesita. Antes decia `emergencias emergencias-lugar` y esa segunda clase no existia
-   * en la hoja: no se veia rota, pero cualquier ajuste a la variante del lugar se habria
-   * escrito contra una clase que el CSS no conoce, sin que nada fallara.
-   */
+export function BotonesEmergencia() {
   return (
-    <div className={soloLugar ? 'emergencias' : 'emergencias emergencias-inicio'}>
-      {lista.map((e) => (
+    <div className="emergencias emergencias-inicio">
+      {EMERGENCIAS.map((e) => (
         <a
           key={e.numero}
           href={`tel:${e.numero}`}
