@@ -19,12 +19,13 @@ adrenalina abandone.
 A partir de ahí es **una pregunta por pantalla**, con botones grandes, y elegir es avanzar:
 un toque por respuesta.
 
-1. **¿Hay alguien herido?** — es lo primero y no se puede saltear. Si la respuesta no es
-   "no", la pantalla siguiente es roja y tiene dos botones: **107** y **911**.
+1. **Lo esencial** — la foto del daño de cada vehículo, con la patente a la vista, y los
+   papeles del otro conductor si lo hubo. Los papeles propios no se piden: se cargan una
+   vez en Mi documentación.
 2. **Captura silenciosa** — mientras contesta, el sistema registra por su cuenta las
    coordenadas GPS, la hora, la dirección real de la calle y **las condiciones
    meteorológicas de ese punto en ese minuto**.
-3. **Lo que se pierde si no se toma ahora** — la patente y los datos del tercero, cómo
+3. **Lo que se pierde si no se toma ahora** — los datos del tercero, cómo
    quedaron los vehículos, las 12 fotografías guiadas de a una, el relato en audio y los
    testigos por QR.
 4. **Cómo ocurrió** — mecánica del hecho, condiciones del lugar y quién intervino.

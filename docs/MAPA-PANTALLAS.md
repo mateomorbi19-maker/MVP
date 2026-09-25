@@ -80,7 +80,8 @@ y que vuelve a la pantalla de origen después de entrar.
 
 El mockup lo muestra como una sola pantalla con todo junto. La aplicación lo resuelve como
 **una pregunta por pantalla**, que es la decisión de diseño que ordena el producto entero:
-botones grandes, un toque por respuesta, y elegir es avanzar.
+botones grandes, un toque por respuesta, y elegir es avanzar. La excepción son las dos
+preguntas de los vehículos (`sinAutoAvance`): ahí se elige y se toca «Seguir».
 
 | Pantalla | Archivo | Clases | Endpoint |
 | --- | --- | --- | --- |
@@ -89,7 +90,6 @@ botones grandes, un toque por respuesta, y elegir es avanzar.
 | Relato en audio | `pantallas/GrabadorAudio.tsx` | `.grabando`, `.contador`, `.aviso[data-nivel]` | `POST /api/casos/[id]/media` |
 | Una toma (hasta cinco fotos) | `pantallas/PantallaFoto.tsx` | `.foto-guiada`, `.foto-grilla`, `.miniatura`, `.miniatura-estado`, `.miniatura-pdf`, `.cargar-pdf`, `.entrada-oculta` | `POST /api/casos/[id]/media` |
 | Testigos | `pantallas/PantallaTestigos.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.punto[data-estado]` | `GET /api/casos/[id]/qr` |
-| Consentimiento del tercero | `pantallas/PantallaConsentimiento.tsx` | `.qr`, `.qr-imagen`, `.qr-esperando`, `.aviso[data-nivel]` | `GET /api/casos/[id]/qr?destino=tercero` |
 | Corte | `pantallas/PantallaCorte.tsx` | `.hito-corte`, `.hito-simbolo`, `.acceso-boton`, `.numero-actuacion`, `.nota-pie` | ninguno; «guardar y relatar luego» vuelve a `/` |
 | Ubicación | `pantallas/ChipUbicacion.tsx` | `.chip[data-estado]`, `.punto[data-estado]`, `.chip-flecha` | `POST /api/casos/[id]/ubicacion` |
 | Conmutador | `Flujo.tsx` | `.envoltura-flujo`, `.pantalla[data-paso][data-bloque]`, `.progreso-fino`, `.progreso-fino-relleno`, `.volver` | — |
@@ -246,7 +246,7 @@ Dos cosas que hay que saber antes de tocar cualquier texto que termine acá:
 | --- | --- | --- |
 | Carga de testigo | `app/t/[id]/page.tsx` | El testigo escanea el QR y carga sus datos desde su propio teléfono, con consentimiento expreso |
 | Verificador público | `app/verificar/page.tsx` | Cualquiera comprueba la integridad de un expediente con su número |
-| Consentimiento del tercero | `app/c/[id]/page.tsx` | El otro conductor presta consentimiento desde su teléfono antes de que se lea su documento |
+| Consentimiento del tercero | `app/c/[id]/page.tsx` | El otro conductor presta consentimiento desde su teléfono antes de que se lea su documento. El recorrido ya no muestra el QR que lleva acá |
 | Panel de la aseguradora | `app/panel/page.tsx`, `app/panel/[id]/page.tsx` | Listado y detalle, con el informe de consistencia |
 | Cuenta | `app/cuenta/page.tsx` | Quién sos, cambiar la contraseña, cerrar sesión, y los accesos al resto |
 | Mis actuaciones | `app/historial/page.tsx` | Las actuaciones de la persona, con el estado de cada trámite |

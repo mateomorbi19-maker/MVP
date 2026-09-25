@@ -76,6 +76,12 @@ export interface Pregunta {
   /** La única que no se puede saltear: define si hay que pedir una ambulancia. */
   sinOmitir?: boolean
   /**
+   * Elegir una opción no avanza sola: hace falta tocar «Seguir». Va en las preguntas de
+   * los vehículos porque de su respuesta depende qué se pide después, y saltar de pantalla
+   * apenas se toca no deja ver qué se eligió.
+   */
+  sinAutoAvance?: true
+  /**
    * Retirada del recorrido. No se borra porque su id y sus respuestas siguen escritos en
    * expedientes sellados, y el informe de esos expedientes necesita poder nombrarla.
    */
@@ -320,7 +326,7 @@ export const SECCIONES: Seccion[] = [
   /*
    * Va separada de «Qué pasó» porque se contesta antes de las fotos del tercero: de estas
    * respuestas depende si hay otro vehículo que fotografiar y un tercero a quien pedirle
-   * el consentimiento. Preguntarlas después obligaba a pedir todo a ciegas.
+   * los papeles. Preguntarlas después obligaba a pedir todo a ciegas.
    */
   {
     id: 'vehiculos',
@@ -341,6 +347,7 @@ export const SECCIONES: Seccion[] = [
         tipo: 'opcion',
         opciones: Object.values(VALOR.cantidad_vehiculos),
         requerida: true,
+        sinAutoAvance: true,
       },
       {
         id: 'tercero_actitud',
@@ -349,6 +356,7 @@ export const SECCIONES: Seccion[] = [
         opciones: Object.values(VALOR.tercero_actitud),
         requerida: true,
         criticaCobertura: true,
+        sinAutoAvance: true,
         dependeDe: HAY_TERCERO,
       },
     ],
@@ -885,7 +893,6 @@ export type Etapa =
   | { tipo: 'testigos' }
   | { tipo: 'corte' }
   | { tipo: 'croquis' }
-  | { tipo: 'consentimiento' }
   | { tipo: 'validacion' }
   | { tipo: 'firma' }
   | { tipo: 'revision' }
@@ -904,16 +911,10 @@ export const RECORRIDO: Etapa[] = [
   { tipo: 'seccion', id: 'vehiculos' },
   { tipo: 'fotos', grupo: 'tercero' },
   /*
-   * El consentimiento del tercero va ANTES de las fotos de documentos, y no es un detalle
-   * de orden. Dos de las tomas son la licencia y la cédula del otro conductor, y la
-   * lectura automática se dispara al subirlas. Procesar el documento de identidad de una
-   * persona que todavía no consintió nada es tratar el dato de un titular que no es el
-   * asegurado, y por quien el asegurado no puede consentir (arts. 5 y 11, Ley 25.326).
-   *
-   * No agrega fricción real: el tercero está parado al lado, y es justo el momento en que
-   * se le pide el documento.
+   * Sin el QR de consentimiento del tercero, que salió para acortar el recorrido, sus
+   * papeles se fotografían pero no se leen solos: la lectura automática exige que él haya
+   * consentido, porque el asegurado no puede consentir por él (arts. 5 y 11, Ley 25.326).
    */
-  { tipo: 'consentimiento' },
   { tipo: 'fotos', grupo: 'documentos' },
   { tipo: 'corte' },
   { tipo: 'seccion', id: 'identificacion' },

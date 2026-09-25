@@ -30,8 +30,11 @@ export function PantallaPregunta({
   subir: Subir
 }) {
   const { pregunta, seccion } = paso
-  // Con un toque alcanza: elegir ya es avanzar. El resto necesita confirmación.
-  const autoAvanza = pregunta.tipo === 'opcion' || pregunta.tipo === 'zonaImpacto'
+  const deElegir = pregunta.tipo === 'opcion' || pregunta.tipo === 'zonaImpacto'
+  // Con un toque alcanza: elegir ya es avanzar, salvo donde la pregunta lo pide. El resto
+  // necesita confirmación.
+  const autoAvanza = deElegir && !pregunta.sinAutoAvance
+  const elegir = autoAvanza ? responderYAvanzar : responder
 
   return (
     <>
@@ -48,7 +51,7 @@ export function PantallaPregunta({
                 type="button"
                 className="opcion"
                 data-elegida={valor === o}
-                onClick={() => responderYAvanzar(pregunta.id, o)}
+                onClick={() => elegir(pregunta.id, o)}
               >
                 <span className="marca-opcion">
                   <span className="marca-opcion-punto" />
@@ -136,7 +139,7 @@ export function PantallaPregunta({
                 type="button"
                 className="zona"
                 data-elegida={valor === z}
-                onClick={() => responderYAvanzar(pregunta.id, z)}
+                onClick={() => elegir(pregunta.id, z)}
               >
                 {z}
               </button>
@@ -152,7 +155,7 @@ export function PantallaPregunta({
       </div>
 
       <div className="barra-accion">
-        {!autoAvanza || yaEsta ? (
+        {!deElegir || yaEsta ? (
           <button className="boton-primario" onClick={seguir}>
             Seguir
           </button>

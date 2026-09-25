@@ -16,8 +16,8 @@ import { sha256 } from './hash'
  *
  * ANTES DE ENCHUFAR UN PROVEEDOR EXTRANJERO hay que resolver, en este orden:
  *   a) el consentimiento del TERCERO, que es el titular del dato y por quien el asegurado
- *      no puede consentir (arts. 5 y 11, Ley 25.326). El circuito ya lo pide antes de las
- *      fotos, y la lectura no se dispara sin él;
+ *      no puede consentir (arts. 5 y 11, Ley 25.326). El recorrido ya no ofrece el QR para
+ *      pedirlo, así que hoy la lectura no se dispara: sin él no se lee nada;
  *   b) la transferencia internacional (art. 12): cláusulas tipo conforme Disposición AAIP
  *      60-E/2016, o el consentimiento del inciso 2;
  *   c) el contrato de encargado de tratamiento (art. 25), con prohibición expresa de uso

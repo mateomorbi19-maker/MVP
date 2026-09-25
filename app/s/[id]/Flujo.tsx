@@ -15,7 +15,6 @@ import { PantallaTestigos } from './pantallas/PantallaTestigos'
 import { PantallaCorte } from './pantallas/PantallaCorte'
 import { PantallaResumen } from './pantallas/PantallaResumen'
 import { PantallaCroquis } from './pantallas/PantallaCroquis'
-import { PantallaConsentimiento } from './pantallas/PantallaConsentimiento'
 import { PantallaValidacion } from './pantallas/PantallaValidacion'
 import { PantallaFirma } from './pantallas/PantallaFirma'
 import { PantallaRevision } from './pantallas/PantallaRevision'
@@ -31,7 +30,6 @@ interface Props {
   testigosIniciales: Testigo[]
   ubicacionInicial: Ubicacion
   croquisInicial: Croquis | null
-  tercerosIniciales: number
 }
 
 /* ================= Componente principal ================= */
@@ -456,10 +454,6 @@ export function Flujo(props: Props) {
               router.push('/')
             }}
           />
-        ) : null}
-
-        {actual?.tipo === 'consentimiento' ? (
-          <PantallaConsentimiento casoId={props.casoId} yaCargado={props.tercerosIniciales > 0} seguir={() => mover(1)} />
         ) : null}
 
         {actual?.tipo === 'validacion' ? <PantallaValidacion casoId={props.casoId} seguir={() => mover(1)} /> : null}

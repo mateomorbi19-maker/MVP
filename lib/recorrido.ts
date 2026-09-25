@@ -60,7 +60,6 @@ export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'pregunta'; seccion: Seccion; pregunta: Pregunta }
   | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
   | { clave: string; bloque: Bloque; tipo: 'testigos' }
-  | { clave: string; bloque: Bloque; tipo: 'consentimiento' }
   | { clave: string; bloque: Bloque; tipo: 'validacion' }
   | { clave: string; bloque: Bloque; tipo: 'firma' }
   | { clave: string; bloque: Bloque; tipo: 'resumen' }
@@ -98,22 +97,6 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
       if (!seccion) continue
       for (const pregunta of preguntasVisibles(seccion, respuestas)) {
         pasos.push({ clave: `p:${pregunta.id}`, bloque: seccion.bloque, tipo: 'pregunta', seccion, pregunta })
-      }
-      continue
-    }
-
-    if (etapa.tipo === 'consentimiento') {
-      /*
-       * Sólo si hay un tercero y sigue en el lugar. A quien chocó contra un árbol no se le
-       * pide el consentimiento de nadie, y a quien declaró que el otro se dio a la fuga
-       * pedírselo sería pedirle algo imposible.
-       */
-      const cuantos = respuestas.cantidad_vehiculos
-      const actitud = respuestas.tercero_actitud
-      const hayTercero = typeof cuantos === 'string' && cuantos !== VALOR.cantidad_vehiculos.N1
-      const seFue = actitud === VALOR.tercero_actitud.SE_DIO_A_LA_FUGA
-      if (hayTercero && !seFue) {
-        pasos.push({ clave: 'consentimiento', bloque: 'lugar', tipo: 'consentimiento' })
       }
       continue
     }

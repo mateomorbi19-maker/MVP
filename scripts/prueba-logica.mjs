@@ -177,7 +177,7 @@ verificar(
 )
 verificar(
   'sin contestar la cantidad de vehículos no se pide nada del tercero',
-  !sinContestar.some((p) => p.tipo === 'consentimiento' || p.clave === 'f:dano_tercero'),
+  !sinContestar.some((p) => p.clave === 'f:dano_tercero'),
 )
 
 verificar('el recorrido termina en la pantalla final', sinContestar[sinContestar.length - 1]?.tipo === 'final')
@@ -197,18 +197,19 @@ verificar(
 verificar(
   'con otro vehículo, antes del corte va su daño y su documentación',
   antesDelCorte(conOtro) ===
-    'resumen, f:dano_propio, p:cantidad_vehiculos, p:tercero_actitud, f:dano_tercero, consentimiento, f:cedula_tercero, f:licencia_tercero, f:seguro_tercero',
+    'resumen, f:dano_propio, p:cantidad_vehiculos, p:tercero_actitud, f:dano_tercero, f:cedula_tercero, f:licencia_tercero, f:seguro_tercero',
   antesDelCorte(conOtro),
 )
 verificar(
-  'sin otro vehículo no hay fotos ni consentimiento del tercero',
-  !soloMio.some((p) => p.tipo === 'consentimiento' || (p.tipo === 'foto' && p.guia.grupo === 'tercero')) &&
+  'sin otro vehículo no hay fotos del tercero',
+  !soloMio.some((p) => p.tipo === 'foto' && p.guia.grupo === 'tercero') &&
     !soloMio.some((p) => p.clave === 'f:seguro_tercero' || p.clave === 'f:licencia_tercero'),
 )
 verificar(
-  'con otro vehículo el consentimiento va antes de sus documentos',
-  claves(conOtro).indexOf('consentimiento') < claves(conOtro).indexOf('f:licencia_tercero') &&
-    claves(conOtro).indexOf('consentimiento') > claves(conOtro).indexOf('f:dano_tercero'),
+  'las preguntas de los vehículos esperan a que se toque Seguir',
+  ['cantidad_vehiculos', 'tercero_actitud'].every((id) =>
+    SECCIONES.flatMap((s) => s.preguntas).find((p) => p.id === id)?.sinAutoAvance === true,
+  ),
 )
 const iCorte = claves(conOtro).indexOf('corte')
 const ultimaDocumento = conOtro.findLastIndex((p) => p.tipo === 'foto' && p.guia.grupo === 'documentos')
