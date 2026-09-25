@@ -158,8 +158,13 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
  * Desde que el último bloque se puede completar más tarde, volver siempre a la
  * primera pregunta sería inaceptable: la persona ya contestó veinte pantallas.
  * Se retoma en lo primero que quedó sin hacer.
+ *
+ * Sin nada hecho se arranca en la primera pantalla, aunque no sea una pregunta: es el
+ * resumen que dice cuánto falta para poder irse, y saltearlo deja a la persona en la
+ * primera foto sin saber cuántas vienen.
  */
 export function pasoInicial(pasos: Paso[], respuestas: Respuestas, medias: MediaMinima[]): string {
+  if (pasos.length > 0 && Object.keys(respuestas).length === 0 && medias.length === 0) return pasos[0].clave
   for (const paso of pasos) {
     if (paso.tipo === 'pregunta' && !respondida(paso.pregunta, respuestas, medias)) return paso.clave
     if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {

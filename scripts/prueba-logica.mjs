@@ -228,10 +228,18 @@ verificar(
 
 /* Dónde se retoma. */
 verificar(
-  'sin nada hecho se retoma en la foto del daño',
-  pasoInicial(sinContestar, {}, []) === 'f:dano_propio',
+  'sin nada hecho se arranca en el resumen de lo esencial',
+  pasoInicial(sinContestar, {}, []) === 'resumen',
   pasoInicial(sinContestar, {}, []),
 )
+{
+  const conFoto = [{ id: 'IMG-1', tipo: 'foto', guia_id: 'dano_propio' }]
+  verificar(
+    'con la foto del daño sacada se retoma en lo que sigue',
+    pasoInicial(sinContestar, {}, conFoto) === 'p:cantidad_vehiculos',
+    pasoInicial(sinContestar, {}, conFoto),
+  )
+}
 
 /*
  * Con todo contestado y todas las fotos obligatorias sacadas, se retoma en la revisión.

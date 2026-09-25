@@ -33,13 +33,14 @@ export type TipoDocumento = 'licencia' | 'cedula' | 'patente'
 /**
  * Qué guía de foto alimenta qué tipo de documento.
  *
- * La patente se lee de la foto del daño: la toma propia de la patente se retiró y ahora
- * se pide que se vea dentro de esa foto.
+ * La foto del daño del tercero no se lee aunque ahora muestre la patente: la toma admite
+ * hasta cinco encuadres, la validación se queda con la última lectura, y un primer plano
+ * del golpe sin patente pisaría la buena. La patente se sigue cargando en su pregunta.
  */
 export const GUIA_A_DOCUMENTO: Record<string, TipoDocumento> = {
   licencia_tercero: 'licencia',
   cedula_tercero: 'cedula',
-  dano_tercero: 'patente',
+  patente_tercero: 'patente',
 }
 
 export interface CampoLeido {

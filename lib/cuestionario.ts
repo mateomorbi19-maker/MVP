@@ -595,7 +595,7 @@ export const SECCIONES: Seccion[] = [
   /* ---------------- Bloque 2: se puede completar después ---------------- */
   {
     id: 'cobertura',
-    titulo: 'Vehículo y licencia',
+    titulo: 'Vehículo y conductor',
     descripcion: 'Contestá con honestidad: una respuesta falsa acá es lo que después hace caer la cobertura.',
     bloque: 'despues',
     preguntas: [
