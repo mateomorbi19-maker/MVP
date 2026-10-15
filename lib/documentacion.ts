@@ -10,7 +10,7 @@ import { guardarDocumento, borrarDocumento, type ArchivoGuardado } from './almac
  * número, y tipear el número no impide sumarle una foto.
  */
 
-export const TIPOS_DOCUMENTACION = ['poliza', 'licencia', 'cedula'] as const
+export const TIPOS_DOCUMENTACION = ['poliza', 'licencia', 'cedula', 'dni'] as const
 export type TipoDocumentacion = (typeof TIPOS_DOCUMENTACION)[number]
 
 /** Tope por bloque: alcanza para frente, dorso y un PDF de varias versiones sin llenar el disco. */
@@ -33,6 +33,8 @@ export interface ArchivoDocumentacion {
   id: string
   tipo: TipoDocumentacion
   nombre: string | null
+  nombre_original: string | null
+  poliza_id: string | null
   mime: string
   bytes: number
   creado_en: string
@@ -42,6 +44,17 @@ export interface Documentacion {
   licencia: DatosLicencia | null
   cedula: DatosCedula | null
   archivos: ArchivoDocumentacion[]
+}
+
+export function completitudDocumentacion(
+  archivos: { tipo: string; mime: string; poliza_id: string | null }[],
+  polizaId: string | null,
+) {
+  const faltantes = TIPOS_DOCUMENTACION.filter((tipo) => !archivos.some((a) =>
+    a.tipo === tipo && a.mime.startsWith('image/') &&
+    ((tipo === 'licencia' || tipo === 'dni') || (polizaId !== null && a.poliza_id === polizaId)),
+  ))
+  return { completa: faltantes.length === 0, faltantes }
 }
 
 export class ErrorDocumentacion extends Error {}
@@ -103,6 +116,8 @@ const mapearArchivo = (f: Record<string, unknown>): ArchivoDocumentacion => ({
   id: f.id as string,
   tipo: f.tipo as TipoDocumentacion,
   nombre: (f.nombre as string) ?? null,
+  nombre_original: (f.nombre as string) ?? null,
+  poliza_id: (f.poliza_id as string) ?? null,
   mime: f.mime as string,
   bytes: Number(f.bytes),
   creado_en: new Date(f.creado_en as string).toISOString(),
@@ -138,12 +153,15 @@ export async function agregarArchivoDocumentacion(
   nombre: string | null,
   mime: string,
   bytes: Uint8Array,
+  polizaId: unknown = null,
 ): Promise<ArchivoDocumentacion> {
-  if (!esTipoDocumentacion(tipo)) throw new ErrorDocumentacion('El tipo tiene que ser poliza, licencia o cedula.')
+  if (!esTipoDocumentacion(tipo)) throw new ErrorDocumentacion('Elegí póliza, licencia, cédula o DNI.')
   const pg = await db()
-  const cuantos = await pg.query('SELECT count(*)::int AS n FROM archivos_usuario WHERE usuario_id = $1 AND tipo = $2', [
+  const vinculo = await validarVinculo(usuarioId, tipo, polizaId)
+  const cuantos = await pg.query('SELECT count(*)::int AS n FROM archivos_usuario WHERE usuario_id = $1 AND tipo = $2 AND poliza_id IS NOT DISTINCT FROM $3', [
     usuarioId,
     tipo,
+    vinculo,
   ])
   if ((cuantos.rows[0]?.n ?? 0) >= MAXIMO_ARCHIVOS_DOCUMENTACION) {
     throw new ErrorDocumentacion(
@@ -152,14 +170,43 @@ export async function agregarArchivoDocumentacion(
   }
 
   const id = nuevoId('ARC')
-  // La carpeta es la del usuario y no la de una póliza: la licencia y la cédula no cuelgan de ninguna.
   const guardado: ArchivoGuardado = await guardarDocumento(`usuarios/${usuarioId}`, id, mime, bytes)
-  const res = await pg.query(
-    `INSERT INTO archivos_usuario (id, usuario_id, tipo, archivo, mime, bytes, sha256, nombre)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [id, usuarioId, tipo, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256, nombre?.slice(0, 160) ?? null],
-  )
-  return mapearArchivo(res.rows[0])
+  try {
+    const res = await pg.query(
+      `INSERT INTO archivos_usuario (id, usuario_id, tipo, archivo, mime, bytes, sha256, nombre, poliza_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [id, usuarioId, tipo, guardado.archivo, guardado.mime, guardado.bytes, guardado.sha256, nombre?.slice(0, 160) ?? null, vinculo],
+    )
+    return mapearArchivo(res.rows[0])
+  } catch (err) {
+    await borrarDocumento(guardado.archivo).catch(() => {})
+    throw err
+  }
+}
+
+async function validarVinculo(usuarioId: string, tipo: TipoDocumentacion, polizaId: unknown): Promise<string | null> {
+  if (tipo === 'licencia' || tipo === 'dni') return null
+  if (typeof polizaId !== 'string' || !polizaId) throw new ErrorDocumentacion('Elegí el vehículo y la póliza a los que pertenece el archivo.')
+  const pg = await db()
+  const res = await pg.query('SELECT id FROM polizas WHERE id = $1 AND usuario_id = $2', [polizaId, usuarioId])
+  if (!res.rows[0]) throw new ErrorDocumentacion('Elegí una póliza de tu cuenta.')
+  return polizaId
+}
+
+export async function asignarArchivoDocumentacion(usuarioId: string, archivoId: string, polizaId: unknown): Promise<void> {
+  const pg = await db()
+  const fila = await pg.query('SELECT tipo FROM archivos_usuario WHERE id = $1 AND usuario_id = $2', [archivoId, usuarioId])
+  if (!fila.rows[0]) throw new ErrorDocumentacion('Volvé a cargar la documentación y elegí un archivo de tu cuenta.')
+  const vinculo = await validarVinculo(usuarioId, fila.rows[0].tipo, polizaId)
+  await pg.query('UPDATE archivos_usuario SET poliza_id = $1 WHERE id = $2 AND usuario_id = $3', [vinculo, archivoId, usuarioId])
+}
+
+/** Las rutas internas sólo salen hacia el armado de copias, nunca hacia la API de listado. */
+export async function listarArchivosDocumentacion(usuarioId: string, polizaId?: string | null): Promise<(ArchivoDocumentacion & { archivo: string; sha256: string })[]> {
+  const pg = await db()
+  const res = await pg.query('SELECT * FROM archivos_usuario WHERE usuario_id = $1 ORDER BY creado_en ASC', [usuarioId])
+  return res.rows.filter((f) => polizaId === undefined || f.tipo === 'licencia' || f.tipo === 'dni' || f.poliza_id === polizaId)
+    .map((f) => ({ ...mapearArchivo(f), archivo: f.archivo, sha256: f.sha256 }))
 }
 
 /** Devuelve la ruta y el mime sólo si el archivo es de quien lo pide; si no, null. */

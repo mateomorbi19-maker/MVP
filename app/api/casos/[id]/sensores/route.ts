@@ -1,3 +1,4 @@
+import { bloquearCasoAbierto } from '@/lib/casos'
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { db, nuevoId } from '@/lib/db'
@@ -47,6 +48,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const cliente = await pg.connect()
     try {
       await cliente.query('BEGIN')
+      await bloquearCasoAbierto(id, cliente)
       await cliente.query(
         `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256)
          VALUES ($1,$2,'sensores',NULL,$3,$4,$5,$6)`,

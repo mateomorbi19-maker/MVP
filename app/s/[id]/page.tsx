@@ -16,6 +16,7 @@ export default async function PaginaSiniestro({ params }: { params: Promise<{ id
       casoId={caso.id}
       estadoInicial={caso.estado}
       respuestasIniciales={caso.respuestas}
+      progresoInicial={caso.progreso}
       datosIniciales={{
         poliza: caso.poliza ?? '',
         patente: caso.patente ?? '',
@@ -23,7 +24,7 @@ export default async function PaginaSiniestro({ params }: { params: Promise<{ id
         telefono: caso.telefono ?? '',
       }}
       hashMaestro={caso.hash_maestro}
-      mediasIniciales={medias.map((m) => ({ id: m.id, tipo: m.tipo, guia_id: m.guia_id }))}
+      mediasIniciales={medias.map((m) => ({ id: m.id, idempotencia: m.idempotencia, tipo: m.tipo, guia_id: m.guia_id }))}
       testigosIniciales={testigos.map((t) => ({ id: t.id, nombre: t.nombre }))}
       ubicacionInicial={caso.gps ? { lat: caso.gps.lat, lon: caso.gps.lon, direccion: caso.direccion } : null}
       croquisInicial={caso.croquis}

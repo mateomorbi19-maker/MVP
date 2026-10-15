@@ -13,7 +13,7 @@
  * LÍMITE HONESTO EN iPhone: no hay Background Sync. La cola sólo avanza mientras la
  * aplicación está abierta y al frente. Si la persona saca las fotos sin señal y cierra la
  * aplicación, esperan hasta que la vuelva a abrir. Por eso la bomba vive en el layout, y
- * por eso al cerrar con pendientes se declara el hash de cada una en la cadena. Safari
+ * por eso no se permite cerrar hasta confirmar todas las piezas pendientes. Safari
  * además desaloja el almacenamiento del sitio tras siete días sin uso: una foto en cola
  * puede desaparecer, y eso no se puede evitar desde el navegador.
  */
@@ -33,6 +33,8 @@ export interface PiezaEnCola {
   lat: number | null
   lon: number | null
   intentos: number
+  error?: string
+  estadoHttp?: number
   bytes: Blob
 }
 
@@ -57,9 +59,19 @@ function conAlmacen<T>(modo: IDBTransactionMode, fn: (a: IDBObjectStore) => IDBR
       new Promise<T>((resolver, rechazar) => {
         const tx = db.transaction(ALMACEN, modo)
         const pedido = fn(tx.objectStore(ALMACEN))
-        pedido.onsuccess = () => resolver(pedido.result)
-        pedido.onerror = () => rechazar(pedido.error ?? new Error('Falló el almacén local.'))
-        tx.oncomplete = () => db.close()
+        // El éxito del request no garantiza que la escritura haya quedado durable.
+        tx.oncomplete = () => {
+          db.close()
+          resolver(pedido.result)
+        }
+        tx.onabort = () => {
+          db.close()
+          rechazar(tx.error ?? new Error('No se pudo confirmar el guardado local. Liberá espacio y reintentá.'))
+        }
+        tx.onerror = () => {
+          db.close()
+          rechazar(tx.error ?? pedido.error ?? new Error('Falló el almacén local.'))
+        }
       }),
   )
 }
@@ -88,21 +100,39 @@ export async function quitar(id: string): Promise<void> {
   await conAlmacen('readwrite', (a) => a.delete(id))
 }
 
-async function marcarIntento(pieza: PiezaEnCola): Promise<void> {
-  await conAlmacen('readwrite', (a) => a.put({ ...pieza, intentos: pieza.intentos + 1 }))
+async function marcarIntento(pieza: PiezaEnCola, error: string, estadoHttp?: number): Promise<void> {
+  await conAlmacen('readwrite', (almacen) => {
+    const pedido = almacen.get(pieza.id) as IDBRequest<PiezaEnCola | undefined>
+    pedido.onsuccess = () => {
+      // La persona pudo retirar el borrador mientras el servidor respondía: no se recrea.
+      const actual = pedido.result
+      if (actual) almacen.put({ ...actual, intentos: actual.intentos + 1, error, estadoHttp })
+    }
+    return pedido
+  })
 }
 
 /**
  * Intenta subir todo lo pendiente.
  *
- * Devuelve cuántas subió. Una pieza que el servidor rechaza por 4xx —la actuación cerrada,
- * el archivo inválido— se saca de la cola: reintentarla para siempre no la va a arreglar y
- * mantendría el aviso encendido sin motivo. Un fallo de red se reintenta.
+ * Sólo borra una pieza cuando el servidor confirma su recepción. Un rechazo conserva
+ * los bytes y su motivo: un 409 puede indicar un cierre concurrente y no una recepción.
  */
-export async function drenar(): Promise<number> {
-  if (typeof indexedDB === 'undefined') return 0
+interface ResultadoDrenaje {
+  subidas: number
+  errores: Array<{ casoId: string; error: Error }>
+}
+
+async function drenarPendientes(): Promise<ResultadoDrenaje> {
+  if (typeof indexedDB === 'undefined') return { subidas: 0, errores: [] }
   let subidas = 0
-  for (const pieza of await todasLasPendientes()) {
+  const errores: ResultadoDrenaje['errores'] = []
+  for (const pendiente of await todasLasPendientes()) {
+    // El snapshot puede incluir un borrador retirado mientras se enviaba la pieza anterior.
+    const pieza = await conAlmacen<PiezaEnCola | undefined>('readonly', (almacen) => almacen.get(pendiente.id))
+    if (!pieza) continue
+    let motivo: string | null = null
+    let estadoHttp: number | undefined
     try {
       const cuerpo = new FormData()
       cuerpo.append('archivo', new File([pieza.bytes], `${pieza.id}.bin`, { type: pieza.mime }))
@@ -115,20 +145,30 @@ export async function drenar(): Promise<number> {
       cuerpo.append('tomada_en', pieza.tomadaEn)
 
       const res = await fetch(`/api/casos/${pieza.casoId}/media`, { method: 'POST', body: cuerpo })
-      if (res.ok || res.status === 409) {
+      if (res.ok) {
         await quitar(pieza.id)
         subidas++
         continue
       }
-      if (res.status >= 400 && res.status < 500) {
-        await quitar(pieza.id)
-        continue
-      }
-      await marcarIntento(pieza)
-    } catch {
-      // Sin red. Se queda en la cola y se reintenta cuando vuelva.
-      await marcarIntento(pieza)
+      const respuesta = await res.json().catch(() => ({}))
+      estadoHttp = res.status
+      motivo = typeof respuesta.error === 'string' ? respuesta.error : 'No se confirmó la recepción. Revisá la conexión y reintentá.'
+    } catch (error) {
+      motivo = error instanceof Error ? error.message : 'Recuperá la conexión para subir el archivo guardado en este teléfono.'
     }
+    await marcarIntento(pieza, motivo ?? 'Reintentá subir el archivo.', estadoHttp)
+    errores.push({ casoId: pieza.casoId, error: new Error(`${motivo} El archivo sigue guardado en este teléfono.`) })
   }
-  return subidas
+  return { subidas, errores }
+}
+
+let drenajeEnCurso: Promise<ResultadoDrenaje> | null = null
+
+/** La bomba global y el recorrido comparten un único envío por pieza. */
+export async function drenar(casoId?: string): Promise<number> {
+  drenajeEnCurso ??= drenarPendientes().finally(() => { drenajeEnCurso = null })
+  const resultado = await drenajeEnCurso
+  const fallo = resultado.errores.find((e) => !casoId || e.casoId === casoId)
+  if (fallo) throw fallo.error
+  return resultado.subidas
 }

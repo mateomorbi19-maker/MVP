@@ -39,32 +39,38 @@ export async function POST(req: Request, { params }: Ctx) {
       return NextResponse.json({ error: 'La firma es demasiado grande.' }, { status: 413 })
     }
 
-    const [medias, testigos] = await Promise.all([listarMedias(id), listarTestigos(id)])
-    const acta = construirActa(caso, medias, testigos)
-
     const hashVisto = form.get('hash')
-    if (typeof hashVisto !== 'string' || hashVisto !== acta.hash) {
-      return NextResponse.json(
-        {
-          error:
-            'El expediente cambió entre que se te mostró el acta y firmaste. Volvé a la pantalla anterior y firmá de nuevo: vas a estar firmando el contenido actualizado.',
-          hash_actual: acta.hash,
-        },
-        { status: 409 },
-      )
-    }
-
-    const firmante =
-      typeof form.get('firmante') === 'string' ? String(form.get('firmante')).slice(0, 120) : caso.asegurado
-
     const mediaId = nuevoId('FIR')
-    const guardado = await guardarArchivo(id, mediaId, archivo.type, new Uint8Array(await archivo.arrayBuffer()))
+    const contenido = new Uint8Array(await archivo.arrayBuffer())
 
     // La fila y su eslabón en la misma transacción: la firma entra al manifiesto como pieza.
     const pg = await db()
     const cliente = await pg.connect()
+    let hashActa: string
     try {
       await cliente.query('BEGIN')
+      await cliente.query("SET LOCAL lock_timeout = '8s'")
+      const bloqueado = await cliente.query('SELECT estado FROM casos WHERE id = $1 FOR UPDATE', [id])
+      if (!bloqueado.rows[0] || bloqueado.rows[0].estado === 'cerrado') {
+        await cliente.query('ROLLBACK')
+        return NextResponse.json({ error: 'La actuación ya fue cerrada y sellada o no está disponible.' }, { status: 409 })
+      }
+      const actual = await obtenerCaso(id, { cliente })
+      if (!actual) throw new Error('No se pudo releer la actuación para firmar. Volvé a abrirla.')
+      const medias = await listarMedias(id, { cliente })
+      const testigos = await listarTestigos(id, { cliente })
+      const acta = construirActa(actual, medias, testigos)
+      if (typeof hashVisto !== 'string' || hashVisto !== acta.hash) {
+        await cliente.query('ROLLBACK')
+        return NextResponse.json({
+          error: 'El expediente cambió desde que viste el acta. Volvé a la pantalla anterior y firmá de nuevo para confirmar el contenido actualizado.',
+          hash_actual: acta.hash,
+        }, { status: 409 })
+      }
+      hashActa = acta.hash
+      const firmante = typeof form.get('firmante') === 'string'
+        ? String(form.get('firmante')).trim().slice(0, 120) || actual.asegurado : actual.asegurado
+      const guardado = await guardarArchivo(id, mediaId, archivo.type, contenido)
       await cliente.query(
         `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps, firmante, hash_firmado)
          VALUES ($1,$2,'firma',NULL,$3,$4,$5,$6,NULL,$7,$8)`,
@@ -75,12 +81,11 @@ export async function POST(req: Request, { params }: Ctx) {
         'acta_firmada_asegurado',
         {
           media_id: mediaId,
-          firmante,
           hash_acta: acta.hash,
           version_declaracion: DECLARACION.version,
           sha256: guardado.sha256,
         },
-        { cliente },
+        { reservado: { firmante }, cliente },
       )
       await cliente.query('COMMIT')
     } catch (err) {
@@ -90,7 +95,7 @@ export async function POST(req: Request, { params }: Ctx) {
       cliente.release()
     }
 
-    return NextResponse.json({ ok: true, id: mediaId, hash_acta: acta.hash }, { status: 201 })
+    return NextResponse.json({ ok: true, id: mediaId, hash_acta: hashActa }, { status: 201 })
   } catch (err) {
     if (err instanceof ErrorArchivo) return NextResponse.json({ error: err.message }, { status: 400 })
     return errorApi('firma:POST', err, 'No se pudo registrar la firma.')

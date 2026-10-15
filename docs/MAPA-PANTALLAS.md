@@ -1,5 +1,22 @@
 # Mapa de pantallas
 
+## Actualización del MVP de octubre de 2026
+
+El recorrido vigente reúne las fotos esenciales y una toma libre opcional antes del corte.
+`pantallas/PantallaCorte.tsx` reúne guardar/continuar y el intercambio de documentos/testigos.
+La segunda etapa empieza en `pantallas/PantallaRelato.tsx`: grabación o escritura en una
+pantalla, borrador recuperable, transcripción original y texto confirmado. La API es
+`POST /api/casos/[id]/transcripcion`; transcribir un borrador todavía no lo incorpora al acta.
+La pregunta condicional del número policial incluye `components/AdjuntoActa.tsx` para
+fotografiar o adjuntar el acta sin sumar otro paso. Se conservan circulabilidad, ubicación
+actual del vehículo, policía, otras intervenciones, VTV, alcoholemia, firma, revisión y final.
+Las preguntas retiradas, el croquis y sus piezas siguen disponibles para expedientes históricos.
+La revisión OCR se inserta antes de la firma sólo si hay lecturas pendientes. La firma
+permite revisar e incorporar documentación antes de preparar el acta; mientras esa
+incorporación está en curso, no habilita firmar. `components/PendientesSubida.tsx` ofrece
+reintento, respaldo y descarte local en corte, firma, revisión y final.
+Las secciones de referencia de abajo describen también componentes históricos conservados.
+
 De cada pantalla del mockup al archivo que la dibuja, las clases que usa y el endpoint del
 que depende. Si creás una pantalla nueva bajo `app/s/[id]/pantallas/`, agregala acá:
 `npm run contrato` falla si falta.

@@ -55,9 +55,30 @@ export async function POST(req: Request) {
      * campos siguen siendo editables al final del recorrido.
      */
     const precarga = sesion ? await precargaDe(sesion.usuario_id) : null
+    const polizaSolicitada = typeof cuerpo?.poliza_id === 'string' ? cuerpo.poliza_id.trim() : null
+    let polizaElegida: { id: string; numero: string; patente: string | null; productor_usuario_id: string | null } | null = null
+    if (polizaSolicitada) {
+      if (!sesion) return NextResponse.json({ error: 'Ingresá a tu cuenta para elegir una póliza.' }, { status: 401 })
+      const seleccion = await pg.query(
+        `SELECT po.id, po.numero, po.patente, pr.usuario_id AS productor_usuario_id
+         FROM polizas po LEFT JOIN productores pr ON pr.id = po.productor_id
+         WHERE po.id = $1 AND po.usuario_id = $2`,
+        [polizaSolicitada, sesion.usuario_id],
+      )
+      if (!seleccion.rows[0]) return NextResponse.json({ error: 'Elegí una póliza cargada en tu cuenta.' }, { status: 400 })
+      polizaElegida = seleccion.rows[0]
+    } else if (precarga?.poliza_id && !precarga.ambigua) {
+      const seleccion = await pg.query(
+        `SELECT po.id, po.numero, po.patente, pr.usuario_id AS productor_usuario_id
+         FROM polizas po LEFT JOIN productores pr ON pr.id = po.productor_id
+         WHERE po.id = $1 AND po.usuario_id = $2`,
+        [precarga.poliza_id, sesion?.usuario_id],
+      )
+      polizaElegida = seleccion.rows[0] ?? null
+    }
     const conPrecarga = {
-      poliza: datos.poliza ?? precarga?.poliza ?? null,
-      patente: datos.patente ?? precarga?.patente ?? null,
+      poliza: polizaSolicitada ? polizaElegida?.numero ?? null : datos.poliza ?? polizaElegida?.numero ?? null,
+      patente: polizaSolicitada ? polizaElegida?.patente ?? null : datos.patente ?? polizaElegida?.patente ?? null,
       asegurado: datos.asegurado ?? precarga?.asegurado ?? null,
       telefono: datos.telefono ?? precarga?.telefono ?? null,
     }
@@ -65,34 +86,39 @@ export async function POST(req: Request) {
     let id = ''
     for (let intento = 0; intento < 5; intento++) {
       const candidato = nuevoId()
+      const cliente = await pg.connect()
       try {
-        await pg.query(
-          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version, secreto_sha256, usuario_id, poliza_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [candidato, conPrecarga.poliza, conPrecarga.patente, conPrecarga.asegurado, conPrecarga.telefono, VERSION_MANIFIESTO, hashToken(secreto), sesion?.usuario_id ?? null, precarga?.poliza_id ?? null],
+        await cliente.query('BEGIN')
+        await cliente.query(
+          `INSERT INTO casos (id, poliza, patente, asegurado, telefono, manifiesto_version, secreto_sha256, usuario_id, poliza_id, productor_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [candidato, conPrecarga.poliza, conPrecarga.patente, conPrecarga.asegurado, conPrecarga.telefono, VERSION_MANIFIESTO, hashToken(secreto), sesion?.usuario_id ?? null, polizaElegida?.id ?? null, polizaElegida?.productor_usuario_id ?? null],
         )
+        await registrarEvento(
+          candidato,
+          'apertura_actuacion',
+          { user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null },
+          { reservado: { poliza: conPrecarga.poliza, patente: conPrecarga.patente }, cliente },
+        )
+        await cliente.query('COMMIT')
         id = candidato
         break
       } catch (err) {
+        await cliente.query('ROLLBACK').catch(() => {})
         // 23505 = unique_violation. Cualquier otra cosa no se resuelve reintentando.
         if ((err as { code?: string })?.code !== '23505') throw err
+      } finally {
+        cliente.release()
       }
     }
     if (!id) {
       throw new Error('No se pudo generar un número de actuación libre después de cinco intentos.')
     }
 
-    await registrarEvento(
-      id,
-      'apertura_actuacion',
-      { user_agent: req.headers.get('user-agent')?.slice(0, 200) ?? null },
-      { reservado: { poliza: conPrecarga.poliza, patente: conPrecarga.patente } },
-    )
-
     // Anota qué navegador tiene este id: es lo que le habilita las fotos y el expediente.
     await anotarPosesion(id)
 
-    return NextResponse.json({ id, secreto, precarga_ambigua: precarga?.ambigua ?? false }, { status: 201 })
+    return NextResponse.json({ id, secreto, precarga_ambigua: Boolean(precarga?.ambigua && !polizaElegida) }, { status: 201 })
   } catch (err) {
     return errorApi('casos:POST', err, 'No se pudo crear la actuación.')
   }

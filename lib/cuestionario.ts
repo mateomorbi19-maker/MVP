@@ -351,6 +351,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'tercero_actitud',
+      oculta: true,
         texto: '¿El otro conductor sigue en el lugar?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.tercero_actitud),
@@ -369,6 +370,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'momento_declarado',
+      oculta: true,
         texto: '¿Hace cuánto pasó?',
         ayuda: 'Cuanto antes se registre, más valor probatorio tiene.',
         tipo: 'opcion',
@@ -386,6 +388,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'tercero_patente',
+      oculta: true,
         texto: 'Patente del otro vehículo',
         ayuda: 'Es el dato más difícil de recuperar después. Si lo tenés, cargalo ahora.',
         tipo: 'texto',
@@ -394,6 +397,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'tercero_datos',
+      oculta: true,
         texto: 'Datos del otro conductor',
         tipo: 'persona',
         dependeDe: HAY_TERCERO,
@@ -402,6 +406,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'tercero_aseguradora',
+      oculta: true,
         texto: '¿Qué aseguradora tiene el otro vehículo?',
         tipo: 'texto',
         dependeDe: HAY_OTRO_VEHICULO,
@@ -409,6 +414,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'tercero_poliza',
+      oculta: true,
         texto: 'Número de póliza del otro vehículo',
         tipo: 'texto',
         dependeDe: HAY_OTRO_VEHICULO,
@@ -424,6 +430,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'relato',
+      oculta: true,
         texto: 'Contá con tus palabras cómo pasó',
         ayuda:
           'Hablá tranquilo, entre 30 y 90 segundos. Va antes de las preguntas a propósito: así contás lo que viste sin que ninguna pregunta te sugiera la respuesta.',
@@ -433,12 +440,15 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'relato_texto',
+      oculta: true,
         texto: 'Si preferís, contalo por escrito',
         ayuda:
           'Vale igual que el audio. Está acá para quien no puede grabar: por ruido, por vergüenza, o porque el teléfono no le dio permiso al micrófono. Hasta ahora, quien tocaba «Prefiero no grabar» perdía el relato entero.',
         tipo: 'parrafo',
         omitir: 'Ya lo conté por voz',
       },
+      { id: 'transcripcion_original', texto: 'Transcripción original aportada desde el dispositivo (sin verificación de contenido)', tipo: 'parrafo', oculta: true },
+      { id: 'contactos_testigos', texto: 'Contactos de testigos anotados por el asegurado', tipo: 'parrafo', oculta: true },
     ],
   },
   {
@@ -449,6 +459,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'calle',
+      oculta: true,
         texto: '¿Por qué calle o ruta venías?',
         tipo: 'texto',
         requerida: true,
@@ -456,12 +467,14 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'sentido',
+      oculta: true,
         texto: '¿Hacia dónde ibas?',
         ayuda: 'Por ejemplo: "hacia el centro", "sentido norte", "hacia Av. Mitre".',
         tipo: 'texto',
       },
       {
         id: 'maniobra',
+      oculta: true,
         texto: '¿Qué estabas haciendo justo antes del impacto?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.maniobra),
@@ -469,6 +482,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'velocidad',
+      oculta: true,
         texto: '¿A qué velocidad venías?',
         ayuda: 'Un número aproximado está bien.',
         tipo: 'numero',
@@ -478,6 +492,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'freno',
+      oculta: true,
         texto: '¿Llegaste a frenar?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.freno),
@@ -486,6 +501,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'zona_propia',
+      oculta: true,
         texto: '¿Dónde golpeó tu vehículo?',
         ayuda: 'Tocá la zona del primer contacto.',
         tipo: 'zonaImpacto',
@@ -493,12 +509,14 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'zona_tercero',
+      oculta: true,
         texto: '¿Y dónde golpeó el otro vehículo?',
         tipo: 'zonaImpacto',
         dependeDe: HAY_OTRO_VEHICULO,
       },
       {
         id: 'semaforo',
+      oculta: true,
         texto: '¿Cómo estaba el semáforo para vos?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.semaforo),
@@ -506,6 +524,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'senalizacion',
+      oculta: true,
         texto: '¿Qué señalización había en el cruce?',
         tipo: 'multiple',
         opciones: Object.values(VALOR.senalizacion),
@@ -520,6 +539,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'pavimento',
+      oculta: true,
         texto: '¿Cómo estaba el pavimento?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.pavimento),
@@ -528,6 +548,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'clima',
+      oculta: true,
         texto: '¿Cómo estaba el tiempo?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.clima),
@@ -536,6 +557,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'luz',
+      oculta: true,
         texto: '¿Cómo era la visibilidad?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.luz),
@@ -548,7 +570,7 @@ export const SECCIONES: Seccion[] = [
     id: 'estado',
     titulo: 'Estado del vehículo',
     descripcion: 'Define si hace falta una grúa antes de irte del lugar.',
-    bloque: 'lugar',
+    bloque: 'despues',
     preguntas: [
       {
         id: 'circula',
@@ -557,13 +579,19 @@ export const SECCIONES: Seccion[] = [
         opciones: Object.values(VALOR.circula),
         requerida: true,
       },
+      {
+        id: 'ubicacion_vehiculo',
+        texto: '¿Dónde está el vehículo ahora?',
+        ayuda: 'Indicá si está en tu casa, en un taller o en otro lugar, y la dirección para que puedan revisarlo.',
+        tipo: 'texto',
+      },
     ],
   },
   {
     id: 'intervenciones',
     titulo: 'Quién intervino',
     descripcion: 'Cada intervención genera un expediente paralelo que después hay que poder pedir.',
-    bloque: 'lugar',
+    bloque: 'despues',
     preguntas: [
       {
         id: 'policia',
@@ -581,6 +609,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'policia_dependencia',
+      oculta: true,
         texto: '¿Qué dependencia o comisaría intervino?',
         tipo: 'texto',
         dependeDe: { pregunta: 'policia', valores: [VALOR.policia.SI] },
@@ -593,6 +622,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'quien_llamo',
+      oculta: true,
         texto: '¿Quién llamó a la policía o la ambulancia?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.quien_llamo),
@@ -609,6 +639,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'quien_conducia',
+      oculta: true,
         texto: '¿Quién manejaba tu vehículo?',
         ayuda: 'Si manejaba otra persona, la póliza puede requerir que esté declarada.',
         tipo: 'opcion',
@@ -618,6 +649,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'conductor_datos',
+      oculta: true,
         texto: 'Datos de quien manejaba',
         tipo: 'persona',
         dependeDe: { pregunta: 'quien_conducia', valores: [VALOR.quien_conducia.OTRA_PERSONA] },
@@ -625,6 +657,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'acompanantes',
+      oculta: true,
         texto: '¿Cuántas personas iban con vos?',
         ayuda: 'Sin contarte a vos.',
         tipo: 'numero',
@@ -656,6 +689,7 @@ export const SECCIONES: Seccion[] = [
       },
       {
         id: 'uso_vehiculo',
+      oculta: true,
         texto: '¿Para qué estabas usando el vehículo?',
         tipo: 'opcion',
         opciones: Object.values(VALOR.uso_vehiculo),
@@ -671,6 +705,7 @@ export const SECCIONES: Seccion[] = [
     preguntas: [
       {
         id: 'relato_ampliado',
+      oculta: true,
         texto: 'Contá lo que pasó, con todo el detalle que puedas',
         ayuda:
           'Esto es lo que va a leer quien resuelva el siniestro. Lo de abajo es una guía, no un formulario: contalo como te salga.',
@@ -834,6 +869,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
   },
   {
     id: 'posicion_final',
+    oculta: true,
     titulo: 'Cómo quedaron los autos',
     instruccion: 'Si todavía no los moviste, que se vea cómo quedó cada uno respecto del otro.',
     obligatoria: true,
@@ -841,6 +877,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
   },
   {
     id: 'pano_atras',
+    oculta: true,
     titulo: 'Vista general desde atrás',
     instruccion: 'Alejate unos 10 pasos hacia atrás. Que se vean los vehículos y la calle.',
     obligatoria: true,
@@ -848,6 +885,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
   },
   {
     id: 'pano_frente',
+    oculta: true,
     titulo: 'Vista general desde adelante',
     instruccion: 'Lo mismo pero desde el otro lado, para que se vea el cruce completo.',
     obligatoria: true,
@@ -855,6 +893,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
   },
   {
     id: 'pavimento',
+    oculta: true,
     titulo: 'Estado del pavimento',
     instruccion: 'Apuntá al piso donde ocurrió el impacto. Si hay huellas de frenada, vidrios o restos, que se vean.',
     obligatoria: true,
@@ -862,6 +901,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
   },
   {
     id: 'senalizacion',
+    oculta: true,
     titulo: 'Señalización del lugar',
     instruccion: 'Sacá el semáforo, el cartel o la señal que corresponda al cruce.',
     obligatoria: false,
@@ -870,9 +910,27 @@ export const GUIA_FOTOS: GuiaFoto[] = [
   {
     id: 'libre',
     titulo: 'Lo que quieras agregar',
-    instruccion: 'Cualquier cosa que te parezca importante y no esté en las fotos anteriores.',
+    instruccion: 'Podés sumar una panorámica de los vehículos o una foto de algo que haya influido en el siniestro: un obstáculo, el pavimento o la señalización.',
     obligatoria: false,
     grupo: 'lugar',
+  },
+  {
+    id: 'acta_policial',
+    titulo: 'Acta policial',
+    instruccion: 'Que se lean el número, la dependencia y los datos del acta.',
+    obligatoria: false,
+    grupo: 'documentos',
+    admitePdf: true,
+    oculta: true,
+  },
+  {
+    id: 'dni_propio',
+    titulo: 'Tu DNI',
+    instruccion: 'Documento incorporado desde Mi documentación.',
+    obligatoria: false,
+    grupo: 'documentos',
+    admitePdf: true,
+    oculta: true,
   },
 ]
 
@@ -889,6 +947,7 @@ export const GUIA_FOTOS: GuiaFoto[] = [
 export type Etapa =
   | { tipo: 'seccion'; id: string }
   | { tipo: 'fotos'; grupo: GrupoFoto }
+  | { tipo: 'relato' }
   | { tipo: 'resumen' }
   | { tipo: 'testigos' }
   | { tipo: 'corte' }
@@ -899,52 +958,26 @@ export type Etapa =
   | { tipo: 'final' }
 
 export const RECORRIDO: Etapa[] = [
-  // Sin preguntas visibles: sigue acá porque toda sección tiene que estar en el recorrido.
   { tipo: 'seccion', id: 'triage' },
-  /*
-   * Lo esencial primero, en el orden en que se pierde: el daño de cada vehículo con su
-   * patente, los papeles del tercero, y recién después el corte. Con eso la persona ya se
-   * puede ir del lugar; el relato y las demás preguntas se pueden completar más tarde.
-   */
   { tipo: 'resumen' },
   { tipo: 'fotos', grupo: 'propio' },
   { tipo: 'seccion', id: 'vehiculos' },
   { tipo: 'fotos', grupo: 'tercero' },
-  /*
-   * Sin el QR de consentimiento del tercero, que salió para acortar el recorrido, sus
-   * papeles se fotografían pero no se leen solos: la lectura automática exige que él haya
-   * consentido, porque el asegurado no puede consentir por él (arts. 5 y 11, Ley 25.326).
-   */
   { tipo: 'fotos', grupo: 'documentos' },
+  { tipo: 'fotos', grupo: 'lugar' },
   { tipo: 'corte' },
+  { tipo: 'relato' },
+  // Las definiciones ocultas conservan su lugar para leer actuaciones anteriores.
   { tipo: 'seccion', id: 'identificacion' },
   { tipo: 'seccion', id: 'terceros' },
-  { tipo: 'fotos', grupo: 'lugar' },
   { tipo: 'seccion', id: 'relato' },
-  { tipo: 'testigos' },
-  /*
-   * La revisión de lo que leyó la máquina va DESPUÉS del relato en audio y de los
-   * testigos, no antes. El orden del relato es deliberado —primero la persona cuenta lo
-   * que vio, sin que ninguna pregunta le sugiera la respuesta— y meter en el medio una
-   * pantalla con los datos del tercero lo rompería.
-   */
-  { tipo: 'validacion' },
   { tipo: 'seccion', id: 'mecanica' },
   { tipo: 'seccion', id: 'contexto' },
   { tipo: 'seccion', id: 'estado' },
   { tipo: 'seccion', id: 'intervenciones' },
   { tipo: 'seccion', id: 'cobertura' },
   { tipo: 'seccion', id: 'relato_casa' },
-  /*
-   * La carátula (patente, póliza, nombre y teléfono) ya no tiene pantalla: sale de la
-   * póliza de la cuenta al abrir la actuación, y sin cuenta queda vacía.
-   */
-  { tipo: 'croquis' },
-  /*
-   * La firma va antes de la revisión y NO dentro de ella. La revisión ya es la pantalla más
-   * cargada del recorrido —lo que se sella, los faltantes, el aviso de ubicación y el botón
-   * de cerrar—, y meter el lienzo ahí empuja a firmar sin leer. Firmar es un acto aparte.
-   */
+  { tipo: 'validacion' },
   { tipo: 'firma' },
   { tipo: 'revision' },
   { tipo: 'final' },
@@ -969,7 +1002,9 @@ function visible(
 }
 
 export function preguntasVisibles(seccion: Seccion, respuestas: Record<string, unknown>): Pregunta[] {
-  return seccion.preguntas.filter((p) => !p.oculta && visible(p, respuestas))
+  return seccion.preguntas
+    .filter((p) => !p.oculta && visible(p, respuestas))
+    .map((p) => p.id === 'policia' ? { ...p, opciones: [VALOR.policia.SI, VALOR.policia.NO] } : p)
 }
 
 /** Las tomas que corresponden a este siniestro: sin tercero no se piden fotos del tercero. */

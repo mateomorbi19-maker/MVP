@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       archivo.name || null,
       archivo.type,
       new Uint8Array(await archivo.arrayBuffer()),
+      form.get('poliza_id'),
     )
     return NextResponse.json(creado, { status: 201 })
   } catch (err) {

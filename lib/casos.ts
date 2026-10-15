@@ -1,5 +1,5 @@
 import { db } from './db'
-import { construirManifiesto } from './hash'
+import { construirManifiesto, ErrorActuacionCerrada } from './hash'
 import { construirActa } from './acta'
 import { analizar, type InformeConsistencia } from './consistencia'
 import { fotosObligatorias } from './cuestionario'
@@ -8,6 +8,14 @@ import type { Sello } from './sello'
 import type { DatosExpediente } from './pdf'
 import type { AlcanceCasos } from './sesion'
 import type { Croquis } from './croquis'
+import type { PoolClient } from 'pg'
+
+export interface ProgresoCaso {
+  paso?: string
+  omitidos?: string[]
+}
+
+type LecturaCaso = { cliente?: PoolClient }
 
 export interface Caso {
   id: string
@@ -19,6 +27,7 @@ export interface Caso {
   asegurado: string | null
   telefono: string | null
   respuestas: Record<string, unknown>
+  progreso?: ProgresoCaso
   gps: { lat: number; lon: number; precision_m: number | null; capturado_en: string } | null
   direccion: string | null
   clima: Clima | null
@@ -45,6 +54,7 @@ function mapear(fila: Record<string, unknown>): Caso {
     asegurado: (fila.asegurado as string) ?? null,
     telefono: (fila.telefono as string) ?? null,
     respuestas: (fila.respuestas as Record<string, unknown>) ?? {},
+    progreso: (fila.progreso as ProgresoCaso) ?? {},
     gps: (fila.gps as Caso['gps']) ?? null,
     direccion: (fila.direccion as string) ?? null,
     clima: (fila.clima as Clima) ?? null,
@@ -58,10 +68,20 @@ function mapear(fila: Record<string, unknown>): Caso {
   }
 }
 
-export async function obtenerCaso(id: string): Promise<Caso | null> {
-  const pg = await db()
+export async function obtenerCaso(id: string, opciones: LecturaCaso = {}): Promise<Caso | null> {
+  const pg = opciones.cliente ?? await db()
   const res = await pg.query('SELECT * FROM casos WHERE id = $1', [id])
   return res.rows[0] ? mapear(res.rows[0]) : null
+}
+
+/** Antes de escribir: evita modificaciones posteriores al cierre y upgrades de locks por la FK de piezas. */
+export async function bloquearCasoAbierto(id: string, cliente: PoolClient): Promise<Caso> {
+  await cliente.query("SET LOCAL lock_timeout = '8s'")
+  const res = await cliente.query('SELECT * FROM casos WHERE id = $1 FOR UPDATE', [id])
+  if (!res.rows[0]) throw new Error('La actuación no existe. Volvé a abrir el enlace correcto.')
+  const caso = mapear(res.rows[0])
+  if (caso.estado === 'cerrado') throw new ErrorActuacionCerrada(id)
+  return caso
 }
 
 /**
@@ -90,6 +110,7 @@ export async function listarCasos(alcance: AlcanceCasos): Promise<Caso[]> {
 
 export interface Media {
   id: string
+  idempotencia?: string | null
   caso_id: string
   tipo: string
   guia_id: string | null
@@ -105,11 +126,12 @@ export interface Media {
   origen: string | null
 }
 
-export async function listarMedias(casoId: string): Promise<Media[]> {
-  const pg = await db()
+export async function listarMedias(casoId: string, opciones: LecturaCaso = {}): Promise<Media[]> {
+  const pg = opciones.cliente ?? await db()
   const res = await pg.query('SELECT * FROM medias WHERE caso_id = $1 ORDER BY capturado_en ASC', [casoId])
   return res.rows.map((m) => ({
     id: m.id,
+    idempotencia: m.idempotencia ?? null,
     caso_id: m.caso_id,
     tipo: m.tipo,
     guia_id: m.guia_id,
@@ -137,8 +159,8 @@ export interface Testigo {
   sha256: string
 }
 
-export async function listarTestigos(casoId: string): Promise<Testigo[]> {
-  const pg = await db()
+export async function listarTestigos(casoId: string, opciones: LecturaCaso = {}): Promise<Testigo[]> {
+  const pg = opciones.cliente ?? await db()
   const res = await pg.query('SELECT * FROM testigos WHERE caso_id = $1 ORDER BY creado_en ASC', [casoId])
   return res.rows.map((t) => ({
     id: t.id,
@@ -153,11 +175,11 @@ export async function listarTestigos(casoId: string): Promise<Testigo[]> {
 }
 
 /** Recalcula el informe de consistencia con el estado actual del expediente. */
-export async function calcularConsistencia(casoId: string): Promise<InformeConsistencia | null> {
-  const caso = await obtenerCaso(casoId)
+export async function calcularConsistencia(casoId: string, opciones: LecturaCaso = {}): Promise<InformeConsistencia | null> {
+  const caso = await obtenerCaso(casoId, opciones)
   if (!caso) return null
-  const medias = await listarMedias(casoId)
-  const testigos = await listarTestigos(casoId)
+  const medias = await listarMedias(casoId, opciones)
+  const testigos = await listarTestigos(casoId, opciones)
 
   return analizar({
     respuestas: caso.respuestas,
@@ -217,6 +239,10 @@ export async function datosExpediente(casoId: string): Promise<DatosExpediente |
       sha256: m.sha256,
       capturado_en: m.capturado_en,
       gps: m.gps,
+      firmante: m.firmante,
+      hash_firmado: m.hash_firmado,
+      tomada_en: m.tomada_en,
+      origen: m.origen,
     })),
     testigos: testigos.map((t) => ({
       id: t.id,

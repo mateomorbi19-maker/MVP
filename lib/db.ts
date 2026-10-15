@@ -367,6 +367,36 @@ CREATE TABLE IF NOT EXISTS archivos_usuario (
 );
 CREATE INDEX IF NOT EXISTS archivos_usuario_idx ON archivos_usuario (usuario_id, tipo, creado_en);
 
+-- Las fotos personales se separan de las que identifican un vehículo concreto.
+ALTER TABLE archivos_usuario DROP CONSTRAINT IF EXISTS archivos_usuario_tipo_check;
+ALTER TABLE archivos_usuario ADD CONSTRAINT archivos_usuario_tipo_check CHECK (tipo IN ('poliza', 'licencia', 'cedula', 'dni'));
+ALTER TABLE archivos_usuario ADD COLUMN IF NOT EXISTS poliza_id TEXT REFERENCES polizas(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS archivos_usuario_poliza_idx ON archivos_usuario (poliza_id, tipo);
+ALTER TABLE polizas ADD COLUMN IF NOT EXISTS contactos JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE polizas ADD COLUMN IF NOT EXISTS estado_cuenta JSONB;
+CREATE TABLE IF NOT EXISTS cambios_poliza (
+  id TEXT PRIMARY KEY,
+  poliza_id TEXT NOT NULL REFERENCES polizas(id) ON DELETE CASCADE,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  origen TEXT NOT NULL,
+  anterior JSONB NOT NULL,
+  actual JSONB NOT NULL,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS cambios_poliza_idx ON cambios_poliza (poliza_id, creado_en DESC);
+ALTER TABLE casos ADD COLUMN IF NOT EXISTS progreso JSONB NOT NULL DEFAULT '{}';
+
+-- El permiso de intercambio no es una pieza del expediente ni altera su cadena.
+CREATE TABLE IF NOT EXISTS documentos_compartidos (
+  token_sha256 TEXT PRIMARY KEY,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  caso_id TEXT NOT NULL REFERENCES casos(id) ON DELETE CASCADE,
+  archivos JSONB NOT NULL,
+  vence_en TIMESTAMPTZ NOT NULL,
+  revocado_en TIMESTAMPTZ,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Contacto de confianza para el escalamiento por impacto.
 -- Es un dato personal de alguien que NO está presente para consentir su tratamiento: se
 -- guarda el mínimo, se usa sólo para eso, y no entra al expediente ni al PDF.
@@ -550,7 +580,8 @@ ALTER TABLE medias ADD COLUMN IF NOT EXISTS desfase_reloj_ms BIGINT;
 ALTER TABLE medias ADD COLUMN IF NOT EXISTS origen           TEXT;
 -- Impide que un reintento duplique la misma toma. El uuid lo genera el navegador por
 -- CAPTURA y no por guía: si se generara por guía, «repetir la foto» devolvería la vieja.
-CREATE UNIQUE INDEX IF NOT EXISTS medias_idempotencia_uidx ON medias (idempotencia) WHERE idempotencia IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS medias_caso_idempotencia_uidx ON medias (caso_id, idempotencia) WHERE idempotencia IS NOT NULL;
+DROP INDEX IF EXISTS medias_idempotencia_uidx;
 
 -- ===================== Notificaciones y telemetría =====================
 
@@ -633,7 +664,7 @@ CREATE TRIGGER gestiones_inmutables
  * informa "esquema creado" aunque la tabla nueva haya fallado —que es exactamente el
  * escenario que ese endpoint existe para detectar—.
  */
-export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'documentacion_usuario', 'archivos_usuario', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos', 'dispositivos', 'telemetria'] as const
+export const TABLAS = ['casos', 'eventos', 'medias', 'testigos', 'usuarios', 'sesiones', 'posesiones', 'bitacora', 'productores', 'polizas', 'documentos_poliza', 'documentacion_usuario', 'archivos_usuario', 'contactos_confianza', 'terceros', 'extracciones', 'envios', 'gestiones', 'eventos_reservados', 'expurgos', 'dispositivos', 'telemetria', 'cambios_poliza', 'documentos_compartidos'] as const
 
 /** Crea el esquema si no existe. Se ejecuta una sola vez por proceso. */
 export function asegurarEsquema(): Promise<void> {

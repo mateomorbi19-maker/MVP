@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Icono } from '@/app/components/Iconos'
-import { MAXIMO_FOTOS_POR_GUIA, fotosDeGuia, type Paso } from '@/lib/recorrido'
+import { MAXIMO_FOTOS_POR_GUIA, fotosAnteriores, type Paso } from '@/lib/recorrido'
 import type { Media, Subir } from '../tipos'
 
 /* ================= Fotos de una toma, hasta cinco por pantalla ================= */
@@ -53,8 +53,7 @@ export function PantallaFoto({
 
   // Las de una sesión anterior (recarga, retomar) se ven desde el servidor; las de ahora,
   // desde el archivo local, porque su id todavía puede no existir allá.
-  const propias = new Set(capturas.map((c) => c.mediaId).filter(Boolean))
-  const anteriores = fotosDeGuia(medias, paso.guia.id).filter((m) => !propias.has(m.id))
+  const anteriores = fotosAnteriores(medias, paso.guia.id, capturas.map((c) => c.mediaId))
   const vigentes = capturas.filter((c) => c.estado !== 'fallo')
   const cantidad = anteriores.length + vigentes.length
   const guardadas = anteriores.length + capturas.filter((c) => c.estado === 'guardada').length
@@ -109,7 +108,13 @@ export function PantallaFoto({
         {anteriores.length + capturas.length > 0 ? (
           <div className="foto-grilla">
             {anteriores.map((m) =>
-              m.tipo === 'documento' ? (
+              m.pendiente ? (
+                <div key={m.id} className="miniatura miniatura-pdf">
+                  <Icono nombre="archivo" />
+                  <strong>Guardada en este teléfono</strong>
+                  <span className="miniatura-pdf-nombre">Esperando conexión para subir</span>
+                </div>
+              ) : m.tipo === 'documento' ? (
                 <FichaPdf key={m.id} href={`/api/media/${m.id}`} nombre={paso.guia.titulo}>
                   <span className="insignia miniatura-estado" data-nivel="ok">Guardada</span>
                 </FichaPdf>

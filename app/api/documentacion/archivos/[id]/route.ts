@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { exigirRol } from '@/lib/sesion'
 import { leerDocumento } from '@/lib/almacenamiento'
-import { archivoDelUsuario, quitarArchivoDocumentacion } from '@/lib/documentacion'
+import { archivoDelUsuario, asignarArchivoDocumentacion, ErrorDocumentacion, quitarArchivoDocumentacion } from '@/lib/documentacion'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -37,5 +37,18 @@ export async function DELETE(_req: Request, { params }: Ctx) {
     return NextResponse.json({ ok: true })
   } catch (err) {
     return errorApi('documentacion-archivo:DELETE', err, 'No se pudo quitar el archivo.')
+  }
+}
+
+export async function PATCH(req: Request, { params }: Ctx) {
+  try {
+    const { id } = await params
+    const sesion = await exigirRol('asegurado', 'productor', 'aseguradora')
+    const cuerpo = await req.json().catch(() => ({}))
+    await asignarArchivoDocumentacion(sesion.usuario_id, id, cuerpo.poliza_id)
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    if (err instanceof ErrorDocumentacion) return NextResponse.json({ error: err.message }, { status: 400 })
+    return errorApi('documentacion-archivo:PATCH', err, 'No se pudo asignar el archivo. Elegí la póliza y volvé a intentar.')
   }
 }

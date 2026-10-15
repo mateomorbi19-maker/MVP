@@ -94,12 +94,15 @@ const IDS_CONGELADOS = [
   'luz', 'circula', 'policia', 'policia_acta', 'policia_dependencia', 'otras_intervenciones',
   'quien_llamo', 'quien_conducia', 'conductor_datos', 'acompanantes', 'licencia_vigente', 'vtv',
   'alcoholemia', 'uso_vehiculo', 'relato_ampliado',
+  // Nuevos datos del informe de octubre: los identificadores anteriores se conservan.
+  'ubicacion_vehiculo', 'transcripcion_original', 'contactos_testigos',
 ]
 
 const GUIAS_CONGELADAS = [
   'posicion_final', 'patente_tercero', 'dano_tercero', 'pano_atras', 'pano_frente',
   'dano_propio', 'patente_propia', 'pavimento', 'cedula_tercero', 'licencia_tercero',
   'senalizacion', 'libre', 'licencia_propia', 'cedula_propia', 'seguro_propio', 'seguro_tercero',
+  'acta_policial', 'dni_propio',
 ]
 
 /*

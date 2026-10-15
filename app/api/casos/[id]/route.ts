@@ -8,6 +8,7 @@ import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso, listarMedias, listarTestigos, limpiarDatosAsegurado } from '@/lib/casos'
 import { SECCIONES } from '@/lib/cuestionario'
+import { limpiarProgreso } from '@/lib/recorrido'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,7 +27,7 @@ export async function GET(_req: Request, { params }: Ctx) {
     const [medias, testigos] = await Promise.all([listarMedias(id), listarTestigos(id)])
     return NextResponse.json({
       ...caso,
-      medias: medias.map((m) => ({ id: m.id, tipo: m.tipo, guia_id: m.guia_id, mime: m.mime, capturado_en: m.capturado_en })),
+      medias: medias.map((m) => ({ id: m.id, idempotencia: m.idempotencia, tipo: m.tipo, guia_id: m.guia_id, mime: m.mime, capturado_en: m.capturado_en })),
       testigos: testigos.map((t) => ({ id: t.id, nombre: t.nombre, creado_en: t.creado_en })),
     })
   } catch (err) {
@@ -45,68 +46,75 @@ export async function PATCH(req: Request, { params }: Ctx) {
   const { id } = await params
   try {
     await exigirAccesoCaso(id)
-    const caso = await obtenerCaso(id)
-    if (!caso) return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
-    if (caso.estado === 'cerrado') {
-      return NextResponse.json({ error: 'La actuación ya fue cerrada y sellada: no admite cambios.' }, { status: 409 })
-    }
-
     const cuerpo = await req.json().catch(() => ({}))
-    const entrantes = (cuerpo?.respuestas ?? {}) as Record<string, unknown>
-
-    // Sólo se aceptan ids de preguntas definidos en el cuestionario.
+    const entrantes = cuerpo?.respuestas && typeof cuerpo.respuestas === 'object' && !Array.isArray(cuerpo.respuestas)
+      ? cuerpo.respuestas as Record<string, unknown> : {}
     const validas: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(entrantes)) {
-      if (IDS_VALIDOS.has(k)) validas[k] = v
+    for (const [clave, valor] of Object.entries(entrantes)) {
+      if (IDS_VALIDOS.has(clave)) validas[clave] = valor
     }
-
-    /*
-     * Los cuatro campos de la carátula llegan por separado porque son columnas, no
-     * respuestas: los usan el panel, el PDF y el listado. Sólo se pisa lo que viene
-     * con contenido, para que un envío parcial no borre lo ya cargado.
-     */
+    for (const clave of ['relato_texto', 'transcripcion_original']) {
+      if (clave in validas && (typeof validas[clave] !== 'string' || validas[clave].length > 30000)) {
+        return NextResponse.json({ error: 'El relato y la transcripción deben ser textos de hasta 30.000 caracteres.' }, { status: 400 })
+      }
+    }
+    if ('contactos_testigos' in validas) {
+      const contactos = validas.contactos_testigos
+      if (!Array.isArray(contactos) || contactos.length > 20 || contactos.some((contacto) =>
+        !contacto || typeof contacto !== 'object' || typeof contacto.telefono !== 'string' ||
+        contacto.telefono.trim().length < 3 || contacto.telefono.length > 40 ||
+        (contacto.nombre !== undefined && (typeof contacto.nombre !== 'string' || contacto.nombre.length > 120)),
+      )) {
+        return NextResponse.json({ error: 'Cargá hasta 20 testigos con un teléfono de 3 a 40 caracteres y un nombre de hasta 120.' }, { status: 400 })
+      }
+      validas.contactos_testigos = contactos.map((contacto) => ({
+        ...(contacto.nombre?.trim() ? { nombre: contacto.nombre.trim() } : {}),
+        telefono: contacto.telefono.trim(), origen: 'asegurado',
+      }))
+    }
     const datos = limpiarDatosAsegurado(cuerpo?.datos)
-    const cambios = Object.entries(datos).filter(([, v]) => v !== null) as Array<[string, string]>
-
-    if (Object.keys(validas).length === 0 && cambios.length === 0) {
-      return NextResponse.json({ ok: true, sinCambios: true })
-    }
-
+    const cambios = Object.entries(datos).filter(([, valor]) => valor !== null) as Array<[string, string]>
     const pg = await db()
-
-    if (Object.keys(validas).length > 0) {
-      const combinadas = { ...caso.respuestas, ...validas }
-      await pg.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(combinadas)])
-      /*
-       * Los nombres de las preguntas quedan en claro; sus valores, reservados. El detalle
-       * de un eslabón entra al preimagen del hash, y el contenido de una respuesta puede
-       * ser el nombre del otro conductor, su DNI o su patente.
-       */
-      await registrarEvento(
-        id,
-        'respuestas_registradas',
-        { preguntas: Object.keys(validas).sort() },
-        { reservado: { valores: validas } },
-      )
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await cliente.query("SET LOCAL lock_timeout = '8s'")
+      const bloqueado = await cliente.query('SELECT estado, respuestas FROM casos WHERE id = $1 FOR UPDATE', [id])
+      if (!bloqueado.rows[0]) {
+        await cliente.query('ROLLBACK')
+        return NextResponse.json({ error: 'Actuación inexistente.' }, { status: 404 })
+      }
+      if (bloqueado.rows[0].estado === 'cerrado') {
+        await cliente.query('ROLLBACK')
+        return NextResponse.json({ error: 'La actuación ya fue cerrada y sellada: no admite cambios.' }, { status: 409 })
+      }
+      // El merge se lee bajo el mismo lock que el cierre y el resto de los guardados.
+      const respuestas = { ...bloqueado.rows[0].respuestas, ...validas }
+      const progreso = cuerpo?.progreso && typeof cuerpo.progreso === 'object'
+        ? limpiarProgreso(cuerpo.progreso, respuestas) : null
+      if (Object.keys(validas).length > 0) {
+        await cliente.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(respuestas)])
+        await registrarEvento(id, 'respuestas_registradas', { preguntas: Object.keys(validas).sort() },
+          { reservado: { valores: validas }, cliente })
+      }
+      if (cambios.length > 0) {
+        const asignaciones = cambios.map(([clave], i) => `${clave} = $${i + 2}`).join(', ')
+        await cliente.query(`UPDATE casos SET ${asignaciones} WHERE id = $1`, [id, ...cambios.map(([, valor]) => valor)])
+        await registrarEvento(id, 'datos_asegurado_registrados', { campos: cambios.map(([clave]) => clave).sort() },
+          { reservado: Object.fromEntries(cambios), cliente })
+      }
+      if (progreso) {
+        await cliente.query('UPDATE casos SET progreso = $2 WHERE id = $1', [id, JSON.stringify(progreso)])
+        await registrarEvento(id, 'progreso_guardado', { paso: progreso.paso, omitidos: progreso.omitidos }, { cliente })
+      }
+      await cliente.query('COMMIT')
+      return NextResponse.json({ ok: true, respuestas, ...(progreso ? { progreso } : {}) })
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
     }
-
-    if (cambios.length > 0) {
-      // Las claves vienen de DatosAsegurado, no del cuerpo: son siempre esas cuatro.
-      const asignaciones = cambios.map(([clave], i) => `${clave} = $${i + 2}`).join(', ')
-      await pg.query(
-        `UPDATE casos SET ${asignaciones} WHERE id = $1`,
-        [id, ...cambios.map(([, valor]) => valor)],
-      )
-      await registrarEvento(
-        id,
-        'datos_asegurado_registrados',
-        { campos: cambios.map(([clave]) => clave).sort() },
-        { reservado: Object.fromEntries(cambios) },
-      )
-    }
-
-    const actualizado = await obtenerCaso(id)
-    return NextResponse.json({ ok: true, respuestas: actualizado?.respuestas ?? caso.respuestas })
   } catch (err) {
     return errorApi('caso:PATCH', err, 'No se pudieron guardar las respuestas.')
   }

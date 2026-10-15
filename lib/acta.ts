@@ -56,7 +56,7 @@ export interface ActaParaFirmar {
   hash: string
   cuerpo: CuerpoActa
   /** Qué cubre la firma, en palabras, para mostrárselo a la persona antes de firmar. */
-  resumen: { fotos: number; audios: number; testigos: number; conCroquis: boolean; respuestas: number }
+  resumen: { fotos: number; audios: number; documentos: number; testigos: number; conCroquis: boolean; respuestas: number }
 }
 
 /**
@@ -95,6 +95,7 @@ export function construirActa(caso: Caso, medias: Media[], testigos: Testigo[]):
     resumen: {
       fotos: medias.filter((m) => m.tipo === 'foto').length,
       audios: medias.filter((m) => m.tipo === 'audio').length,
+      documentos: medias.filter((m) => m.tipo === 'documento').length,
       testigos: testigos.length,
       conCroquis: Boolean(caso.croquis),
       respuestas: Object.keys(caso.respuestas).length,

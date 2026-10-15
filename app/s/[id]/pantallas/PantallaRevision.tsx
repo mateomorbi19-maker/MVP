@@ -17,6 +17,8 @@ export function PantallaRevision({
   alReintentarGps,
   antesDeCerrar,
   alCerrar,
+  tieneRelato,
+  contactosManuales,
 }: {
   casoId: string
   /** Lo que falta, ya calculado por lib/recorrido.ts. */
@@ -28,6 +30,8 @@ export function PantallaRevision({
   alReintentarGps: () => void
   antesDeCerrar: () => Promise<void>
   alCerrar: (r: { hash_maestro: string }) => void
+  tieneRelato: boolean
+  contactosManuales: number
 }) {
   const [cerrando, setCerrando] = useState(false)
   const [fallo, setFallo] = useState<string | null>(null)
@@ -71,15 +75,17 @@ export function PantallaRevision({
         <div className="tarjeta tarjeta-resumen">
           <h3 className="tarjeta-resumen-titulo">Lo que se va a sellar</h3>
           <div className="pila lista-resumen">
-            <Linea etiqueta="Ubicación y clima" ok={ubicacion !== null} texto={ubicacion ? 'Registrados' : 'Sin registrar'} />
+            <Linea etiqueta="Ubicación del dispositivo" ok={ubicacion !== null} texto={ubicacion ? 'Registrada' : 'Sin registrar'} />
             <Linea
               etiqueta="Respuestas obligatorias"
               ok={faltantes.length === 0}
               texto={faltantes.length === 0 ? 'Completas' : `Faltan ${faltantes.length}`}
             />
             <Linea etiqueta="Fotografías" ok={fotos > 0} texto={`${fotos} cargadas`} />
-            <Linea etiqueta="Relato en audio" ok={audios > 0} texto={audios > 0 ? 'Grabado' : 'Sin grabar'} />
+            <Linea etiqueta="Documentos" ok={medias.some((m) => m.tipo === 'documento')} texto={`${medias.filter((m) => m.tipo === 'documento').length} incorporados`} />
+            <Linea etiqueta="Relato" ok={tieneRelato} texto={tieneRelato ? (audios > 0 ? 'Audio incorporado' : 'Por escrito') : 'Sin completar'} />
             <Linea etiqueta="Testigos" ok={testigos.length > 0} texto={`${testigos.length} registrados`} />
+            <Linea etiqueta="Contactos anotados por vos" ok={contactosManuales > 0} texto={`${contactosManuales} contactos`} />
           </div>
         </div>
 

@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { construirPasos, faltantes, pasoInicial, respondida, type Respuestas } from '@/lib/recorrido'
 import { olvidarActuacion, recordarActuacion } from '@/lib/local'
-import { drenar, encolar, huellaDe } from '@/lib/cola'
+import { drenar, encolar, huellaDe, pendientesDe } from '@/lib/cola'
+import { leerBorradorActuacion, guardarBorradorActuacion, quitarBorradorActuacion } from '@/lib/borrador'
+import { limpiarProgreso, type ProgresoRecorrido } from '@/lib/recorrido'
+import { relatoCompleto } from '@/lib/relato'
+import { PantallaRelato } from './pantallas/PantallaRelato'
+import { AdjuntoActa } from '@/app/components/AdjuntoActa'
+import { PendientesSubida } from '@/app/components/PendientesSubida'
+import type { ContactoAnotado } from '@/app/components/ContactosTestigos'
 
 import type { Croquis } from '@/lib/croquis'
 import type { Datos, FalloGps, Media, Subir, Testigo, Ubicacion } from './tipos'
@@ -24,6 +31,7 @@ interface Props {
   casoId: string
   estadoInicial: string
   respuestasIniciales: Respuestas
+  progresoInicial?: ProgresoRecorrido
   datosIniciales: Datos
   hashMaestro: string | null
   mediasIniciales: Media[]
@@ -44,16 +52,18 @@ export function Flujo(props: Props) {
   const [falloGps, setFalloGps] = useState<FalloGps>(null)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sinCopiaLocal, setSinCopiaLocal] = useState(false)
+  const [validacionPendiente, setValidacionPendiente] = useState(false)
   const [cierre, setCierre] = useState<{ hash_maestro: string } | null>(
     props.hashMaestro ? { hash_maestro: props.hashMaestro } : null,
   )
 
-  const pasos = useMemo(() => construirPasos(respuestas), [respuestas])
+  const pasos = useMemo(() => construirPasos(respuestas, validacionPendiente), [respuestas, validacionPendiente])
 
   const [clave, setClave] = useState<string>(() =>
     props.estadoInicial === 'cerrado'
       ? 'final'
-      : pasoInicial(construirPasos(props.respuestasIniciales), props.respuestasIniciales, props.mediasIniciales),
+      : pasoInicial(construirPasos(props.respuestasIniciales), props.respuestasIniciales, props.mediasIniciales, props.progresoInicial),
   )
 
   /*
@@ -75,8 +85,36 @@ export function Flujo(props: Props) {
   claveRef.current = clave
 
   const pendientes = useRef<{ respuestas: Respuestas }>({ respuestas: {} })
+  const enVuelo = useRef<Respuestas>({})
+  const progreso = useRef<ProgresoRecorrido>(props.progresoInicial ?? {})
+  const respuestasRef = useRef(respuestas)
+  respuestasRef.current = respuestas
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cola = useRef<Promise<void>>(Promise.resolve())
+  const persistir = useCallback(() => {
+    const guardado = guardarBorradorActuacion(props.casoId, {
+      pendientes: { ...enVuelo.current, ...pendientes.current.respuestas },
+      progreso: progreso.current,
+    })
+    setSinCopiaLocal(!guardado)
+    return guardado
+  }, [props.casoId])
+
+  useEffect(() => {
+    if (props.estadoInicial === 'cerrado') {
+      quitarBorradorActuacion(props.casoId)
+      return
+    }
+    const local = leerBorradorActuacion(props.casoId)
+    if (local) {
+      const combinadas = { ...props.respuestasIniciales, ...local.pendientes }
+      pendientes.current.respuestas = local.pendientes
+      respuestasRef.current = combinadas
+      setRespuestas(combinadas)
+      progreso.current = limpiarProgreso(local.progreso, combinadas)
+      if (progreso.current.paso) setClave(progreso.current.paso)
+    }
+  }, [props.casoId, props.estadoInicial, props.respuestasIniciales])
 
   /*
    * Anota que este navegador tiene el id de la actuación. Es lo que después le habilita
@@ -172,8 +210,17 @@ export function Flujo(props: Props) {
 
   useEffect(() => {
     if (props.ubicacionInicial) return
+    if (props.estadoInicial === 'cerrado') return
+    const guardado = leerBorradorActuacion(props.casoId)?.progreso?.paso ?? props.progresoInicial?.paso
+    const destino = new URLSearchParams(window.location.search).get('paso') ?? guardado ?? claveRef.current
+    const lista = pasosRef.current
+    if (lista.findIndex((p) => p.clave === destino) > lista.findIndex((p) => p.tipo === 'corte')) {
+      setEstadoGps('error')
+      setFalloGps({ codigo: 0, motivo: 'no_solicitada' })
+      return
+    }
     pedirUbicacion()
-  }, [props.ubicacionInicial, pedirUbicacion])
+  }, [props.ubicacionInicial, props.estadoInicial, props.casoId, props.progresoInicial, pedirUbicacion])
 
   /* ---------- Guardado automático ---------- */
 
@@ -183,47 +230,96 @@ export function Flujo(props: Props) {
      * las respuestas leyendo primero lo guardado, así que dos PATCH simultáneos
      * pueden pisarse. Con auto-avance los toques llegan rápido, así que pasa.
      */
-    cola.current = cola.current.then(async () => {
+    cola.current = cola.current.catch(() => {}).then(async () => {
       const lote = pendientes.current
       pendientes.current = { respuestas: {} }
-      if (Object.keys(lote.respuestas).length === 0) return
+      enVuelo.current = lote.respuestas
+      persistir()
 
       setGuardando(true)
       try {
         const res = await fetch(`/api/casos/${props.casoId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ respuestas: lote.respuestas }),
+          body: JSON.stringify({ respuestas: lote.respuestas, progreso: progreso.current }),
         })
         if (!res.ok) {
           const cuerpo = await res.json().catch(() => ({}))
           throw new Error(cuerpo?.error ?? 'No se pudo guardar.')
         }
         setError(null)
+        enVuelo.current = {}
+        persistir()
       } catch (e) {
         // Se devuelven al buffer para reintentar en el próximo guardado.
         pendientes.current = { respuestas: { ...lote.respuestas, ...pendientes.current.respuestas } }
         setError(e instanceof Error ? e.message : 'No se pudo guardar.')
+        enVuelo.current = {}
+        persistir()
+        throw e
       } finally {
         setGuardando(false)
       }
     })
     return cola.current
-  }, [props.casoId])
+  }, [props.casoId, persistir])
 
   const programarGuardado = useCallback(() => {
     if (temporizador.current) clearTimeout(temporizador.current)
-    temporizador.current = setTimeout(enviarPendientes, 700)
+    temporizador.current = setTimeout(() => { void enviarPendientes().catch(() => {}) }, 700)
   }, [enviarPendientes])
 
   const responder = useCallback(
     (id: string, valor: unknown) => {
       setRespuestas((prev) => ({ ...prev, [id]: valor }))
       pendientes.current.respuestas[id] = valor
+      respuestasRef.current = { ...respuestasRef.current, [id]: valor }
+      persistir()
       programarGuardado()
     },
-    [programarGuardado],
+    [programarGuardado, persistir],
   )
+
+  const sincronizarMedias = useCallback(async () => {
+    const locales = await pendientesDe(props.casoId).catch(() => [])
+    const res = await fetch(`/api/casos/${props.casoId}`)
+    if (!res.ok) throw new Error('No se pudo confirmar la subida. Revisá la conexión y reintentá.')
+    const cuerpo = await res.json()
+    const recibidas: Media[] = cuerpo.medias ?? []
+    setMedias([...recibidas, ...locales.filter((p) => !recibidas.some((m) => m.idempotencia === p.id))
+      .map((p) => ({ id: p.id, idempotencia: p.id, tipo: p.tipo, guia_id: p.guiaId, pendiente: true }))])
+    setTestigos(cuerpo.testigos ?? [])
+    const extracciones = await fetch(`/api/casos/${props.casoId}/extracciones`).catch(() => null)
+    if (extracciones?.ok) {
+      const lecturas: Array<{ confirmada: boolean; estado: string }> = await extracciones.json()
+      setValidacionPendiente(lecturas.some((l) => !l.confirmada && (l.estado === 'lista' || l.estado === 'pendiente')))
+    }
+  }, [props.casoId])
+
+  const prepararCierre = useCallback(async () => {
+    await enviarPendientes()
+    await drenar(props.casoId)
+    const pendientesArchivo = await pendientesDe(props.casoId)
+    if (pendientesArchivo.length) throw new Error('Todavía hay archivos guardados sólo en este teléfono. Recuperá la conexión y esperá a que terminen de subir antes de firmar o cerrar.')
+    await sincronizarMedias()
+  }, [enviarPendientes, props.casoId, sincronizarMedias])
+
+  useEffect(() => {
+    if (props.estadoInicial === 'cerrado') return
+    const recuperar = () => {
+      void enviarPendientes().catch(() => {})
+      void drenar(props.casoId).then(sincronizarMedias).catch(() => {})
+    }
+    const alSalir = () => { persistir() }
+    window.addEventListener('online', recuperar)
+    window.addEventListener('pagehide', alSalir)
+    void sincronizarMedias().catch(() => {})
+    return () => {
+      window.removeEventListener('online', recuperar)
+      window.removeEventListener('pagehide', alSalir)
+      if (temporizador.current) clearTimeout(temporizador.current)
+    }
+  }, [props.estadoInicial, enviarPendientes, sincronizarMedias, persistir])
 
   /* ---------- Navegación ---------- */
 
@@ -242,6 +338,11 @@ export function Flujo(props: Props) {
   // El montaje lo resuelve el efecto de abajo, que corre después de éste.
   useEffect(() => {
     if (!montado.current) return
+    if (clave !== 'final') {
+      progreso.current = { ...progreso.current, paso: clave }
+      persistir()
+      programarGuardado()
+    }
     if (desdeHistorial.current) {
       desdeHistorial.current = false
       return
@@ -249,7 +350,7 @@ export function Flujo(props: Props) {
     // Se pasa `null` como estado a propósito: el estado del historial es de Next.
     window.history.pushState(null, '', `?paso=${encodeURIComponent(clave)}`)
     profundidad.current += 1
-  }, [clave])
+  }, [clave, persistir, programarGuardado])
 
   useEffect(() => {
     /*
@@ -296,16 +397,22 @@ export function Flujo(props: Props) {
   const mover = useCallback(
     (delta: number) => {
       if (temporizador.current) clearTimeout(temporizador.current)
-      void enviarPendientes()
       const lista = pasosRef.current
       const desde = lista.findIndex((p) => p.clave === claveRef.current)
       const siguiente = lista[Math.max(0, Math.min(lista.length - 1, (desde < 0 ? 0 : desde) + delta))]
       if (siguiente) {
-        setClave(siguiente.clave)
-        window.scrollTo({ top: 0 })
+        const avanzar = async () => {
+          if (siguiente.tipo === 'firma') await prepararCierre()
+          progreso.current = { ...progreso.current, paso: siguiente.clave }
+          persistir()
+          setClave(siguiente.clave)
+          window.scrollTo({ top: 0 })
+          void enviarPendientes().catch(() => {})
+        }
+        void avanzar().catch((e) => setError(e instanceof Error ? e.message : 'Reintentá guardar antes de continuar.'))
       }
     },
-    [enviarPendientes],
+    [enviarPendientes, prepararCierre, persistir],
   )
 
   /**
@@ -320,7 +427,7 @@ export function Flujo(props: Props) {
   const volver = useCallback(() => {
     if (profundidad.current > 0) {
       if (temporizador.current) clearTimeout(temporizador.current)
-      void enviarPendientes()
+      void enviarPendientes().catch(() => {})
       window.history.back()
       return
     }
@@ -356,32 +463,47 @@ export function Flujo(props: Props) {
    */
   const subir = useCallback<Subir>(
     async (archivo, tipo, guiaId) => {
-      const id = crypto.randomUUID()
+      // Un rechazo por tamaño no se resuelve reintentando: no debe entrar en la cola durable.
+      if (!archivo.size || archivo.size > 20 * 1024 * 1024) {
+        throw new Error('El archivo debe tener contenido y pesar como máximo 20 MB. Elegí uno más pequeño o volvé a grabar.')
+      }
       const sha256 = await huellaDe(archivo)
-      await encolar({
-        id,
-        casoId: props.casoId,
-        tipo,
-        guiaId: guiaId ?? null,
-        mime: archivo.type,
-        sha256,
-        tomadaEn: new Date().toISOString(),
-        lat: ubicacion?.lat ?? null,
-        lon: ubicacion?.lon ?? null,
-        bytes: archivo,
-      }).catch(() => {
-        /* sin almacenamiento local se sigue igual: se intenta la subida directa */
-      })
-
-      await drenar().catch(() => undefined)
-
-      // La pieza se muestra apenas se guarda: para la persona ya está incorporada, y lo
-      // está —lo que puede faltar es que haya llegado al servidor, y eso lo dice la cola.
-      // Se suma y no reemplaza: cada toma lleva hasta cinco fotos y todas son evidencia.
-      setMedias((prev) => [...prev.filter((m) => m.id !== id), { id, tipo, guia_id: guiaId ?? null }])
+      const lista = pasosRef.current
+      const enLugar = lista.findIndex((p) => p.clave === claveRef.current) <= lista.findIndex((p) => p.tipo === 'corte')
+      // Confirmar nuevamente el mismo audio reutiliza su pieza aunque fallara el texto.
+      const id = tipo === 'audio' ? `${props.casoId}-audio-${sha256.slice(0, 40)}` : crypto.randomUUID()
+      const pieza = {
+        id, casoId: props.casoId, tipo, guiaId: guiaId ?? null,
+        mime: archivo.type, sha256, tomadaEn: new Date().toISOString(),
+        // El relato y el acta pueden cargarse desde casa: no heredan el GPS anterior.
+        lat: enLugar ? ubicacion?.lat ?? null : null, lon: enLugar ? ubicacion?.lon ?? null : null, bytes: archivo,
+      }
+      try {
+        await encolar(pieza)
+      } catch {
+        const cuerpo = new FormData()
+        cuerpo.append('archivo', archivo)
+        cuerpo.append('tipo', tipo)
+        cuerpo.append('idempotencia', id)
+        cuerpo.append('sha256_cliente', sha256)
+        cuerpo.append('tomada_en', pieza.tomadaEn)
+        if (guiaId) cuerpo.append('guia_id', guiaId)
+        if (pieza.lat !== null && pieza.lon !== null) {
+          cuerpo.append('lat', String(pieza.lat))
+          cuerpo.append('lon', String(pieza.lon))
+        }
+        const res = await fetch(`/api/casos/${props.casoId}/media`, { method: 'POST', body: cuerpo })
+        const resultado = await res.json()
+        if (!res.ok) throw new Error(resultado.error ?? 'No se guardó el archivo. Revisá la conexión y volvé a cargarlo.')
+        await sincronizarMedias()
+        return resultado.id
+      }
+      setMedias((prev) => [...prev.filter((m) => m.id !== id), { id, idempotencia: id, tipo, guia_id: guiaId ?? null, pendiente: true }])
+      await drenar(props.casoId).catch(() => undefined)
+      await sincronizarMedias().catch(() => undefined)
       return id
     },
-    [props.casoId, ubicacion],
+    [props.casoId, ubicacion, sincronizarMedias],
   )
 
   /* ---------- Pantalla ---------- */
@@ -413,6 +535,10 @@ export function Flujo(props: Props) {
         ) : null}
 
         {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
+        {sinCopiaLocal ? <div className="aviso" data-nivel="atencion">Este navegador no permite guardar una copia local. Mantené la conexión y esperá a que termine el guardado antes de salir.</div> : null}
+        {actual && ['corte', 'firma', 'revision', 'final'].includes(actual.tipo) ? (
+          <PendientesSubida casoId={props.casoId} alCambiar={() => { void sincronizarMedias().catch(() => {}) }} />
+        ) : null}
 
         {actual?.tipo === 'pregunta' ? (
           <PantallaPregunta
@@ -426,10 +552,28 @@ export function Flujo(props: Props) {
             responderYAvanzar={responderYAvanzar}
             seguir={() => mover(1)}
             subir={subir}
+            adjunto={actual.pregunta.id === 'policia_acta' ? <AdjuntoActa medias={medias} subir={subir} /> : undefined}
           />
         ) : null}
 
-        {actual?.tipo === 'resumen' ? <PantallaResumen seguir={() => mover(1)} /> : null}
+        {actual?.tipo === 'relato' ? (
+          <PantallaRelato
+            casoId={props.casoId}
+            textoInicial={String(respuestas.relato_texto ?? respuestas.relato_ampliado ?? '')}
+            transcripcionInicial={String(respuestas.transcripcion_original ?? '')}
+            hayAudio={medias.some((m) => m.tipo === 'audio')}
+            audioId={[...medias].reverse().find((m) => m.tipo === 'audio' && m.id.startsWith('AUD-'))?.id}
+            alConfirmar={async (texto, audio, original) => {
+              if (audio) await subir(audio, 'audio')
+              responder('relato_texto', texto)
+              responder('transcripcion_original', original ?? '')
+              await enviarPendientes()
+            }}
+            seguir={() => mover(1)}
+          />
+        ) : null}
+
+        {actual?.tipo === 'resumen'  ? <PantallaResumen seguir={() => mover(1)} /> : null}
 
         {actual?.tipo === 'foto' ? (
           <PantallaFoto key={actual.clave} paso={actual} medias={medias} subir={subir} seguir={() => mover(1)} />
@@ -447,10 +591,23 @@ export function Flujo(props: Props) {
         {actual?.tipo === 'corte' ? (
           <PantallaCorte
             casoId={props.casoId}
+            contactos={Array.isArray(respuestas.contactos_testigos) ? respuestas.contactos_testigos as ContactoAnotado[] : []}
+            alCambiarContactos={(contactos) => responder('contactos_testigos', contactos)}
+            testigos={testigos}
+            alRecibirTestigos={setTestigos}
+            alIncorporar={() => { void sincronizarMedias().catch(() => {}) }}
+            esencialesCompletos={faltantes(pasos.slice(0, pasos.findIndex((p) => p.tipo === 'corte')), respuestas, medias).length === 0}
             seguir={() => mover(1)}
             alGuardar={async () => {
               // La actuación queda abierta a propósito: el inicio la ofrece para retomarla.
-              await enviarPendientes()
+              progreso.current = { ...progreso.current, paso: 'relato' }
+              persistir()
+              try { await enviarPendientes() } catch {
+                if (!persistir()) {
+                  setError('No pudimos guardar en el servidor ni en este teléfono. Mantené la página abierta y recuperá la conexión antes de salir.')
+                  return
+                }
+              }
               router.push('/')
             }}
           />
@@ -468,7 +625,7 @@ export function Flujo(props: Props) {
         ) : null}
 
         {actual?.tipo === 'firma' ? (
-          <PantallaFirma casoId={props.casoId} nombreSugerido={props.datosIniciales.asegurado} seguir={() => mover(1)} />
+          <PantallaFirma casoId={props.casoId} nombreSugerido={props.datosIniciales.asegurado} antesDePreparar={prepararCierre} seguir={() => mover(1)} />
         ) : null}
 
         {actual?.tipo === 'revision' ? (
@@ -480,10 +637,14 @@ export function Flujo(props: Props) {
             ubicacion={ubicacion}
             irA={irA}
             alReintentarGps={pedirUbicacion}
-            antesDeCerrar={enviarPendientes}
+            antesDeCerrar={prepararCierre}
+            tieneRelato={relatoCompleto(respuestas, medias)}
+            contactosManuales={Array.isArray(respuestas.contactos_testigos) ? respuestas.contactos_testigos.length : 0}
             alCerrar={(r) => {
+              if (temporizador.current) clearTimeout(temporizador.current)
               setCierre(r)
               olvidarActuacion()
+              quitarBorradorActuacion(props.casoId)
               setClave('final')
               window.scrollTo({ top: 0 })
             }}

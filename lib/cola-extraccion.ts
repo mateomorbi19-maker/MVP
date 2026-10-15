@@ -1,7 +1,8 @@
 import { db } from './db'
 import { leerArchivo } from './almacenamiento'
-import { registrarEvento } from './hash'
-import { proveedorActivo, type TipoDocumento } from './extraccion'
+import { registrarEvento, ErrorActuacionCerrada } from './hash'
+import { bloquearCasoAbierto } from './casos'
+import { proveedorActivo, type TipoDocumento, type ResultadoExtraccion } from './extraccion'
 
 /**
  * Cola de lectura automática, en proceso.
@@ -36,36 +37,51 @@ async function procesar(extraccionId: string): Promise<void> {
   const proveedor = proveedorActivo()
   if (!proveedor) return
 
+  let resultado: ResultadoExtraccion | null = null
+  let motivo: string | null = null
   try {
     const bytes = await leerArchivo(fila.archivo)
-    const resultado = await proveedor.leer(new Uint8Array(bytes), fila.mime, fila.tipo_documento as TipoDocumento)
-
-    await pg.query(
-      `UPDATE extracciones
-          SET estado = 'lista', campos = $2, confianza_global = $3, simulado = $4, procesado_en = now()
-        WHERE id = $1`,
-      [extraccionId, JSON.stringify(resultado.campos), resultado.confianza_global, resultado.simulado],
-    )
-
-    /*
-     * El eslabón guarda la confianza y el proveedor. El número no se le muestra al
-     * asegurado —la especificación funcional lo pide expresamente— pero sí tiene que
-     * quedar en el expediente: es lo que después permite auditar de dónde salió un dato.
-     */
-    await registrarEvento(fila.caso_id, 'lectura_automatica_registrada', {
-      extraccion_id: extraccionId,
-      proveedor: proveedor.nombre,
-      simulado: resultado.simulado,
-      confianza_global: resultado.confianza_global,
-      campos: resultado.campos.map((c) => ({ clave: c.clave, confianza: c.confianza })),
-    })
+    resultado = await proveedor.leer(new Uint8Array(bytes), fila.mime, fila.tipo_documento as TipoDocumento)
   } catch (err) {
-    const motivo = err instanceof Error ? err.message : 'Error desconocido'
-    await pg.query(`UPDATE extracciones SET estado = 'fallida', error = $2, procesado_en = now() WHERE id = $1`, [
-      extraccionId,
-      motivo.slice(0, 400),
-    ])
-    await registrarEvento(fila.caso_id, 'lectura_automatica_fallida', { extraccion_id: extraccionId, error: motivo.slice(0, 200) })
+    motivo = (err instanceof Error ? err.message : 'No se pudo completar la lectura').slice(0, 400)
+  }
+
+  // El proveedor puede terminar cuando el expediente ya se cerró: se relee bajo lock.
+  const cliente = await pg.connect()
+  try {
+    await cliente.query('BEGIN')
+    await bloquearCasoAbierto(fila.caso_id, cliente)
+    const actual = await cliente.query('SELECT estado FROM extracciones WHERE id = $1 AND caso_id = $2 FOR UPDATE', [extraccionId, fila.caso_id])
+    if (actual.rows[0]?.estado !== 'pendiente') {
+      await cliente.query('ROLLBACK')
+      return
+    }
+    if (resultado) {
+      await cliente.query(
+        `UPDATE extracciones
+            SET estado = 'lista', campos = $2, confianza_global = $3, simulado = $4, procesado_en = now(), error = NULL
+          WHERE id = $1`,
+        [extraccionId, JSON.stringify(resultado.campos), resultado.confianza_global, resultado.simulado],
+      )
+      await registrarEvento(fila.caso_id, 'lectura_automatica_registrada', {
+        extraccion_id: extraccionId,
+        proveedor: proveedor.nombre,
+        simulado: resultado.simulado,
+        confianza_global: resultado.confianza_global,
+        campos: resultado.campos.map((c) => ({ clave: c.clave, confianza: c.confianza })),
+      }, { cliente })
+    } else {
+      await cliente.query(`UPDATE extracciones SET estado = 'fallida', error = $2, procesado_en = now() WHERE id = $1`, [extraccionId, motivo])
+      await registrarEvento(fila.caso_id, 'lectura_automatica_fallida', { extraccion_id: extraccionId },
+        { reservado: { motivo }, cliente })
+    }
+    await cliente.query('COMMIT')
+  } catch (err) {
+    await cliente.query('ROLLBACK').catch(() => {})
+    if (err instanceof ErrorActuacionCerrada) return
+    throw err
+  } finally {
+    cliente.release()
   }
 }
 
@@ -96,13 +112,23 @@ export function encolarLectura(extraccionId: string): void {
  */
 export async function reencolarPendientes(casoId: string): Promise<number> {
   const pg = await db()
-  const res = await pg.query<{ id: string }>(
-    `SELECT id FROM extracciones WHERE caso_id = $1 AND estado IN ('pendiente', 'fallida')`,
-    [casoId],
-  )
-  for (const f of res.rows) {
-    await pg.query(`UPDATE extracciones SET estado = 'pendiente', error = NULL WHERE id = $1`, [f.id])
-    encolarLectura(f.id)
+  const cliente = await pg.connect()
+  let ids: string[] = []
+  try {
+    await cliente.query('BEGIN')
+    await bloquearCasoAbierto(casoId, cliente)
+    const res = await cliente.query<{ id: string }>(
+      `UPDATE extracciones SET estado = 'pendiente', error = NULL
+        WHERE caso_id = $1 AND estado IN ('pendiente', 'fallida') RETURNING id`, [casoId],
+    )
+    ids = res.rows.map((fila) => fila.id)
+    await cliente.query('COMMIT')
+  } catch (err) {
+    await cliente.query('ROLLBACK').catch(() => {})
+    throw err
+  } finally {
+    cliente.release()
   }
-  return res.rows.length
+  for (const id of ids) encolarLectura(id)
+  return ids.length
 }

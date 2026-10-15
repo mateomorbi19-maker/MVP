@@ -1,5 +1,12 @@
 # Contrato de interfaz
 
+Actualización aprobada del MVP, octubre de 2026: la pantalla única de relato reúne audio,
+texto y guía; el corte reúne las cuatro acciones de continuar/guardar/documentos/testigos.
+Son excepciones deliberadas a una pregunta por pantalla. El acta policial también admite
+su adjunto junto al número. Se agregan los identificadores `ubicacion_vehiculo`,
+`transcripcion_original`, `contactos_testigos`, `acta_policial` y `dni_propio` al contrato,
+sin renombrar ni eliminar ninguno anterior ni alterar `VALOR`.
+
 Qué se puede cambiar libremente y qué no, para que el trabajo visual y el funcional
 avancen sin pisarse.
 

@@ -4,6 +4,7 @@ import { GUIA_RELATO, ZONAS_IMPACTO } from '@/lib/cuestionario'
 import type { Paso } from '@/lib/recorrido'
 import type { Media, Subir } from '../tipos'
 import { GrabadorAudio } from './GrabadorAudio'
+import type { ReactNode } from 'react'
 
 /* ================= Una pregunta, una pantalla ================= */
 
@@ -17,6 +18,7 @@ export function PantallaPregunta({
   responderYAvanzar,
   seguir,
   subir,
+  adjunto,
 }: {
   paso: Extract<Paso, { tipo: 'pregunta' }>
   /** El valor ya contestado para ESTA pregunta. La pantalla no ve las demás. */
@@ -28,6 +30,7 @@ export function PantallaPregunta({
   responderYAvanzar: (id: string, valor: unknown) => void
   seguir: () => void
   subir: Subir
+  adjunto?: ReactNode
 }) {
   const { pregunta, seccion } = paso
   const deElegir = pregunta.tipo === 'opcion' || pregunta.tipo === 'zonaImpacto'
@@ -152,6 +155,7 @@ export function PantallaPregunta({
         {pregunta.tipo === 'audio' ? (
           <GrabadorAudio subir={subir} yaGrabado={yaEsta} casoId={casoId} />
         ) : null}
+        {adjunto}
       </div>
 
       <div className="barra-accion">

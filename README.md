@@ -1,8 +1,8 @@
 # Acta Digital de Siniestro
 
-Registro probatorio de siniestros viales. Captura la evidencia **en el lugar y en el momento
-del hecho**, la sella con una cadena de custodia verificable y genera un expediente en PDF
-listo para presentar ante la aseguradora.
+Registro probatorio de siniestros viales. Reúne fotos del lugar, documentación previa y
+declaraciones, conserva sus distintos orígenes, los incorpora a una cadena de custodia
+verificable y genera un expediente en PDF para presentar ante la aseguradora.
 
 Versión 1 — MVP. Orientado a **aseguradora**: prioriza hechos objetivos, datos de cobertura y
 detección de contradicciones.
@@ -16,27 +16,34 @@ botón**: "Tuve un accidente". No se le pide nada antes: ni la póliza, ni la pa
 nombre. Un formulario en la primera pantalla es exactamente lo que hace que alguien con
 adrenalina abandone.
 
-A partir de ahí es **una pregunta por pantalla**, con botones grandes, y elegir es avanzar:
-un toque por respuesta.
+A partir de ahí hay pantallas breves y botones grandes. El recorrido actual es:
 
-1. **Lo esencial** — la foto del daño de cada vehículo, con la patente a la vista, y los
-   papeles del otro conductor si lo hubo. Los papeles propios no se piden: se cargan una
-   vez en Mi documentación.
-2. **Captura silenciosa** — mientras contesta, el sistema registra por su cuenta las
-   coordenadas GPS, la hora, la dirección real de la calle y **las condiciones
-   meteorológicas de ese punto en ese minuto**.
-3. **Lo que se pierde si no se toma ahora** — los datos del tercero, cómo
-   quedaron los vehículos, las 12 fotografías guiadas de a una, el relato en audio y los
-   testigos por QR.
-4. **Cómo ocurrió** — mecánica del hecho, condiciones del lugar y quién intervino.
-5. **Corte** — "ya tenés lo importante". Puede irse y retomar más tarde desde el mismo
-   enlace, o seguir de largo.
-6. **Lo que se completa después** — la póliza, la licencia, la VTV, el uso del vehículo.
-   Datos que la persona tiene siempre y que no se pierden por irse del lugar.
-7. **Cierre y sellado** — se calcula el hash maestro, se firma y se pide un sello de tiempo
-   RFC 3161. Desde ese momento el expediente no admite cambios.
-8. **Expediente PDF** — mapa del lugar, fotos, declaración, testigos, clima, informe de
-   consistencia y tabla completa de cadena de custodia.
+1. **Daños y documentación del otro vehículo** — foto del daño propio con patente visible,
+   cantidad de vehículos y, cuando corresponde, daño y papeles del otro conductor.
+   Se pueden sumar fotos adicionales opcionales.
+2. **Guardar o continuar** — el corte permite guardar y relatar después. Ahí se puede
+   elegir el vehículo y la póliza, incorporar documentación propia y generar un QR limitado
+   para compartirla. También ofrece QR para testigos y permite anotar varios teléfonos.
+3. **Un solo relato** — por escrito o con audio, con una guía permanente. Se puede escuchar,
+   descartar y volver a grabar antes de confirmar. La transcripción, si está configurada,
+   es editable; se distingue el texto original recibido del texto confirmado.
+4. **Lo que se completa después** — circulabilidad y ubicación actual del vehículo,
+   intervención policial Sí/No, número y foto o PDF del acta cuando corresponde, otros
+   intervinientes, VTV y alcoholemia. Los formularios redundantes y el croquis ya no se
+   muestran en actuaciones nuevas; sus datos anteriores se conservan.
+5. **Firma, revisión y cierre** — la firma electrónica se vincula al hash del acta mostrada.
+   Se revisan faltantes y se cierra el expediente. Una firma de contenido anterior se
+   rechaza para que la persona vuelva a revisar y firmar.
+6. **Expediente PDF y verificación** — fotos, documentos elegidos, relato, testigos,
+   contactos anotados, informe de consistencia y cadena de custodia. Los contactos
+   aportados por el asegurado se distinguen de los testimonios con consentimiento.
+
+Con permiso del navegador se registra la ubicación disponible. La dirección y el clima
+dependen de la conexión y de sus proveedores; si no se obtienen, se informa la ausencia.
+Una coordenada ausente no se convierte en `0,0`. La hora de recepción del servidor se
+distingue de la hora declarada por el dispositivo y de la documentación cargada antes del
+hecho. Al cerrar se calcula el hash maestro y se solicita el sello RFC 3161 cuando la TSA
+está habilitada. El expediente cerrado no admite nuevas piezas ni eventos de cadena.
 
 Más un **panel** para la aseguradora y un **verificador público** de integridad.
 
@@ -44,35 +51,61 @@ Más un **panel** para la aseguradora y un **verificador público** de integrida
 
 ## El orden es de urgencia, no jurídico
 
-Es la decisión de diseño que ordena todo lo demás. El cuestionario tiene 9 secciones y 38
-preguntas —muchas condicionales, así que nadie las ve todas— y cada sección declara a qué
-`bloque` pertenece:
+El recorrido visible se calcula a partir de las respuestas y las definiciones de
+`lib/cuestionario.ts`. El archivo también conserva preguntas y tomas retiradas para leer
+expedientes anteriores: su cantidad total no describe lo que se le pide hoy a una persona.
 
-| Bloque | Qué contiene | Por qué ahí |
+| Etapa | Qué contiene | Por qué ahí |
 | --- | --- | --- |
-| `seguridad` | heridos, riesgo en el lugar | Define si hay que pedir una ambulancia |
-| `lugar` | tercero, fotos, relato, testigos, mecánica | Deja de existir cuando la persona se va |
-| `despues` | póliza, licencia, VTV, uso del vehículo | Lo tiene siempre; no se pierde |
+| `lugar` | daños con patentes, cantidad de vehículos, documentos del tercero y extras | Conviene obtenerlo antes de irse |
+| Corte | guardar/continuar, documentación propia y contactos de testigos | Permite retomar sin repetir la primera etapa |
+| `despues` | relato, estado del vehículo, intervenciones, VTV, alcoholemia, firma y revisión | Puede completarse más tarde |
 
-**Nada bloquea el avance salvo la pregunta por los heridos.** Cada pantalla tiene su forma
-de saltearse —"No la pude ver", "No me los quiso dar", "Todavía no me lo dieron"— y lo que
-quede sin completar aparece en la revisión final como un botón que lleva directo a esa
-pregunta. Un expediente incompleto vale más que uno abandonado en la tercera pantalla.
+Las preguntas sobre heridos y riesgo se conservaron para los históricos y están ocultas
+en el recorrido actual. Las omisiones visibles quedan en la revisión y no impiden cerrar
+un expediente incompleto. La falta de documentación propia tampoco bloquea una denuncia
+urgente. Los avisos de emergencia no llaman por su cuenta.
 
-El relato en audio va **antes** que las preguntas de mecánica, también a propósito: primero
-la persona cuenta lo que vio con sus palabras, y recién después las preguntas cerradas.
-Al revés, cada pregunta le sugiere la respuesta al relato.
+El paso y las omisiones se guardan en el servidor y en un borrador local cuando el
+navegador lo permite. Las fotos pendientes usan una cola local. Si falla la conexión, la
+interfaz informa el estado del guardado; no conviene cerrar una página que avisa que no
+pudo guardar ni en el servidor ni en el dispositivo.
 
-Las preguntas y las fotos que no corresponden no se muestran: quien chocó contra un árbol
-no ve las cinco pantallas del otro vehículo, y a quien declara que el tercero se dio a la
-fuga no se le piden sus datos personales.
+## Mi documentación y pólizas
+
+Se pueden cargar varias pólizas y elegir cuál es principal. Cada vehículo se identifica
+por su póliza; la patente, cobertura, vigencia y contactos del productor y de la
+aseguradora se pueden editar. Tener varias pólizas no atribuye automáticamente la patente
+del vehículo principal a una actuación sin selección expresa.
+
+La documentación reúne **fotos de póliza, cédula, licencia y DNI**. Los PDF y los datos a
+mano complementan las fotos. La indicación de documentación completa exige una foto de
+cada categoría para el vehículo elegido; la persona debe revisar legibilidad y caras
+necesarias. Los archivos de póliza y cédula se asocian a una póliza, mientras licencia y DNI
+son personales. Los archivos anteriores sin asignar requieren elegir su vehículo.
+
+Desde el recorrido se puede guardar el vehículo elegido aunque todavía no haya archivos.
+Para incorporar o compartir documentos hay que seleccionarlos expresamente: el sistema
+copia sus bytes al expediente, conserva su hash y los identifica como documentación
+previa. Cambiar o borrar el original de la cuenta no cambia esa copia. No se mezclan
+documentos de distintos vehículos.
+
+El QR de documentación permite acceder sólo a las copias seleccionadas por **24 horas** y
+puede revocarse, incluso después del sellado. Un permiso nuevo reemplaza el anterior de la
+misma cuenta y actuación. La revocación no borra las copias que un receptor ya descargó.
+
+El estado de cuenta es **informativo y manual**, con fecha, origen, modalidad de pago,
+saldo y movimientos. Lo puede cargar el titular, el productor asignado activo o una cuenta
+de aseguradora autorizada. No consulta bancos ni confirma pagos o cobertura. Los cambios
+de póliza y de cuenta quedan en un historial independiente de la cadena de los expedientes.
 
 ---
 
 ## Motor de consistencia
 
-Es la pieza diferencial. Contrasta lo declarado contra datos objetivos y contra la coherencia
-interna de las propias respuestas, **sin necesidad de ningún sensor**:
+Contrasta los datos disponibles contra registros objetivos y contra su coherencia interna.
+Los siguientes contrastes siguen disponibles para datos existentes, incluidos expedientes
+anteriores; las preguntas cerradas retiradas no vuelven a aparecer para alimentarlos:
 
 | Declaración | Se contrasta contra |
 | --- | --- |
@@ -86,6 +119,10 @@ interna de las propias respuestas, **sin necesidad de ningún sensor**:
 
 Además levanta **banderas de cobertura**: licencia vencida, alcoholemia positiva, conductor
 no titular, uso comercial, VTV vencida, fuga del tercero.
+
+Cuando faltan datos o una fuente externa no estuvo disponible, el control figura como no
+evaluable. La ausencia de información no se presenta como coincidencia. El relato no se
+convierte automáticamente en respuestas estructuradas de mecánica o clima.
 
 Criterio de diseño deliberado: **el motor no dice quién tuvo la culpa ni concluye que hay
 fraude.** Marca contradicciones verificables y las deja a criterio del liquidador. Un sistema
@@ -142,14 +179,14 @@ ALTER TABLE testigos ENABLE ROW LEVEL SECURITY;
 ### Scripts
 
 ```bash
-npm run prueba    # pruebas de la lógica pura, sin base de datos
+npm run prueba    # suites de lógica, documentación, relato, integridad y entorno, sin DB real
 npm run contrato  # el borde entre el trabajo visual y el funcional
 npm run tipos     # chequeo de tipos
 npm run build     # build de producción
 npm run e2e       # circuito completo contra un servidor ya levantado
 ```
 
-`npm run prueba` verifica el orden y la visibilidad del cuestionario (que ninguna sección
+`npm run prueba` ejecuta las suites de `scripts/prueba-mvp.mjs`. Verifica el orden y la visibilidad del cuestionario (que ninguna sección
 quede fuera del recorrido, que no se pidan fotos del tercero cuando no hay tercero), el
 encadenado de hashes —incluido que alterar o suprimir un eslabón rompa la validación—, el
 motor de consistencia y la generación del PDF de punta a punta. Deja un expediente de
@@ -164,6 +201,20 @@ obligatoria antes de tocar pantallas o estilos.
 
 `npm run e2e` necesita `npm run dev` corriendo aparte y una base configurada: recorre el
 circuito real, desde el alta sin datos hasta el sello de tiempo y la verificación pública.
+Para la verificación reproducible sin cuentas, archivos ni credenciales de producción,
+usá el entorno local aislado de [docs/VERIFICACION-MVP.md](docs/VERIFICACION-MVP.md).
+
+### Transcripción del relato
+
+El servidor tiene una integración con ElevenLabs Scribe v2 mediante una credencial
+dedicada, `TRANSCRIPCION_ELEVENLABS_API_KEY`. No lleva prefijo `NEXT_PUBLIC_` y no se
+reutilizan claves de otros módulos. La configuración corresponde al operador del servidor.
+
+Sin credencial o ante un error del proveedor, la aplicación informa la causa y permite
+conservar el audio y escribir el relato. La transcripción original recibida se conserva
+separada de las correcciones confirmadas por el usuario. La integración real requiere
+validación con una credencial autorizada; las pruebas locales usan respuestas controladas
+y el entorno aislado desactiva las llamadas externas.
 
 ---
 
@@ -194,18 +245,20 @@ El esquema de base de datos se crea solo en el primer arranque.
 ### Funciona
 
 - Flujo completo de captura, cuestionario, fotos, audio y testigos
-- Clima y geocodificación reales (Open-Meteo y Nominatim, ambos gratuitos)
-- Mapa del lugar incrustado en el PDF (mosaicos de OpenStreetMap)
+- Integraciones de clima y geocodificación (Open-Meteo y Nominatim), con ausencia explícita si no responden
+- Mapa del lugar en el PDF cuando están disponibles los mosaicos de OpenStreetMap
 - Cadena de custodia con hashes encadenados, más un trigger de Postgres que rechaza
   `UPDATE` y `DELETE` sobre las tablas append-only
-- Motor de consistencia completo
+- Motor de consistencia con controles no evaluables cuando faltan fuentes o declaraciones
 - Expediente PDF, verificador público y página pública de verificación por QR
 - Sello de tiempo RFC 3161 contra una TSA pública (la solicitud DER se arma a mano
   en `lib/sello.ts`)
 - Cuentas con rol, sesiones y control de acceso sobre el panel, el listado, las
   fotografías y el expediente
-- Póliza, documentación adjunta, historial y contacto de confianza
-- Croquis del hecho, con el mismo dibujo en la pantalla y en el expediente
+- Varias pólizas y vehículos, fotos de cuatro categorías, contactos y estado de cuenta manual con historial
+- Copia inmutable y QR limitado de documentos seleccionados; contacto de confianza
+- Lectura y conservación de croquis históricos, retirados del recorrido nuevo
+- Relato único por audio o texto, reproducción y transcripción editable cuando se configura el servidor
 - Firma electrónica del asegurado, atada al hash del contenido que firma
 - Consentimiento del tercero desde su propio teléfono
 - Lectura automática de la documentación del tercero, **enchufable y apagada por defecto**
@@ -231,7 +284,9 @@ El esquema de base de datos se crea solo en el primer arranque.
 5. **El consentimiento del tercero y la transferencia internacional**, si alguna vez se
    enchufa un proveedor de lectura automática fuera del país. Los cinco pasos están
    escritos al principio de `lib/extraccion.ts`.
-6. **Transcripción del audio.** El audio se guarda y se hashea, pero no se transcribe.
+6. **Validación real de transcripción y teléfono.** La integración está implementada;
+   falta probar el proveedor con una credencial autorizada y completar las comprobaciones
+   manuales de cámara, micrófono, GPS, navegación y pérdida de señal.
 7. **Nominatim y los mosaicos de OSM** son gratuitos pero piden volumen bajo. Con uso real
    hay que pasar a un proveedor propio.
 
@@ -276,6 +331,7 @@ app/
   s/[id]/pantallas/      una pantalla por archivo
   s/[id]/tipos.ts        los tipos que comparten las pantallas
   t/[id]/                carga de testigo por QR
+  compartir/[token]/     documentación elegida, con permiso limitado y revocable
   panel/                 listado y detalle para la aseguradora
   verificar/             verificador público de integridad
   api/                   rutas de servidor
@@ -290,14 +346,22 @@ lib/
   geo.ts                 Nominatim y mosaicos de mapa
   db.ts                  Postgres y esquema
   almacenamiento.ts      archivos en el volumen
+  documentacion.ts       documentos de la cuenta y completitud por categoría
+  polizas.ts             vehículos, pólizas, contactos, cuenta manual e historial
+  intercambio.ts         copia al expediente y permisos de QR
+  transcripcion.ts       integración dedicada de transcripción del relato
   local.ts               qué actuación quedó abierta en este teléfono
 docs/
   CONTRATO-UI.md         qué puede tocar un agente visual y qué no
   MAPA-PANTALLAS.md      de cada pantalla del mockup al archivo que la dibuja
+  VERIFICACION-MVP.md    entorno aislado, evidencia automatizada y controles manuales pendientes
 scripts/
   prueba-logica.mjs      pruebas sin base de datos
   prueba-contrato.mjs    el contrato de interfaz
   prueba-e2e.mjs         circuito completo contra un servidor levantado
+  prueba-mvp-e2e.mjs     cuentas, pólizas, documentación, copias y QR en entorno aislado
+  prueba-evidencia-e2e.mjs  concurrencia, firma, PDF e integridad en entorno aislado
+  servidor-prueba.mjs    runner con puertos, archivos e integraciones de prueba separados
 ```
 
 `lib/cuestionario.ts` es el único lugar donde se toca el contenido del cuestionario:

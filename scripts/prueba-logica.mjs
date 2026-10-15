@@ -98,26 +98,15 @@ const conFuga = { ...contraAuto, tercero_actitud: 'Se dio a la fuga' }
 const idsConFuga = preguntasVisibles(seccionTerceros, conFuga).map((p) => p.id)
 
 verificar('si el tercero se fugó no se le piden sus datos', !idsConFuga.includes('tercero_datos'))
-verificar('si el tercero se fugó igual se pregunta la patente', idsConFuga.includes('tercero_patente'))
-verificar(
-  'si el tercero está presente se le piden los datos',
-  preguntasVisibles(seccionTerceros, { ...contraAuto, tercero_actitud: 'Sí, está acá' })
-    .map((p) => p.id)
-    .includes('tercero_datos'),
-)
-
-// Saltear una pregunta no puede hacer desaparecer las que vienen después.
-verificar(
-  'omitir la pregunta del tercero no esconde el resto',
-  preguntasVisibles(seccionTerceros, contraAuto).map((p) => p.id).includes('tercero_datos'),
-)
+verificar('los datos manuales del tercero ya no se repiten', preguntasVisibles(seccionTerceros, contraAuto).length === 0)
+verificar('los campos del tercero se conservan para expedientes anteriores', seccionTerceros.preguntas.some((p) => p.id === 'tercero_patente'))
 
 verificar('las guías de foto no tienen ids repetidos', new Set(GUIA_FOTOS.map((g) => g.id)).size === GUIA_FOTOS.length)
 
 {
-  const papeles = ['licencia_propia', 'cedula_propia', 'seguro_propio', 'cedula_tercero', 'licencia_tercero', 'seguro_tercero']
+  const papeles = ['licencia_propia', 'cedula_propia', 'seguro_propio', 'cedula_tercero', 'licencia_tercero', 'seguro_tercero', 'acta_policial', 'dni_propio']
   const conPdf = GUIA_FOTOS.filter((g) => g.admitePdf).map((g) => g.id).sort()
-  verificar('sólo las seis tomas de papeles admiten PDF', JSON.stringify(conPdf) === JSON.stringify([...papeles].sort()), conPdf.join(', '))
+  verificar('sólo las tomas de papeles admiten PDF', JSON.stringify(conPdf) === JSON.stringify([...papeles].sort()), conPdf.join(', '))
   const piezas = [
     { id: 'a', tipo: 'foto', guia_id: 'cedula_tercero' },
     { id: 'b', tipo: 'documento', guia_id: 'cedula_tercero' },
@@ -190,14 +179,14 @@ const antesDelCorte = (pasos) => claves(pasos).slice(0, claves(pasos).indexOf('c
 
 /* Lo que se pide antes de poder irse, pantalla por pantalla. Agregar una es una decisión. */
 verificar(
-  'sin otro vehículo, antes del corte sólo va la foto del daño',
-  antesDelCorte(soloMio) === 'resumen, f:dano_propio, p:cantidad_vehiculos',
+  'sin otro vehículo, antes del corte van daño y extras opcionales',
+  antesDelCorte(soloMio) === 'resumen, f:dano_propio, p:cantidad_vehiculos, f:libre',
   antesDelCorte(soloMio),
 )
 verificar(
   'con otro vehículo, antes del corte va su daño y su documentación',
   antesDelCorte(conOtro) ===
-    'resumen, f:dano_propio, p:cantidad_vehiculos, p:tercero_actitud, f:dano_tercero, f:cedula_tercero, f:licencia_tercero, f:seguro_tercero',
+    'resumen, f:dano_propio, p:cantidad_vehiculos, f:dano_tercero, f:cedula_tercero, f:licencia_tercero, f:seguro_tercero, f:libre',
   antesDelCorte(conOtro),
 )
 verificar(
@@ -213,10 +202,10 @@ verificar(
 )
 const iCorte = claves(conOtro).indexOf('corte')
 const ultimaDocumento = conOtro.findLastIndex((p) => p.tipo === 'foto' && p.guia.grupo === 'documentos')
-verificar('el corte va justo después de las fotos de documentos', iCorte === ultimaDocumento + 1, String(iCorte))
+verificar('el corte va después de documentos y extras opcionales', iCorte === ultimaDocumento + 2, String(iCorte))
 verificar(
-  'las fotos del lugar van después del corte',
-  conOtro.filter((p) => p.tipo === 'foto' && p.guia.grupo === 'lugar').every((p) => claves(conOtro).indexOf(p.clave) > iCorte),
+  'las fotos adicionales del lugar van antes del corte',
+  conOtro.filter((p) => p.tipo === 'foto' && p.guia.grupo === 'lugar').every((p) => claves(conOtro).indexOf(p.clave) < iCorte),
 )
 verificar(
   'toda guía de foto tiene su grupo',
@@ -269,7 +258,7 @@ verificar(
   pasoInicial(pasosCompletos, respuestasCompletas, mediasCompletas),
 )
 
-/* El relato es audio: se comprueba contra los archivos, no contra las respuestas. */
+/* La alternativa escrita y el audio satisfacen el mismo relato. */
 const preguntaRelato = seccionPorId('relato').preguntas[0]
 verificar(
   'el relato no cuenta como respondido sin el audio',

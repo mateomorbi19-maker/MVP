@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { canonico, registrarEvento, sha256 } from '@/lib/hash'
-import { obtenerCaso } from '@/lib/casos'
+import { obtenerCaso, bloquearCasoAbierto } from '@/lib/casos'
 import { exigirAccesoCaso } from '@/lib/posesion'
 import { limpiarCroquis } from '@/lib/croquis'
 
@@ -42,13 +42,24 @@ export async function POST(req: Request, { params }: Ctx) {
     }
 
     const pg = await db()
-    await pg.query('UPDATE casos SET croquis = $2 WHERE id = $1', [id, JSON.stringify(croquis)])
-    await registrarEvento(id, 'croquis_registrado', {
-      origen: croquis.origen,
-      plantilla: croquis.plantilla,
-      cruce: croquis.cruce,
-      sha256: sha256(canonico(croquis)),
-    })
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await bloquearCasoAbierto(id, cliente)
+      await cliente.query('UPDATE casos SET croquis = $2 WHERE id = $1', [id, JSON.stringify(croquis)])
+      await registrarEvento(id, 'croquis_registrado', {
+        origen: croquis.origen,
+        plantilla: croquis.plantilla,
+        cruce: croquis.cruce,
+        sha256: sha256(canonico(croquis)),
+      }, { cliente })
+      await cliente.query('COMMIT')
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
+    }
 
     return NextResponse.json({ ok: true, croquis })
   } catch (err) {

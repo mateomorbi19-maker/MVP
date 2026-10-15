@@ -1,10 +1,11 @@
+import { bloquearCasoAbierto } from '@/lib/casos'
 import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { exigirAccesoCaso } from '@/lib/posesion'
 import { db, nuevoId } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
 import { obtenerCaso } from '@/lib/casos'
-import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO, MIME_PDF } from '@/lib/almacenamiento'
+import { guardarArchivo, ErrorArchivo, TAMANO_MAXIMO, MIME_PDF, type ArchivoGuardado } from '@/lib/almacenamiento'
 import { GUIA_FOTOS } from '@/lib/cuestionario'
 import { MAXIMO_FOTOS_POR_GUIA } from '@/lib/recorrido'
 import { GUIA_A_DOCUMENTO, extraccionActiva, proveedorActivo } from '@/lib/extraccion'
@@ -58,9 +59,11 @@ export async function POST(req: Request, { params }: Ctx) {
     }
     const tipo = esPdf ? 'documento' : form.get('tipo') === 'audio' ? 'audio' : 'foto'
 
-    const lat = Number(form.get('lat'))
-    const lon = Number(form.get('lon'))
-    const gps = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
+    const latCruda = form.get('lat')
+    const lonCruda = form.get('lon')
+    const lat = typeof latCruda === 'string' && latCruda.trim() ? Number(latCruda) : NaN
+    const lon = typeof lonCruda === 'string' && lonCruda.trim() ? Number(lonCruda) : NaN
+    const gps = Number.isFinite(lat) && Math.abs(lat) <= 90 && Number.isFinite(lon) && Math.abs(lon) <= 180 ? { lat, lon } : null
 
     const pg = await db()
 
@@ -73,37 +76,21 @@ export async function POST(req: Request, { params }: Ctx) {
      */
     const idem = typeof form.get('idempotencia') === 'string' ? String(form.get('idempotencia')).slice(0, 64) : null
     if (idem) {
-      const yaEsta = await pg.query('SELECT id, sha256 FROM medias WHERE idempotencia = $1', [idem])
+      const yaEsta = await pg.query('SELECT id, sha256 FROM medias WHERE caso_id = $1 AND idempotencia = $2', [id, idem])
       if ((yaEsta.rowCount ?? 0) > 0) {
         return NextResponse.json({ id: yaEsta.rows[0].id, sha256: yaEsta.rows[0].sha256, repetido: true }, { status: 200 })
       }
     }
 
-    // Va después de la idempotencia: el reintento de la quinta foto tiene que devolver la
-    // quinta, no rechazarse como si fuera una sexta.
-    if (tipo !== 'audio' && guia) {
-      const cuenta = await pg.query(
-        `SELECT count(*)::int AS n FROM medias WHERE caso_id = $1 AND tipo IN ('foto', 'documento') AND guia_id = $2`,
-        [id, guia],
-      )
-      if (cuenta.rows[0].n >= MAXIMO_FOTOS_POR_GUIA) {
-        return NextResponse.json(
-          { error: `Ya hay ${MAXIMO_FOTOS_POR_GUIA} fotos para esta toma: no se pueden agregar más.` },
-          { status: 400 },
-        )
-      }
-    }
-
     const mediaId = nuevoId(tipo === 'audio' ? 'AUD' : tipo === 'documento' ? 'DOC' : 'IMG')
     const datos = new Uint8Array(await archivo.arrayBuffer())
-    const guardado = await guardarArchivo(id, mediaId, archivo.type, datos, esPdf)
+    let guardado: ArchivoGuardado
 
     /*
      * El hash que declaró el teléfono se REVALIDA acá. Si no coincide, el archivo cambió
      * entre la captura y la subida: se guarda igual —la evidencia manda— pero se marca.
      */
     const shaCliente = typeof form.get('sha256_cliente') === 'string' ? String(form.get('sha256_cliente')) : null
-    const coincideHash = !shaCliente || shaCliente === guardado.sha256
 
     /*
      * Cuándo se sacó, contra cuándo llegó.
@@ -125,7 +112,6 @@ export async function POST(req: Request, { params }: Ctx) {
     const ahora = new Date()
     const desfase = tomadaEn ? ahora.getTime() - tomadaEn.getTime() : null
     const anteriorALaApertura = tomadaEn ? tomadaEn < new Date(caso.creado_en) : false
-    const origen = !coincideHash ? 'incoherente' : anteriorALaApertura ? 'incoherente' : 'no_verificable'
 
     /*
     * La fila y su eslabón van en LA MISMA transacción. La fila entra al manifiesto como
@@ -136,6 +122,27 @@ export async function POST(req: Request, { params }: Ctx) {
     const cliente = await pg.connect()
     try {
       await cliente.query('BEGIN')
+      await bloquearCasoAbierto(id, cliente)
+      // Relee antes del cupo: el reintento de la quinta pieza devuelve esa pieza, incluso en concurrencia.
+      if (idem) {
+        const repetida = await cliente.query('SELECT id, sha256 FROM medias WHERE caso_id = $1 AND idempotencia = $2', [id, idem])
+        if (repetida.rows[0]) {
+          await cliente.query('COMMIT')
+          return NextResponse.json({ id: repetida.rows[0].id, sha256: repetida.rows[0].sha256, repetido: true })
+        }
+      }
+      if (tipo !== 'audio' && guia) {
+        const cantidad = await cliente.query(
+          `SELECT count(*)::int AS n FROM medias WHERE caso_id = $1 AND tipo IN ('foto', 'documento') AND guia_id = $2`, [id, guia],
+        )
+        if (cantidad.rows[0].n >= MAXIMO_FOTOS_POR_GUIA) {
+          await cliente.query('ROLLBACK')
+          return NextResponse.json({ error: `Ya hay ${MAXIMO_FOTOS_POR_GUIA} fotos para esta toma. Elegí otra toma para las capturas adicionales.` }, { status: 400 })
+        }
+      }
+      guardado = await guardarArchivo(id, mediaId, archivo.type, datos, esPdf)
+      const coincideHash = !shaCliente || shaCliente === guardado.sha256
+      const origen = !coincideHash ? 'incoherente' : anteriorALaApertura ? 'incoherente' : 'no_verificable'
       await cliente.query(
         `INSERT INTO medias (id, caso_id, tipo, guia_id, archivo, mime, bytes, sha256, gps,
                              idempotencia, tomada_en, desfase_reloj_ms, origen)

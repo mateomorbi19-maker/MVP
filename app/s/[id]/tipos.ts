@@ -11,7 +11,7 @@ import type { MediaMinima } from '@/lib/recorrido'
 /** Motivo por el que no se pudo obtener la ubicación, para poder explicar qué hacer. */
 export type FalloGps = {
   codigo: number
-  motivo: 'denegado' | 'no_disponible' | 'demora' | 'no_soportado' | 'servidor' | 'sin_respuesta'
+  motivo: 'denegado' | 'no_disponible' | 'demora' | 'no_soportado' | 'servidor' | 'sin_respuesta' | 'no_solicitada'
   detalle?: string
 } | null
 

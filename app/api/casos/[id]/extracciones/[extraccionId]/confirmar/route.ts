@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { errorApi } from '@/lib/api'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
-import { obtenerCaso } from '@/lib/casos'
+import { obtenerCaso, bloquearCasoAbierto } from '@/lib/casos'
 import { exigirAccesoCaso } from '@/lib/posesion'
 import { MAPEO, vistaParaAsegurado } from '@/lib/extraccion'
 
@@ -51,45 +51,56 @@ export async function POST(req: Request, { params }: Ctx) {
     const cuerpo = await req.json().catch(() => ({}))
     const valores = (cuerpo?.valores ?? {}) as Record<string, unknown>
 
-    const respuestas = { ...caso.respuestas }
-    const confirmacion: Array<{ clave: string; valor: string; accion: 'aceptado' | 'corregido' | 'descartado' }> = []
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      const actual = await bloquearCasoAbierto(id, cliente)
+      const respuestas = { ...actual.respuestas }
+      const confirmacion: Array<{ clave: string; valor: string; accion: 'aceptado' | 'corregido' | 'descartado' }> = []
 
-    for (const campo of lectura) {
-      const crudo = valores[campo.clave]
-      const valor = typeof crudo === 'string' ? crudo.trim() : ''
-      if (!valor) {
-        confirmacion.push({ clave: campo.clave, valor: '', accion: 'descartado' })
-        continue
-      }
-      confirmacion.push({
-        clave: campo.clave,
-        valor,
-        accion: valor === campo.lectura ? 'aceptado' : 'corregido',
-      })
+      for (const campo of lectura) {
+        const crudo = valores[campo.clave]
+        const valor = typeof crudo === 'string' ? crudo.trim() : ''
+        if (!valor) {
+          confirmacion.push({ clave: campo.clave, valor: '', accion: 'descartado' })
+          continue
+        }
+        confirmacion.push({
+          clave: campo.clave,
+          valor,
+          accion: valor === campo.lectura ? 'aceptado' : 'corregido',
+        })
 
-      const m = MAPEO[campo.clave]
-      if (!m) continue
-      if (m.subclave) {
-        const previo = (respuestas[m.pregunta] ?? {}) as Record<string, unknown>
-        respuestas[m.pregunta] = { ...previo, [m.subclave]: valor }
-      } else {
-        respuestas[m.pregunta] = valor
+        const m = MAPEO[campo.clave]
+        if (!m) continue
+        if (m.subclave) {
+          const previo = (respuestas[m.pregunta] ?? {}) as Record<string, unknown>
+          respuestas[m.pregunta] = { ...previo, [m.subclave]: valor }
+        } else {
+          respuestas[m.pregunta] = valor
+        }
       }
+
+      await cliente.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(respuestas)])
+      await cliente.query('UPDATE extracciones SET confirmacion = $2, confirmado_en = now() WHERE id = $1', [
+        extraccionId,
+        JSON.stringify(confirmacion),
+      ])
+
+      await registrarEvento(id, 'datos_tercero_confirmados', {
+        extraccion_id: extraccionId,
+        // Qué dijo la máquina y qué resolvió la persona, por separado y para cada campo.
+        campos: confirmacion.map((c) => ({ clave: c.clave, accion: c.accion })),
+      }, { reservado: { confirmacion }, cliente })
+
+      await cliente.query('COMMIT')
+      return NextResponse.json({ ok: true, respuestas })
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
     }
-
-    await pg.query('UPDATE casos SET respuestas = $2 WHERE id = $1', [id, JSON.stringify(respuestas)])
-    await pg.query('UPDATE extracciones SET confirmacion = $2, confirmado_en = now() WHERE id = $1', [
-      extraccionId,
-      JSON.stringify(confirmacion),
-    ])
-
-    await registrarEvento(id, 'datos_tercero_confirmados', {
-      extraccion_id: extraccionId,
-      // Qué dijo la máquina y qué resolvió la persona, por separado y para cada campo.
-      campos: confirmacion.map((c) => ({ clave: c.clave, accion: c.accion })),
-    })
-
-    return NextResponse.json({ ok: true, respuestas })
   } catch (err) {
     return errorApi('confirmar:POST', err, 'No se pudieron confirmar los datos.')
   }

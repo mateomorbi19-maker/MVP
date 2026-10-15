@@ -8,6 +8,10 @@ import type { FalloGps, Ubicacion } from '../tipos'
 
 /** Instrucción concreta según por qué falló, para que se pueda resolver en el momento. */
 const GUIA_FALLO: Record<string, { titulo: string; comoResolver: string }> = {
+  no_solicitada: {
+    titulo: 'No se registró una ubicación al iniciar',
+    comoResolver: 'Si ya te retiraste del lugar, contá dónde ocurrió en el relato. Reintentá la ubicación sólo si todavía estás en el lugar del siniestro: el GPS registra dónde está este dispositivo ahora.',
+  },
   denegado: {
     titulo: 'El acceso a la ubicación está bloqueado',
     comoResolver:

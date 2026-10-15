@@ -13,6 +13,7 @@
 import type { Clima } from './clima'
 import { calleCoincide } from './geo'
 import { VALOR } from './cuestionario'
+import { relatoCompleto } from './relato'
 
 export type Nivel = 'alerta' | 'atencion' | 'cobertura' | 'ok'
 
@@ -28,6 +29,7 @@ export interface InformeConsistencia {
   generado_en: string
   hallazgos: Hallazgo[]
   resumen: { alertas: number; atenciones: number; banderas_cobertura: number; controles_ok: number }
+  controles_no_evaluables?: string[]
   completitud: {
     fotos_obligatorias: number
     fotos_presentes: number
@@ -109,8 +111,11 @@ export function analizar(e: Entrada): InformeConsistencia {
 
   /* --- 2. Clima declarado vs condición real --- */
   const climaDecl = s(r.clima)
-  if (climaDecl && clima) {
-    const precip = clima.precipitacion_mm ?? 0
+  const climaEvaluable = Boolean(clima && clima.precipitacion_mm !== null && clima.codigo_wmo !== null &&
+    (climaDecl !== VALOR.clima.NIEBLA || clima.visibilidad_m !== null) &&
+    (climaDecl !== VALOR.clima.VIENTO_FUERTE || clima.rafaga_kmh !== null))
+  if (climaDecl && clima && climaEvaluable) {
+    const precip = clima.precipitacion_mm as number
     const secoDeclarado = climaDecl === VALOR.clima.DESPEJADO || climaDecl === VALOR.clima.NUBLADO
     const lluviaDeclarada = climaDecl === VALOR.clima.LLOVIZNANDO || climaDecl === VALOR.clima.LLUVIA_FUERTE
 
@@ -226,13 +231,13 @@ export function analizar(e: Entrada): InformeConsistencia {
         detalle:
           'La ubicación y las condiciones meteorológicas registradas son las del momento de la carga, no las del siniestro. El valor probatorio del expediente cae sensiblemente y el motor de consistencia no puede contrastar el resto de las respuestas.',
       })
-    } else if (momento === VALOR.momento_declarado.RECIEN_HACE_MENOS_DE_10_MINUTOS) {
+    } else if (momento === VALOR.momento_declarado.RECIEN_HACE_MENOS_DE_10_MINUTOS && e.gpsCapturadoEn) {
       h.push({
         nivel: 'ok',
         titulo: 'Captura inmediata al hecho',
         declarado: momento,
-        objetivo: 'GPS y clima corresponden al momento del siniestro',
-        detalle: 'Es el escenario de máximo valor probatorio: la declaración se toma antes de cualquier elaboración.',
+        objetivo: `GPS recibido el ${new Date(e.gpsCapturadoEn).toLocaleString('es-AR')}`,
+        detalle: 'El conductor declaró una captura próxima al hecho. La hora del siniestro es declarativa y no queda verificada por la hora de recepción del GPS.',
       })
     }
   }
@@ -376,27 +381,27 @@ export function analizar(e: Entrada): InformeConsistencia {
    * El relato puede venir por voz o por escrito.
    *
    * Quien no puede grabar —por ruido, por vergüenza, o porque el teléfono le negó el
-   * micrófono— antes perdía el relato entero. Un relato escrito de cierta extensión es una
-   * declaración espontánea igual, y marcarlo como faltante sería reprocharle a la persona
+   * micrófono— antes perdía el relato entero. Un relato escrito también integra la
+   * declaración, y marcarlo como faltante sería reprocharle a la persona
    * haber usado una salida que el propio producto le ofrece.
    */
-  const escrito = s(r.relato_texto) ?? ''
-  const tieneRelatoEscrito = escrito.trim().length >= 80
-  if (!e.tieneAudio && !tieneRelatoEscrito) {
+  const escrito = s(r.relato_texto).trim() || s(r.relato_ampliado).trim()
+  const tieneRelatoEscrito = escrito.length > 0
+  if (!relatoCompleto(r, e.tieneAudio ? [{ tipo: 'audio' }] : [])) {
     h.push({
       nivel: 'atencion',
       titulo: 'Sin relato del conductor',
       declarado: 'No se grabó ni se escribió el relato',
-      objetivo: 'Falta la declaración espontánea del conductor',
-      detalle: 'El relato tomado en el momento es la pieza de mayor valor probatorio del expediente.',
+      objetivo: 'Falta el relato del conductor',
+      detalle: 'Puede incorporarse por audio o por escrito durante la segunda etapa.',
     })
   } else if (!e.tieneAudio && tieneRelatoEscrito) {
     h.push({
       nivel: 'ok',
       titulo: 'Relato tomado por escrito',
       declarado: `${escrito.trim().length} caracteres`,
-      objetivo: 'Declaración espontánea registrada en el lugar',
-      detalle: 'La persona optó por escribirlo en vez de grabarlo. Vale igual.',
+      objetivo: 'Relato escrito aportado por el conductor',
+      detalle: 'Se registró un relato con la guía de la aplicación. Esto acredita su incorporación, sin verificar su contenido ni afirmar que se tomó en el lugar del hecho.',
     })
   }
   if (e.testigos === 0) {
@@ -409,17 +414,26 @@ export function analizar(e: Entrada): InformeConsistencia {
     })
   }
 
+  // La presencia de piezas acredita completitud y no una verificación de lo relatado.
+  const controlesNoEvaluables: string[] = []
+  if (!s(r.pavimento) || clima?.precipitacion_3h_mm == null) controlesNoEvaluables.push('Pavimento: falta la declaración o la precipitación registrada.')
+  if (!climaDecl || !climaEvaluable) controlesNoEvaluables.push('Clima: faltan la declaración o los datos meteorológicos para contrastarla.')
+  if (!s(r.luz) || clima?.es_de_dia == null) controlesNoEvaluables.push('Luz: falta la declaración o la hora solar registrada.')
+  if (!s(r.calle) || !e.direccion) controlesNoEvaluables.push('Ubicación: falta la calle declarada o la dirección registrada.')
+  if (!s(r.maniobra) || n(r.velocidad) === null || !s(r.freno)) controlesNoEvaluables.push('Mecánica: faltan respuestas comparables; el relato libre no se evalúa automáticamente.')
+
   const resumen = {
     alertas: h.filter((x) => x.nivel === 'alerta').length,
     atenciones: h.filter((x) => x.nivel === 'atencion').length,
     banderas_cobertura: h.filter((x) => x.nivel === 'cobertura').length,
-    controles_ok: h.filter((x) => x.nivel === 'ok').length,
+    controles_ok: h.filter((x) => x.nivel === 'ok' && x.titulo !== 'Relato tomado por escrito').length,
   }
 
   return {
     generado_en: new Date().toISOString(),
     hallazgos: h,
     resumen,
+    controles_no_evaluables: controlesNoEvaluables,
     completitud: {
       fotos_obligatorias: e.fotosObligatorias.length,
       fotos_presentes: guiasPresentes.size,

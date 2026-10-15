@@ -3,7 +3,7 @@ import { errorApi } from '@/lib/api'
 import { exigirAccesoCaso } from '@/lib/posesion'
 import { db } from '@/lib/db'
 import { registrarEvento } from '@/lib/hash'
-import { obtenerCaso } from '@/lib/casos'
+import { obtenerCaso, bloquearCasoAbierto } from '@/lib/casos'
 import { consultarClima } from '@/lib/clima'
 import { direccionDeCoordenadas } from '@/lib/geo'
 
@@ -52,31 +52,42 @@ export async function POST(req: Request, { params }: Ctx) {
     ])
 
     const pg = await db()
-    await pg.query('UPDATE casos SET gps = $2, direccion = $3, clima = $4 WHERE id = $1', [
-      id,
-      JSON.stringify(gps),
-      direccion,
-      clima ? JSON.stringify(clima) : null,
-    ])
+    const cliente = await pg.connect()
+    try {
+      await cliente.query('BEGIN')
+      await bloquearCasoAbierto(id, cliente)
+      await cliente.query('UPDATE casos SET gps = $2, direccion = $3, clima = $4 WHERE id = $1', [
+        id,
+        JSON.stringify(gps),
+        direccion,
+        clima ? JSON.stringify(clima) : null,
+      ])
 
-    /*
-     * Las coordenadas exactas y la dirección son dato personal: van reservadas. El resumen
-     * del clima queda en claro, porque es lo que el informe de consistencia contrasta y no
-     * identifica a nadie.
-     */
-    await registrarEvento(id, 'ubicacion_registrada', {
-      clima_obtenido: clima !== null,
-      clima_resumen: clima
-        ? {
-            descripcion: clima.descripcion,
-            temperatura_c: clima.temperatura_c,
-            precipitacion_mm: clima.precipitacion_mm,
-            precipitacion_3h_mm: clima.precipitacion_3h_mm,
-            es_de_dia: clima.es_de_dia,
-            hora_observada: clima.hora_observada,
-          }
-        : null,
-    }, { reservado: { gps, direccion } })
+      /*
+       * Las coordenadas exactas y la dirección son dato personal: van reservadas. El resumen
+       * del clima queda en claro, porque es lo que el informe de consistencia contrasta y no
+       * identifica a nadie.
+       */
+      await registrarEvento(id, 'ubicacion_registrada', {
+        clima_obtenido: clima !== null,
+        clima_resumen: clima
+          ? {
+              descripcion: clima.descripcion,
+              temperatura_c: clima.temperatura_c,
+              precipitacion_mm: clima.precipitacion_mm,
+              precipitacion_3h_mm: clima.precipitacion_3h_mm,
+              es_de_dia: clima.es_de_dia,
+              hora_observada: clima.hora_observada,
+            }
+          : null,
+      }, { reservado: { gps, direccion }, cliente })
+      await cliente.query('COMMIT')
+    } catch (err) {
+      await cliente.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      cliente.release()
+    }
 
     return NextResponse.json({ ok: true, gps, direccion, clima })
   } catch (err) {

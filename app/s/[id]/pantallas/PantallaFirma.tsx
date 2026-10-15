@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { LienzoFirma, pngDelLienzo } from '@/app/components/LienzoFirma'
+import { IntercambioDocumentos } from '@/app/components/IntercambioDocumentos'
 
 type Acta = {
   hash: string
   declaracion: string
-  resumen: { fotos: number; audios: number; testigos: number; conCroquis: boolean; respuestas: number }
+  resumen: { fotos: number; audios: number; documentos: number; testigos: number; conCroquis: boolean; respuestas: number }
   firmada: boolean
 }
 
@@ -27,20 +28,23 @@ export function PantallaFirma({
   casoId,
   nombreSugerido,
   seguir,
+  antesDePreparar,
 }: {
   casoId: string
   nombreSugerido: string
   seguir: () => void
+  antesDePreparar: () => Promise<void>
 }) {
   const canvas = useRef<HTMLCanvasElement | null>(null)
   const [acta, setActa] = useState<Acta | null>(null)
   const [firmante, setFirmante] = useState(nombreSugerido)
   const [hayTrazo, setHayTrazo] = useState(false)
   const [enviando, setEnviando] = useState(false)
+  const [incorporando, setIncorporando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const pedirActa = () =>
-    fetch(`/api/casos/${casoId}/acta`)
+    antesDePreparar().then(() => fetch(`/api/casos/${casoId}/acta`))
       .then(async (r) => {
         const c = await r.json()
         if (!r.ok) throw new Error(c?.error ?? 'No se pudo preparar el acta.')
@@ -54,7 +58,7 @@ export function PantallaFirma({
   }, [casoId])
 
   async function firmar() {
-    if (!acta) return
+    if (!acta || incorporando) return
     setEnviando(true)
     setError(null)
     try {
@@ -86,12 +90,22 @@ export function PantallaFirma({
         <div className="rotulo">Tu firma</div>
         <h1 className="pregunta">Firmá lo que declaraste</h1>
 
+        <details className="tarjeta">
+          <summary>Revisar mi documentación antes de firmar</summary>
+          <p className="mini">Incorporá las fotos de póliza, cédula, licencia y DNI que correspondan. Podés seguir si todavía te falta alguna.</p>
+          <IntercambioDocumentos casoId={casoId} deshabilitado={enviando} alCambiarEstado={(ocupado) => {
+            setIncorporando(ocupado)
+            setActa(null)
+            if (!ocupado) void pedirActa()
+          }} />
+        </details>
+
         {acta ? (
           <div className="tarjeta tarjeta-declaracion">
             <p className="pregunta-ayuda">{acta.declaracion}</p>
             <p className="mini">
               La firma cubre la carátula, tus {acta.resumen.respuestas} respuestas, {acta.resumen.fotos} fotografías,{' '}
-              {acta.resumen.audios} audio{acta.resumen.audios === 1 ? '' : 's'}, {acta.resumen.testigos} testigo
+              {acta.resumen.documentos} documentos, {acta.resumen.audios} audio{acta.resumen.audios === 1 ? '' : 's'}, {acta.resumen.testigos} testigo
               {acta.resumen.testigos === 1 ? '' : 's'}
               {acta.resumen.conCroquis ? ' y el croquis' : ''}.
             </p>
@@ -110,14 +124,14 @@ export function PantallaFirma({
 
         <LienzoFirma refCanvas={canvas} alCambiar={setHayTrazo} />
 
-        {error ? <div className="aviso" data-nivel="alerta">{error}</div> : null}
+        {error ? <div className="aviso" data-nivel="alerta">{error}<button className="boton-secundario" onClick={() => { setError(null); void pedirActa() }}>Reintentar</button></div> : null}
       </div>
 
       <div className="barra-accion">
-        <button className="boton-primario" onClick={firmar} disabled={!hayTrazo || enviando || !acta}>
+        <button className="boton-primario" onClick={firmar} disabled={!hayTrazo || enviando || incorporando || !acta}>
           {enviando ? 'Registrando la firma...' : 'Firmar'}
         </button>
-        <button className="omitir" onClick={seguir}>
+        <button className="omitir" onClick={seguir} disabled={enviando || incorporando}>
           Cerrar sin firmar
         </button>
       </div>

@@ -21,6 +21,7 @@ import {
   type Pregunta,
   type Seccion,
 } from './cuestionario'
+import { relatoCompleto } from './relato'
 
 export type Respuestas = Record<string, unknown>
 
@@ -33,6 +34,8 @@ export type Respuestas = Record<string, unknown>
  */
 export interface MediaMinima {
   id: string
+  idempotencia?: string | null
+  pendiente?: boolean
   tipo: string
   guia_id: string | null
 }
@@ -56,10 +59,17 @@ export function fotosDeGuia(medias: MediaMinima[], guiaId: string): MediaMinima[
   return medias.filter((m) => (m.tipo === 'foto' || m.tipo === 'documento') && m.guia_id === guiaId)
 }
 
+/** La recepción asigna un ID nuevo; la captura conserva su clave de idempotencia. */
+export function fotosAnteriores(medias: MediaMinima[], guiaId: string, capturas: Array<string | null>): MediaMinima[] {
+  const propias = new Set(capturas.filter(Boolean))
+  return fotosDeGuia(medias, guiaId).filter((m) => !propias.has(m.id) && !propias.has(m.idempotencia ?? null))
+}
+
 export type Paso =
   | { clave: string; bloque: Bloque; tipo: 'pregunta'; seccion: Seccion; pregunta: Pregunta }
   | { clave: string; bloque: Bloque; tipo: 'foto'; guia: GuiaFoto; numero: number; total: number }
   | { clave: string; bloque: Bloque; tipo: 'testigos' }
+  | { clave: string; bloque: Bloque; tipo: 'relato' }
   | { clave: string; bloque: Bloque; tipo: 'validacion' }
   | { clave: string; bloque: Bloque; tipo: 'firma' }
   | { clave: string; bloque: Bloque; tipo: 'resumen' }
@@ -78,7 +88,7 @@ export const vacia = (v: unknown): boolean =>
 
 /** El relato no vive en las respuestas sino en los archivos: se comprueba aparte. */
 export function respondida(pregunta: Pregunta, respuestas: Respuestas, medias: MediaMinima[]): boolean {
-  if (pregunta.tipo === 'audio') return medias.some((m) => m.tipo === 'audio')
+  if (pregunta.tipo === 'audio') return relatoCompleto(respuestas, medias)
   return !vacia(respuestas[pregunta.id])
 }
 
@@ -88,10 +98,11 @@ export function respondida(pregunta: Pregunta, respuestas: Respuestas, medias: M
  * Se recalcula en cada cambio porque las preguntas condicionales aparecen y
  * desaparecen: por eso la navegación va por clave y no por índice.
  */
-export function construirPasos(respuestas: Respuestas): Paso[] {
+export function construirPasos(respuestas: Respuestas, incluirValidacion = false): Paso[] {
   const pasos: Paso[] = []
 
   for (const etapa of RECORRIDO) {
+    if (etapa.tipo === 'validacion' && !incluirValidacion) continue
     if (etapa.tipo === 'seccion') {
       const seccion = seccionPorId(etapa.id)
       if (!seccion) continue
@@ -146,9 +157,12 @@ export function construirPasos(respuestas: Respuestas): Paso[] {
  * resumen que dice cuánto falta para poder irse, y saltearlo deja a la persona en la
  * primera foto sin saber cuántas vienen.
  */
-export function pasoInicial(pasos: Paso[], respuestas: Respuestas, medias: MediaMinima[]): string {
+export function pasoInicial(pasos: Paso[], respuestas: Respuestas, medias: MediaMinima[], progreso?: ProgresoRecorrido): string {
+  if (progreso?.paso && pasos.some((p) => p.clave === progreso.paso)) return progreso.paso
   if (pasos.length > 0 && Object.keys(respuestas).length === 0 && medias.length === 0) return pasos[0].clave
   for (const paso of pasos) {
+    if (progreso?.omitidos?.includes(paso.clave)) continue
+    if (paso.tipo === 'relato' && !relatoCompleto(respuestas, medias)) return paso.clave
     if (paso.tipo === 'pregunta' && !respondida(paso.pregunta, respuestas, medias)) return paso.clave
     if (paso.tipo === 'foto' && paso.guia.obligatoria && !medias.some((m) => m.guia_id === paso.guia.id)) {
       return paso.clave
@@ -176,6 +190,9 @@ export interface Faltante {
  */
 export function faltantes(pasos: Paso[], respuestas: Respuestas, medias: MediaMinima[]): Faltante[] {
   return pasos.flatMap((paso) => {
+    if (paso.tipo === 'relato' && !relatoCompleto(respuestas, medias)) {
+      return [{ clave: 'relato', texto: 'Contá cómo pasó, por escrito o con audio' }]
+    }
     if (paso.tipo === 'pregunta' && paso.pregunta.requerida && !respondida(paso.pregunta, respuestas, medias)) {
       return [{ clave: paso.clave, texto: paso.pregunta.texto }]
     }
@@ -184,4 +201,21 @@ export function faltantes(pasos: Paso[], respuestas: Respuestas, medias: MediaMi
     }
     return []
   })
+}
+
+export interface ProgresoRecorrido {
+  paso?: string
+  omitidos?: string[]
+}
+
+/** Una URL antigua nunca vuelve a habilitar una pantalla retirada. */
+export function limpiarProgreso(valor: unknown, respuestas: Respuestas): ProgresoRecorrido {
+  const entrada = valor && typeof valor === 'object' ? valor as ProgresoRecorrido : {}
+  const claves = new Set(construirPasos(respuestas).map((p) => p.clave))
+  return {
+    ...(typeof entrada.paso === 'string' && claves.has(entrada.paso) ? { paso: entrada.paso } : {}),
+    omitidos: Array.isArray(entrada.omitidos)
+      ? [...new Set(entrada.omitidos.filter((v) => typeof v === 'string' && claves.has(v)))].slice(0, 100)
+      : [],
+  }
 }

@@ -410,6 +410,32 @@ button:disabled,
   width: 100%;
 }
 
+.fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.relato-borrador {
+  position: relative;
+  padding-top: 48px;
+}
+
+.relato-descartar {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  min-width: 40px;
+  min-height: 40px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-s);
+  background: var(--superficie);
+  color: var(--tinta);
+  font-size: 24px;
+}
+
 .fila-botones {
   display: flex;
   gap: 10px;
@@ -962,7 +988,8 @@ tr:last-child td {
   line-height: 1.45;
 }
 
-.qr-imagen svg {
+.qr-imagen svg,
+img.qr-imagen {
   display: block;
   width: 100%;
   height: auto;

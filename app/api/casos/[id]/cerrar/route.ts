@@ -70,20 +70,15 @@ export async function POST(_req: Request, { params }: Ctx) {
       )
     }
 
-    /*
-     * El informe se calcula ANTES de abrir la transacción: son varias lecturas y no
-     * necesitan el lock. Nada puede cambiar entremedio de forma que importe, porque
-     * dentro de la transacción se vuelve a leer el estado con el caso bloqueado.
-     */
-    const consistencia = await calcularConsistencia(id)
-
     const pg = await db()
     const cliente = await pg.connect()
+    let consistencia: Awaited<ReturnType<typeof calcularConsistencia>> = null
     let hashMaestro: string
     let eslabones: number
     let piezas: number
     try {
       await cliente.query('BEGIN')
+      await cliente.query("SET LOCAL lock_timeout = '8s'")
 
       const bloqueado = await cliente.query<{ estado: string }>(
         'SELECT estado FROM casos WHERE id = $1 FOR UPDATE',
@@ -102,6 +97,9 @@ export async function POST(_req: Request, { params }: Ctx) {
           { status: 200 },
         )
       }
+
+      // Todos los escritores toman este lock antes de cambiar las piezas o las respuestas.
+      consistencia = await calcularConsistencia(id, { cliente })
 
       await cliente.query('UPDATE casos SET consistencia = $2 WHERE id = $1', [
         id,

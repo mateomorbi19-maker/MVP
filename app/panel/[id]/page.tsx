@@ -8,6 +8,8 @@ import { Marca } from '@/app/components/Marca'
 import { Icono } from '@/app/components/Iconos'
 import { exigirRol } from '@/lib/sesion'
 import { AccionesGestion } from '@/app/components/AccionesGestion'
+import { leerCuentaPolizaGestion } from '@/lib/polizas'
+import { CuentaGestion } from './CuentaGestion'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +17,11 @@ const fecha = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-AR', { dateStyle: 'full', timeStyle: 'medium' }) : '-'
 
 export default async function DetalleCaso({ params }: { params: Promise<{ id: string }> }) {
-  await exigirRol('productor', 'aseguradora')
+  const sesion = await exigirRol('productor', 'aseguradora')
   const { id } = await params
   const caso = await obtenerCaso(id)
   if (!caso) notFound()
+  const cuentaPoliza = await leerCuentaPolizaGestion(sesion, id)
 
   const [medias, testigos, manifiesto] = await Promise.all([
     listarMedias(id),
@@ -59,6 +62,7 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
       {/* Va después del encabezado: quien llega del listado necesita ver de qué actuación
           es el formulario de tramitación antes que el formulario. */}
       <AccionesGestion casoId={id} />
+      {cuentaPoliza ? <CuentaGestion poliza={cuentaPoliza} /> : null}
 
       <hr className="separador" />
 
@@ -77,6 +81,12 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
             <span className="insignia" data-nivel="atencion">{consistencia.resumen.atenciones} a revisar</span>
             <span className="insignia" data-nivel="ok">{consistencia.resumen.controles_ok} consistentes</span>
           </div>
+
+          {consistencia.controles_no_evaluables?.length ? <div className="aviso" data-nivel="info">
+            <strong>Controles sin datos suficientes</strong>
+            <p>El relato queda disponible para revisión junto con los registros objetivos. La ausencia de contradicciones no significa que se haya verificado todo el relato.</p>
+            <ul>{consistencia.controles_no_evaluables.map((control) => <li key={control}>{control}</li>)}</ul>
+          </div> : null}
 
           {(['alerta', 'cobertura', 'atencion', 'ok'] as const).map((nivel) =>
             consistencia.hallazgos
@@ -175,7 +185,9 @@ export default async function DetalleCaso({ params }: { params: Promise<{ id: st
               {conRespuesta.map((p) => {
                 const v = caso.respuestas[p.id]
                 const texto = Array.isArray(v)
-                  ? v.join(' · ')
+                  ? v.map((elemento) => typeof elemento === 'object' && elemento !== null
+                    ? `${String(elemento.nombre || 'Sin nombre')}: ${String(elemento.telefono || '')} (anotado por el asegurado)`
+                    : String(elemento)).join(' · ')
                   : typeof v === 'object' && v !== null
                     ? Object.entries(v as Record<string, unknown>)
                         .filter(([, x]) => x)

@@ -13,6 +13,7 @@ import { writeFileSync, mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000'
+const AISLADO = process.env.ENTORNO_PRUEBA_AISLADO === '1'
 
 let fallos = 0
 let pruebas = 0
@@ -146,9 +147,16 @@ const { res: resUbi, cuerpo: ubi } = await pedir(`/api/casos/${ID}/ubicacion`, {
   body: JSON.stringify({ lat: -34.6037, lon: -58.3816, precision_m: 11 }),
 })
 verificar('se registra la ubicación', resUbi.status === 200 && ubi.ok === true)
-verificar('resuelve la dirección real', typeof ubi.direccion === 'string' && ubi.direccion.length > 10, ubi.direccion ?? 'sin dirección')
-verificar('obtiene el clima real', ubi.clima !== null && typeof ubi.clima?.descripcion === 'string', ubi.clima?.descripcion ?? 'sin clima')
-verificar('determina la franja horaria', typeof ubi.clima?.es_de_dia === 'boolean', `es_de_dia=${ubi.clima?.es_de_dia}`)
+if (AISLADO) {
+  const { cuerpo: persistida } = await pedir(`/api/casos/${ID}`)
+  verificar('conserva GPS y precisión sin depender de servicios externos', persistida.gps?.lat === -34.6037 && persistida.gps?.lon === -58.3816 && persistida.gps?.precision_m === 11)
+  verificar('no inventa una dirección con la red remota desactivada', ubi.direccion === null && persistida.direccion === null)
+  verificar('no inventa clima ni franja solar sin una fuente externa', ubi.clima === null && persistida.clima === null)
+} else {
+  verificar('resuelve la dirección real', typeof ubi.direccion === 'string' && ubi.direccion.length > 10, ubi.direccion ?? 'sin dirección')
+  verificar('obtiene el clima real', ubi.clima !== null && typeof ubi.clima?.descripcion === 'string', ubi.clima?.descripcion ?? 'sin clima')
+  verificar('determina la franja horaria', typeof ubi.clima?.es_de_dia === 'boolean', `es_de_dia=${ubi.clima?.es_de_dia}`)
+}
 if (ubi.clima) {
   console.log(`       clima: ${ubi.clima.descripcion}, ${ubi.clima.temperatura_c} °C, ${ubi.clima.precipitacion_3h_mm} mm en 3 h`)
   console.log(`       sol:   amanecer ${(ubi.clima.amanecer ?? '').slice(11, 16)}, atardecer ${(ubi.clima.atardecer ?? '').slice(11, 16)}`)
@@ -263,7 +271,7 @@ verificar('se suben las 4 fotografías', subidas === 4, `subidas=${subidas}`)
 verificar('el hash que informa el servidor coincide con el del archivo', hashesSubidos.every((h) => h.sha256 === h.esperado))
 
 {
-  const audio = Buffer.from('RIFF$   WAVEfmt      @  @   \b data    ', 'binary')
+  const audio = Buffer.from('524946462400000057415645666d74201000000001000100401f0000401f0000010008006461746100000000', 'hex')
   const form = new FormData()
   form.append('archivo', new Blob([audio], { type: 'audio/wav' }), 'relato.wav')
   form.append('tipo', 'audio')
@@ -316,7 +324,7 @@ verificar('la cadena tiene todos los eslabones', cierre.eslabones >= 9, `eslabon
 verificar('firma el hash maestro', typeof cierre.sello?.firma?.valor === 'string')
 verificar('declara que la firma es electrónica, no digital', cierre.sello?.firma?.tipo === 'firma_electronica_demo')
 console.log(`       sello de tiempo RFC 3161: ${cierre.sello?.tsa?.obtenida ? `obtenido de ${cierre.sello.tsa.autoridad}` : `NO obtenido (${cierre.sello?.tsa?.error})`}`)
-verificar('detecta las contradicciones declaradas', cierre.consistencia?.alertas >= 2, `alertas=${cierre.consistencia?.alertas}`)
+verificar(AISLADO ? 'detecta la contradicción interna detenido/velocidad sin controles externos' : 'detecta las contradicciones declaradas', cierre.consistencia?.alertas >= (AISLADO ? 1 : 2), `alertas=${cierre.consistencia?.alertas}`)
 verificar('levanta las banderas de cobertura', cierre.consistencia?.banderas_cobertura >= 3, `banderas=${cierre.consistencia?.banderas_cobertura}`)
 
 {
